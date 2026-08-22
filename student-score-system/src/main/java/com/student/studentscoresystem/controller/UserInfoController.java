@@ -15,6 +15,8 @@ import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/user")
 public class UserInfoController {
@@ -51,17 +53,46 @@ public class UserInfoController {
         }
 
         try {
-            Claims claims = JwtUtil.parseToken(token.substring(7));
+            // 验证 Token
+            JwtUtil.parseToken(token.substring(7));
 
-            Long userId = claims.get("userId", Long.class);
+            // 查询“学生”岗位
+            SysPosition studentPosition =
+                    sysPositionMapper.selectOne(
+                            new LambdaQueryWrapper<SysPosition>()
+                                    .eq(SysPosition::getName, "学生")
+                    );
 
-            return Result.success(
-                    sysUserService.list(
-                            new LambdaQueryWrapper<SysUser>()
-                                    .eq(SysUser::getStatus, (short) 1)
-                                    .orderByAsc(SysUser::getStudentNo)
-                    )
-            );
+            if (studentPosition == null) {
+                return Result.fail("学生岗位不存在");
+            }
+
+            // 查询拥有“学生”岗位的用户
+            List<SysUserPosition> relations =
+                    sysUserPositionMapper.selectList(
+                            new LambdaQueryWrapper<SysUserPosition>()
+                                    .eq(
+                                            SysUserPosition::getPositionId,
+                                            studentPosition.getId()
+                                    )
+                    );
+
+            List<SysUser> students = new java.util.ArrayList<>();
+
+            for (SysUserPosition relation : relations) {
+
+                SysUser student =
+                        sysUserService.getById(relation.getUserId());
+
+                if (student != null
+                        && student.getStatus() != null
+                        && student.getStatus() == 1) {
+
+                    students.add(student);
+                }
+            }
+
+            return Result.success(students);
 
         } catch (Exception e) {
             return Result.fail("Token无效");

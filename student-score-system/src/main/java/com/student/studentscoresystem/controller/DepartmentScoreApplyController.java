@@ -5,17 +5,8 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAddDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAuditDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreFinalAuditDTO;
-import com.student.studentscoresystem.entity.Department;
-import com.student.studentscoresystem.entity.DepartmentScoreApply;
-import com.student.studentscoresystem.entity.DepartmentScoreTemplate;
-import com.student.studentscoresystem.entity.ScoreRecord;
-import com.student.studentscoresystem.entity.SysUser;
-import com.student.studentscoresystem.entity.SysUserDepartment;
-import com.student.studentscoresystem.mapper.DepartmentMapper;
-import com.student.studentscoresystem.mapper.ScoreRecordMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
-import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
-import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.entity.*;
+import com.student.studentscoresystem.mapper.*;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import com.student.studentscoresystem.utils.JwtUtil;
@@ -41,14 +32,17 @@ public class DepartmentScoreApplyController {
     private final ScoreRecordMapper scoreRecordMapper;
     private final DepartmentMapper departmentMapper;
     private final SysUserMapper sysUserMapper;
-
+    private final SysUserPositionMapper sysUserPositionMapper;
+    private final SysPositionMapper sysPositionMapper;
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
             IDepartmentScoreTemplateService templateService,
             SysUserDepartmentMapper userDepartmentMapper,
             ScoreRecordMapper scoreRecordMapper,
             DepartmentMapper departmentMapper,
-            SysUserMapper sysUserMapper) {
+            SysUserMapper sysUserMapper,
+            SysUserPositionMapper sysUserPositionMapper,
+            SysPositionMapper sysPositionMapper) {
 
         this.applyService = applyService;
         this.templateService = templateService;
@@ -56,6 +50,8 @@ public class DepartmentScoreApplyController {
         this.scoreRecordMapper = scoreRecordMapper;
         this.departmentMapper = departmentMapper;
         this.sysUserMapper = sysUserMapper;
+        this.sysUserPositionMapper = sysUserPositionMapper;
+        this.sysPositionMapper = sysPositionMapper;
     }
 
     /**
@@ -186,30 +182,75 @@ public class DepartmentScoreApplyController {
 
         /*
          * ========================================================
-         * 4. 校验被加减分学生是否存在
+         * 4. 校验被加减分对象
          * ========================================================
+         *
+         * 只有“学生”岗位的人才允许成为部门加减分对象。
+         *
+         * 注意：
+         * 干事、副部长、部长如果同时拥有“学生”岗位，
+         * 仍然可以被加减分。
+         *
+         * 老师、管理员没有“学生”岗位，
+         * 即使 sys_user.status = 1，也不能被加减分。
          */
 
-        SysUser student = sysUserMapper.selectById(dto.getStudentId());
+        SysUser student =
+                sysUserMapper.selectById(dto.getStudentId());
 
         if (student == null) {
             return Result.fail("被加减分学生不存在");
         }
 
         if (!Short.valueOf((short) 1).equals(student.getStatus())) {
-            return Result.fail("被加减分学生当前不是在职用户");
+            return Result.fail("被加减分学生当前不是正常用户");
         }
 
         /*
-         * 注意：
-         *
-         * 干事/部长/副部长本质上仍然是学生。
-         *
-         * 所以这里不能通过 userRole == 学生 来限制，
-         * 否则干部就无法作为被加减分对象。
-         *
-         * 只要 sys_user 中是正常用户即可。
+         * 查询该用户是否拥有“学生”岗位
          */
+        Long studentPositionId =
+                sysPositionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(
+                                        SysPosition::getName,
+                                        "学生"
+                                )
+                ) != null
+                        ? sysPositionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(
+                                        SysPosition::getName,
+                                        "学生"
+                                )
+                ).getId()
+                        : null;
+
+        if (studentPositionId == null) {
+            return Result.fail("系统中不存在“学生”岗位");
+        }
+
+        /*
+         * 查询被加减分用户的学生岗位关系
+         */
+        Long studentPositionCount =
+                sysUserPositionMapper.selectCount(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getUserId,
+                                        dto.getStudentId()
+                                )
+                                .eq(
+                                        SysUserPosition::getPositionId,
+                                        studentPositionId
+                                )
+                );
+
+        if (studentPositionCount == 0) {
+            return Result.fail(
+                    "该用户不是学生，不能进行部门加减分申报"
+            );
+        }
 
         /*
          * ========================================================
