@@ -278,9 +278,13 @@ public class ScoreApplyController {
                 record.setStudentId(apply.getStudentId());
                 record.setRuleId(apply.getRuleId());
                 record.setScore(apply.getApplyScore());
+
+                record.setStatus((short) 1);
+                record.setAdminHidden((short) 0);
+
                 record.setSourceType("CERTIFICATE");
                 record.setSourceId(apply.getId());
-                record.setAdminHidden((short) 0);
+
                 record.setCreateTime(LocalDateTime.now());
 
                 scoreRecordMapper.insert(record);
@@ -327,9 +331,13 @@ public class ScoreApplyController {
             record.setStudentId(apply.getStudentId());
             record.setRuleId(apply.getRuleId());
             record.setScore(apply.getApplyScore());
+
+            record.setStatus((short) 1);
+            record.setAdminHidden((short) 0);
+
             record.setSourceType("CERTIFICATE");
             record.setSourceId(apply.getId());
-            record.setAdminHidden((short) 0);
+
             record.setCreateTime(LocalDateTime.now());
 
             scoreRecordMapper.insert(record);

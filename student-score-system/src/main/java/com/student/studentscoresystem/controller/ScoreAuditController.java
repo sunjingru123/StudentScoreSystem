@@ -340,8 +340,7 @@ public class ScoreAuditController {
          * =====================================================
          */
 
-        ScoreRecord record =
-                new ScoreRecord();
+        ScoreRecord record = new ScoreRecord();
 
         record.setStudentId(
                 apply.getStudentId()
@@ -355,26 +354,37 @@ public class ScoreAuditController {
                 apply.getApplyScore()
         );
 
+        record.setSemesterId(
+                1L
+        );
+
+/**
+ * 默认有效
+ */
+        record.setStatus(
+                (short) 1
+        );
+
+/**
+ * 默认不隐藏
+ */
+        record.setAdminHidden(
+                (short) 0
+        );
+
         record.setSourceType(
-                "SCORE_APPLY"
+                "APPLY"
         );
 
         record.setSourceId(
                 apply.getId()
         );
 
-        record.setAdminHidden(
-                (short) 0
-        );
-
         record.setCreateTime(
                 LocalDateTime.now()
         );
 
-        scoreRecordService.save(
-                record
-        );
-
+        scoreRecordService.save(record);
         /*
          * =====================================================
          * 11. 计算 ScoreFlow
