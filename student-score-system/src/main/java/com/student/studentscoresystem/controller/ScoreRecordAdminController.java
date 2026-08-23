@@ -7,7 +7,6 @@ import com.student.studentscoresystem.entity.ScoreRecordOperationLog;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordOperationLogMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -23,8 +22,6 @@ public class ScoreRecordAdminController {
 
     private final ScoreRecordMapper scoreRecordMapper;
 
-    private final ScoreRuleMapper scoreRuleMapper;
-
     private final SysUserMapper sysUserMapper;
 
     private final ScoreRecordOperationLogMapper operationLogMapper;
@@ -32,12 +29,10 @@ public class ScoreRecordAdminController {
 
     public ScoreRecordAdminController(
             ScoreRecordMapper scoreRecordMapper,
-            ScoreRuleMapper scoreRuleMapper,
             SysUserMapper sysUserMapper,
             ScoreRecordOperationLogMapper operationLogMapper
     ) {
         this.scoreRecordMapper = scoreRecordMapper;
-        this.scoreRuleMapper = scoreRuleMapper;
         this.sysUserMapper = sysUserMapper;
         this.operationLogMapper = operationLogMapper;
     }
@@ -46,10 +41,11 @@ public class ScoreRecordAdminController {
     /**
      * 查询学生全部成绩
      *
-     * 管理员专用
+     * 管理员使用
      *
-     * status = 1 有效
-     * status = 0 已作废
+     * status：
+     * 1 = 有效
+     * 0 = 作废
      */
     @GetMapping("/student/{studentId}")
     public Result<List<ScoreRecord>> studentRecords(
@@ -228,7 +224,7 @@ public class ScoreRecordAdminController {
 
 
     /**
-     * 从 JWT 中获取当前登录用户 ID
+     * 从 JWT 获取当前登录用户 ID
      */
     private Long getUserId(
             HttpServletRequest request

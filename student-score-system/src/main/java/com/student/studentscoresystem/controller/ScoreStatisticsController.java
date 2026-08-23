@@ -26,6 +26,7 @@ public class ScoreStatisticsController {
 
     private final SysUserMapper sysUserMapper;
 
+
     public ScoreStatisticsController(
             IScoreRecordService scoreRecordService,
             ScoreRuleMapper scoreRuleMapper,
@@ -36,20 +37,16 @@ public class ScoreStatisticsController {
         this.sysUserMapper = sysUserMapper;
     }
 
+
     /**
      * =========================================================
      * 学生 / 辅导员查看成绩
      * =========================================================
      *
-     * 管理员隐藏的记录：
+     * 只显示：
      *
-     * 1. 不显示
-     * 2. 不参与加分
-     * 3. 不参与减分
-     *
-     * 地址：
-     *
-     * GET /scoreStatistics/{studentId}
+     * status = 1
+     * adminHidden = 0
      */
     @GetMapping("/{studentId}")
     public Result<ScoreStatisticsVO> detail(
@@ -63,15 +60,17 @@ public class ScoreStatisticsController {
             return Result.fail("学生不存在");
         }
 
-        /*
-         * 学生和辅导员只能看到没有被管理员隐藏的记录
-         */
+
         List<ScoreRecord> records =
                 scoreRecordService.list(
                         new LambdaQueryWrapper<ScoreRecord>()
                                 .eq(
                                         ScoreRecord::getStudentId,
                                         studentId
+                                )
+                                .eq(
+                                        ScoreRecord::getStatus,
+                                        (short) 1
                                 )
                                 .eq(
                                         ScoreRecord::getAdminHidden,
@@ -82,27 +81,25 @@ public class ScoreStatisticsController {
                                 )
                 );
 
+
         return buildStatistics(
                 user,
                 records
         );
     }
 
+
     /**
      * =========================================================
      * 管理员查看学生成绩
      * =========================================================
      *
-     * 管理员可以看到全部成绩记录。
+     * 管理员可以看到隐藏记录。
      *
-     * 包括：
+     * 但是：
      *
-     * 1. 正常记录
-     * 2. 已经被管理员隐藏的记录
-     *
-     * 地址：
-     *
-     * GET /scoreStatistics/admin/{studentId}
+     * status = 0 的作废记录
+     * 仍然不参与统计。
      */
     @GetMapping("/admin/{studentId}")
     public Result<ScoreStatisticsVO> adminDetail(
@@ -116,11 +113,7 @@ public class ScoreStatisticsController {
             return Result.fail("学生不存在");
         }
 
-        /*
-         * 管理员不进行 adminHidden 过滤
-         *
-         * 所以管理员可以看到全部记录
-         */
+
         List<ScoreRecord> records =
                 scoreRecordService.list(
                         new LambdaQueryWrapper<ScoreRecord>()
@@ -128,10 +121,15 @@ public class ScoreStatisticsController {
                                         ScoreRecord::getStudentId,
                                         studentId
                                 )
+                                .eq(
+                                        ScoreRecord::getStatus,
+                                        (short) 1
+                                )
                                 .orderByDesc(
                                         ScoreRecord::getCreateTime
                                 )
                 );
+
 
         return buildStatistics(
                 user,
@@ -139,26 +137,27 @@ public class ScoreStatisticsController {
         );
     }
 
+
     /**
      * =========================================================
-     * 统一计算 40 分上限模型
+     * 统一计算成绩
      * =========================================================
      *
-     * 计算规则：
+     * 基础上限：
      *
-     * 初始最高上限 = 40
+     * 40分
      *
-     * 减分：
+     * 正分：
      *
-     * 当前最高上限 = 40 - 减分总和
+     * 累计加分
      *
-     * 加分：
+     * 负分：
      *
-     * 从 0 开始累计
+     * 累计减分
      *
-     * 最终成绩：
+     * 最终：
      *
-     * min(加分总和, 当前最高上限)
+     * min(加分总和, 40 - 减分总和)
      */
     private Result<ScoreStatisticsVO> buildStatistics(
             SysUser user,
@@ -168,12 +167,14 @@ public class ScoreStatisticsController {
         ScoreStatisticsVO vo =
                 new ScoreStatisticsVO();
 
+
         /*
          * 学生姓名
          */
         vo.setStudentName(
                 user.getRealName()
         );
+
 
         /*
          * =====================================================
@@ -183,18 +184,11 @@ public class ScoreStatisticsController {
         BigDecimal baseLimit =
                 ScoreConstants.MAX_SCORE;
 
+
         /*
          * =====================================================
-         * 2. 计算加分
+         * 2. 加分
          * =====================================================
-         *
-         * 例如：
-         *
-         * +5
-         * +10
-         * +8
-         *
-         * bonusScore = 23
          */
         BigDecimal bonusScore =
                 records.stream()
@@ -215,19 +209,11 @@ public class ScoreStatisticsController {
                                 BigDecimal::add
                         );
 
+
         /*
          * =====================================================
-         * 3. 计算减分
+         * 3. 减分
          * =====================================================
-         *
-         * 数据库中：
-         *
-         * -5
-         * -3
-         *
-         * 统计时：
-         *
-         * deductScore = 8
          */
         BigDecimal deductScore =
                 records.stream()
@@ -251,17 +237,17 @@ public class ScoreStatisticsController {
                                 BigDecimal::add
                         );
 
+
         /*
          * =====================================================
-         * 4. 计算实际最高上限
+         * 4. 实际最高上限
          * =====================================================
-         *
-         * 40 - 减分
          */
         BigDecimal actualLimit =
                 baseLimit.subtract(
                         deductScore
                 );
+
 
         /*
          * 上限最低为 0
@@ -276,38 +262,21 @@ public class ScoreStatisticsController {
                     BigDecimal.ZERO;
         }
 
+
         /*
          * =====================================================
-         * 5. 计算最终成绩
+         * 5. 最终成绩
          * =====================================================
-         *
-         * 加分不能超过当前最高上限
-         *
-         * 例如：
-         *
-         * 加分 = 35
-         * 减分 = 5
-         *
-         * 上限 = 35
-         *
-         * 最终 = 35
-         *
-         *
-         * 加分 = 50
-         * 减分 = 5
-         *
-         * 上限 = 35
-         *
-         * 最终 = 35
          */
         BigDecimal totalScore =
                 bonusScore.min(
                         actualLimit
                 );
 
+
         /*
          * =====================================================
-         * 设置统计结果
+         * 6. 设置统计数据
          * =====================================================
          */
         vo.setBaseLimit(
@@ -330,9 +299,10 @@ public class ScoreStatisticsController {
                 totalScore
         );
 
+
         /*
          * =====================================================
-         * 兼容旧前端字段
+         * 7. 兼容旧字段
          * =====================================================
          */
         double avgScore =
@@ -349,9 +319,11 @@ public class ScoreStatisticsController {
                         .average()
                         .orElse(0);
 
+
         vo.setAvgScore(
                 avgScore
         );
+
 
         int maxScore =
                 records.stream()
@@ -367,9 +339,11 @@ public class ScoreStatisticsController {
                         .max()
                         .orElse(0);
 
+
         vo.setMaxScore(
                 maxScore
         );
+
 
         int minScore =
                 records.stream()
@@ -385,13 +359,15 @@ public class ScoreStatisticsController {
                         .min()
                         .orElse(0);
 
+
         vo.setMinScore(
                 minScore
         );
 
+
         /*
          * =====================================================
-         * 成绩明细
+         * 8. 成绩明细
          * =====================================================
          */
         List<ScoreDetailVO> detail =
@@ -402,13 +378,12 @@ public class ScoreStatisticsController {
                                     ScoreDetailVO d =
                                             new ScoreDetailVO();
 
-                                    /*
-                                     * 查询加分规则名称
-                                     */
+
                                     ScoreRule rule =
                                             scoreRuleMapper.selectById(
                                                     record.getRuleId()
                                             );
+
 
                                     if (rule != null) {
 
@@ -417,41 +392,37 @@ public class ScoreStatisticsController {
                                         );
                                     }
 
-                                    /*
-                                     * 分数
-                                     */
+
                                     d.setScore(
                                             record.getScore()
                                     );
 
-                                    /*
-                                     * 来源
-                                     */
+
                                     d.setSourceType(
                                             record.getSourceType()
                                     );
 
-                                    /*
-                                     * 创建时间
-                                     */
+
                                     d.setCreateTime(
                                             record.getCreateTime()
                                     );
-                                    /*
-                                     * 管理员隐藏状态
-                                     */
+
+
                                     d.setAdminHidden(
                                             record.getAdminHidden()
                                     );
+
 
                                     return d;
                                 }
                         )
                         .toList();
 
+
         vo.setDetail(
                 detail
         );
+
 
         return Result.success(
                 vo
