@@ -3,8 +3,6 @@ package com.student.studentscoresystem.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.ScoreRecord;
-import com.student.studentscoresystem.entity.ScoreRecordAdminLog;
-import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.ScoreRecordAdminLogMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;

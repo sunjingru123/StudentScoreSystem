@@ -1,16 +1,10 @@
 package com.student.studentscoresystem.mapper;
 
-import com.student.studentscoresystem.entity.ScoreRecord;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.student.studentscoresystem.entity.ScoreRecord;
+import org.apache.ibatis.annotations.Mapper;
 
-/**
- * <p>
- * 综合测评记录表 Mapper 接口
- * </p>
- *
- * @author 茹茹宝贝
- * @since 2026-08-05
- */
-public interface ScoreRecordMapper extends BaseMapper<ScoreRecord> {
-
+@Mapper
+public interface ScoreRecordMapper
+        extends BaseMapper<ScoreRecord> {
 }

@@ -2,17 +2,19 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
-import com.student.studentscoresystem.dto.ScoreAdminAdjustmentAddDTO;
 import com.student.studentscoresystem.entity.ScoreAdminAdjustment;
+import com.student.studentscoresystem.entity.ScoreFlow;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserPosition;
+import com.student.studentscoresystem.dto.ScoreAdminAdjustmentAddDTO;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.IScoreAdminAdjustmentService;
+import com.student.studentscoresystem.service.IScoreFlowService;
 import com.student.studentscoresystem.service.IScoreRecordService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ScoreAdminAdjustmentVO;
@@ -32,6 +34,8 @@ public class ScoreAdminAdjustmentController {
 
     private final IScoreRecordService scoreRecordService;
 
+    private final IScoreFlowService scoreFlowService;
+
     private final ScoreRecordMapper scoreRecordMapper;
 
     private final SysUserMapper sysUserMapper;
@@ -43,34 +47,61 @@ public class ScoreAdminAdjustmentController {
     public ScoreAdminAdjustmentController(
             IScoreAdminAdjustmentService adjustmentService,
             IScoreRecordService scoreRecordService,
+            IScoreFlowService scoreFlowService,
             ScoreRecordMapper scoreRecordMapper,
             SysUserMapper sysUserMapper,
             SysUserPositionMapper userPositionMapper,
             SysPositionMapper positionMapper
     ) {
-        this.adjustmentService = adjustmentService;
-        this.scoreRecordService = scoreRecordService;
-        this.scoreRecordMapper = scoreRecordMapper;
-        this.sysUserMapper = sysUserMapper;
-        this.userPositionMapper = userPositionMapper;
-        this.positionMapper = positionMapper;
+
+        this.adjustmentService =
+                adjustmentService;
+
+        this.scoreRecordService =
+                scoreRecordService;
+
+        this.scoreFlowService =
+                scoreFlowService;
+
+        this.scoreRecordMapper =
+                scoreRecordMapper;
+
+        this.sysUserMapper =
+                sysUserMapper;
+
+        this.userPositionMapper =
+                userPositionMapper;
+
+        this.positionMapper =
+                positionMapper;
     }
 
     /**
-     * 从 Token 获取当前登录用户 ID
+     * =========================================================
+     * 获取当前登录用户 ID
+     * =========================================================
      */
-    private Long getUserId(HttpServletRequest request) {
+    private Long getUserId(
+            HttpServletRequest request
+    ) {
 
-        String token = request.getHeader("Authorization");
+        String token =
+                request.getHeader("Authorization");
 
-        if (token == null || !token.startsWith("Bearer ")) {
+        if (
+                token == null
+                        || !token.startsWith("Bearer ")
+        ) {
             return null;
         }
 
-        token = token.substring(7);
+        token =
+                token.substring(7);
 
         try {
-            Claims claims = JwtUtil.parseToken(token);
+
+            Claims claims =
+                    JwtUtil.parseToken(token);
 
             return claims.get(
                     "userId",
@@ -78,14 +109,19 @@ public class ScoreAdminAdjustmentController {
             );
 
         } catch (Exception e) {
+
             return null;
         }
     }
 
     /**
-     * 判断当前用户是否为管理员
+     * =========================================================
+     * 判断管理员权限
+     * =========================================================
      */
-    private boolean isAdmin(Long userId) {
+    private boolean isAdmin(
+            Long userId
+    ) {
 
         if (userId == null) {
             return false;
@@ -117,7 +153,8 @@ public class ScoreAdminAdjustmentController {
                                 )
                 );
 
-        return count != null && count > 0;
+        return count != null
+                && count > 0;
     }
 
     /**
@@ -125,18 +162,22 @@ public class ScoreAdminAdjustmentController {
      * 管理员新增成绩调整
      * =========================================================
      *
+     * 流程：
+     *
+     * 管理员
+     *   ↓
+     * 权限校验
+     *   ↓
+     * 保存 ScoreAdminAdjustment
+     *   ↓
+     * 生成 ScoreRecord
+     *   ↓
+     * 生成 ScoreFlow
+     *
      * adjustType：
      *
      * 1  = 加分
-     * -1 = 扣分
-     *
-     * 保存两份数据：
-     *
-     * 1. ScoreAdminAdjustment
-     *    管理员操作日志
-     *
-     * 2. ScoreRecord
-     *    真正进入综合测评统计的数据
+     * -1 = 减分
      */
     @PostMapping("/add")
     public Result<Void> add(
@@ -146,14 +187,15 @@ public class ScoreAdminAdjustmentController {
 
         /*
          * =====================================================
-         * 1. 获取管理员
+         * 1. 当前管理员
          * =====================================================
          */
 
-        Long adminId = getUserId(request);
+        Long adminId =
+                getUserId(request);
 
         if (adminId == null) {
-            return Result.fail("请先登录");
+            return Result.error("请先登录");
         }
 
         /*
@@ -163,7 +205,7 @@ public class ScoreAdminAdjustmentController {
          */
 
         if (!isAdmin(adminId)) {
-            return Result.fail("没有管理员权限");
+            return Result.error("没有管理员权限");
         }
 
         /*
@@ -172,19 +214,23 @@ public class ScoreAdminAdjustmentController {
          * =====================================================
          */
 
+        if (dto == null) {
+            return Result.error("调整参数不能为空");
+        }
+
         if (dto.getStudentId() == null) {
-            return Result.fail("请选择学生");
+            return Result.error("请选择学生");
         }
 
         if (dto.getAdjustType() == null) {
-            return Result.fail("请选择调整类型");
+            return Result.error("请选择调整类型");
         }
 
         if (
                 dto.getAdjustType() != 1
                         && dto.getAdjustType() != -1
         ) {
-            return Result.fail("调整类型错误");
+            return Result.error("调整类型错误");
         }
 
         if (
@@ -192,21 +238,14 @@ public class ScoreAdminAdjustmentController {
                         || dto.getScore()
                         .compareTo(BigDecimal.ZERO) <= 0
         ) {
-            return Result.fail("调整分数必须大于0");
-        }
-
-        if (
-                dto.getReason() == null
-                        || dto.getReason()
-                        .trim()
-                        .isEmpty()
-        ) {
-            return Result.fail("请填写调整原因");
+            return Result.error(
+                    "调整分数必须大于0"
+            );
         }
 
         /*
          * =====================================================
-         * 4. 查询学生
+         * 4. 学生存在性
          * =====================================================
          */
 
@@ -216,7 +255,17 @@ public class ScoreAdminAdjustmentController {
                 );
 
         if (student == null) {
-            return Result.fail("学生不存在");
+            return Result.error("学生不存在");
+        }
+
+        if (
+                student.getStatus() != null
+                        && !Short.valueOf((short) 1)
+                        .equals(student.getStatus())
+        ) {
+            return Result.error(
+                    "该学生当前不是正常状态"
+            );
         }
 
         /*
@@ -245,34 +294,69 @@ public class ScoreAdminAdjustmentController {
         );
 
         adjustment.setReason(
-                dto.getReason().trim()
+                dto.getReason()
         );
 
-        adjustmentService.save(adjustment);
+        adjustment.setCreateTime(
+                LocalDateTime.now()
+        );
+
+        adjustmentService.save(
+                adjustment
+        );
 
         /*
          * =====================================================
-         * 6. 生成 ScoreRecord
+         * 6. 计算真正进入成绩表的分数
          * =====================================================
-         *
-         * ScoreStatisticsController
-         * 最终只认 ScoreRecord。
-         *
-         * 所以管理员调整必须进入 ScoreRecord。
          */
 
         BigDecimal realScore =
                 dto.getScore();
-
-        /*
-         * 扣分转换成负数
-         */
 
         if (dto.getAdjustType() == -1) {
 
             realScore =
                     realScore.negate();
         }
+
+        /*
+         * =====================================================
+         * 7. 防止重复生成 ScoreRecord
+         * =====================================================
+         *
+         * 一次管理员调整对应一个 adjustmentId。
+         *
+         * ScoreRecord：
+         *
+         * sourceType = ADMIN_ADJUSTMENT
+         * sourceId   = adjustment.id
+         */
+
+        Long existRecord =
+                scoreRecordMapper.selectCount(
+                        new LambdaQueryWrapper<ScoreRecord>()
+                                .eq(
+                                        ScoreRecord::getSourceType,
+                                        "ADMIN_ADJUSTMENT"
+                                )
+                                .eq(
+                                        ScoreRecord::getSourceId,
+                                        adjustment.getId()
+                                )
+                );
+
+        if (existRecord != null
+                && existRecord > 0) {
+
+            return Result.success(null);
+        }
+
+        /*
+         * =====================================================
+         * 8. 创建 ScoreRecord
+         * =====================================================
+         */
 
         ScoreRecord record =
                 new ScoreRecord();
@@ -282,43 +366,160 @@ public class ScoreAdminAdjustmentController {
         );
 
         /*
-         * 管理员手动调整没有 ScoreRule
+         * 管理员调整没有对应规则
          */
-
         record.setRuleId(null);
 
         record.setScore(
                 realScore
         );
 
+        /*
+         * 有效
+         */
+        record.setStatus(
+                (short) 1
+        );
+
+        /*
+         * 正常显示
+         */
+        record.setAdminHidden(
+                (short) 0
+        );
+
+        record.setSemesterId(
+                null
+        );
+
         record.setSourceType(
                 "ADMIN_ADJUSTMENT"
         );
 
-        /*
-         * sourceId 对应管理员调整记录
-         */
-
         record.setSourceId(
                 adjustment.getId()
-        );
-
-        record.setAdminHidden(
-                (short) 0
         );
 
         record.setCreateTime(
                 LocalDateTime.now()
         );
 
-        scoreRecordMapper.insert(record);
+        scoreRecordService.save(
+                record
+        );
+
+        /*
+         * =====================================================
+         * 9. 计算调整前成绩
+         * =====================================================
+         *
+         * 注意：
+         *
+         * 当前刚插入的 record 也会被查询出来，
+         * 所以这里最后要减掉本次 realScore。
+         */
+
+        BigDecimal beforeScore =
+                scoreRecordService.list(
+                                new LambdaQueryWrapper<ScoreRecord>()
+                                        .eq(
+                                                ScoreRecord::getStudentId,
+                                                dto.getStudentId()
+                                        )
+                                        .eq(
+                                                ScoreRecord::getStatus,
+                                                (short) 1
+                                        )
+                                        .eq(
+                                                ScoreRecord::getAdminHidden,
+                                                (short) 0
+                                        )
+                        )
+                        .stream()
+                        .map(
+                                ScoreRecord::getScore
+                        )
+                        .filter(
+                                score -> score != null
+                        )
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        )
+                        .subtract(
+                                realScore
+                        );
+
+        /*
+         * =====================================================
+         * 10. 调整后成绩
+         * =====================================================
+         */
+
+        BigDecimal afterScore =
+                beforeScore.add(
+                        realScore
+                );
+
+        /*
+         * =====================================================
+         * 11. 创建 ScoreFlow
+         * =====================================================
+         */
+
+        ScoreFlow flow =
+                new ScoreFlow();
+
+        flow.setStudentId(
+                dto.getStudentId()
+        );
+
+        flow.setBeforeScore(
+                beforeScore
+        );
+
+        flow.setChangeScore(
+                realScore
+        );
+
+        flow.setAfterScore(
+                afterScore
+        );
+
+        flow.setChangeType(
+                "ADMIN_ADJUSTMENT"
+        );
+
+        String description =
+                dto.getReason();
+
+        if (
+                description == null
+                        || description.trim().isEmpty()
+        ) {
+
+            description =
+                    "管理员成绩调整";
+        }
+
+        flow.setDescription(
+                description.trim()
+        );
+
+        flow.setCreateTime(
+                LocalDateTime.now()
+        );
+
+        scoreFlowService.save(
+                flow
+        );
 
         return Result.success(null);
     }
 
     /**
      * =========================================================
-     * 管理员查看全部成绩调整记录
+     * 管理员查看全部成绩调整
      * =========================================================
      */
     @GetMapping("/list")
@@ -326,14 +527,15 @@ public class ScoreAdminAdjustmentController {
             HttpServletRequest request
     ) {
 
-        Long adminId = getUserId(request);
+        Long adminId =
+                getUserId(request);
 
         if (adminId == null) {
-            return Result.fail("请先登录");
+            return Result.error("请先登录");
         }
 
         if (!isAdmin(adminId)) {
-            return Result.fail("没有管理员权限");
+            return Result.error("没有管理员权限");
         }
 
         List<ScoreAdminAdjustment> list =
@@ -360,14 +562,15 @@ public class ScoreAdminAdjustmentController {
             HttpServletRequest request
     ) {
 
-        Long adminId = getUserId(request);
+        Long adminId =
+                getUserId(request);
 
         if (adminId == null) {
-            return Result.fail("请先登录");
+            return Result.error("请先登录");
         }
 
         if (!isAdmin(adminId)) {
-            return Result.fail("没有管理员权限");
+            return Result.error("没有管理员权限");
         }
 
         SysUser student =
@@ -376,7 +579,7 @@ public class ScoreAdminAdjustmentController {
                 );
 
         if (student == null) {
-            return Result.fail("学生不存在");
+            return Result.error("学生不存在");
         }
 
         List<ScoreAdminAdjustment> list =
@@ -398,7 +601,7 @@ public class ScoreAdminAdjustmentController {
 
     /**
      * =========================================================
-     * 转换 VO
+     * Entity → VO
      * =========================================================
      */
     private List<ScoreAdminAdjustmentVO> convertVO(
@@ -440,7 +643,7 @@ public class ScoreAdminAdjustmentController {
                     );
 
                     /*
-                     * 学生信息
+                     * 学生
                      */
                     SysUser student =
                             sysUserMapper.selectById(
@@ -459,17 +662,17 @@ public class ScoreAdminAdjustmentController {
                     }
 
                     /*
-                     * 管理员信息
+                     * 管理员
                      */
-                    SysUser adminUser =
+                    SysUser admin =
                             sysUserMapper.selectById(
                                     item.getAdminId()
                             );
 
-                    if (adminUser != null) {
+                    if (admin != null) {
 
                         vo.setAdminName(
-                                adminUser.getRealName()
+                                admin.getRealName()
                         );
                     }
 

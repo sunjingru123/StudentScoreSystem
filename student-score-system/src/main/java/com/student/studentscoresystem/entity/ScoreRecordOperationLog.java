@@ -1,5 +1,7 @@
 package com.student.studentscoresystem.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -9,20 +11,27 @@ import java.time.LocalDateTime;
 @TableName("score_record_operation_log")
 public class ScoreRecordOperationLog {
 
+    @TableId(
+            value = "id",
+            type = IdType.AUTO
+    )
     private Long id;
 
     /**
-     * 成绩记录ID
+     * 被操作的成绩记录
      */
     private Long scoreRecordId;
 
     /**
-     * 操作人ID
+     * 操作人
      */
     private Long operatorId;
 
     /**
-     * HIDE / RESTORE
+     * 操作类型
+     *
+     * HIDE   隐藏
+     * RESTORE 恢复
      */
     private String operation;
 
