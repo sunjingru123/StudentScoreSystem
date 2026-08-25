@@ -26,6 +26,9 @@ public class StudentVO {
 
 
     private Short status;
-
+    private Double totalScore;
+    private Double bonusScore;
+    private Double deductScore;
+    private Double actualLimit;
 
 }

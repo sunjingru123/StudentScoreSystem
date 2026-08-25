@@ -1,551 +1,718 @@
 <template>
-  <div class="student-detail-page">
-    <!-- 顶部 -->
-    <div class="page-header">
-      <div>
-        <h2>学生详情</h2>
-        <p>查看学生基本信息、成绩明细及加分申请记录</p>
+  <div class="adjust-page">
+    <el-card>
+      <template #header>
+        <div class="header">
+          <span>管理员成绩调整</span>
+
+          <el-button
+            type="primary"
+            @click="openDialog"
+          >
+            新增调整
+          </el-button>
+        </div>
+      </template>
+
+      <!-- =========================
+           调整记录
+      ========================== -->
+      <el-table
+        :data="list"
+        border
+        stripe
+        v-loading="loading"
+        style="width: 100%"
+      >
+
+        <el-table-column
+          type="index"
+          label="#"
+          width="70"
+          :index="indexMethod"
+        />
+
+        <el-table-column
+          prop="studentName"
+          label="学生姓名"
+          min-width="120"
+        />
+
+        <el-table-column
+          prop="studentNo"
+          label="学号"
+          min-width="140"
+        />
+
+        <el-table-column
+          label="调整类型"
+          width="100"
+        >
+          <template #default="scope">
+
+            <el-tag
+              v-if="scope.row.adjustType === 1"
+              type="success"
+            >
+              加分
+            </el-tag>
+
+            <el-tag
+              v-else-if="scope.row.adjustType === -1"
+              type="danger"
+            >
+              减分
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知
+            </el-tag>
+
+          </template>
+        </el-table-column>
+
+        <el-table-column
+          prop="score"
+          label="调整分数"
+          width="110"
+        />
+
+        <el-table-column
+          prop="reason"
+          label="调整原因"
+          min-width="220"
+          show-overflow-tooltip
+        />
+
+        <el-table-column
+          prop="adminName"
+          label="操作管理员"
+          min-width="120"
+        />
+
+        <el-table-column
+          prop="createTime"
+          label="操作时间"
+          min-width="180"
+        />
+
+      </el-table>
+
+
+      <!-- =========================
+           分页
+      ========================== -->
+      <div class="pagination-wrapper">
+
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 30, 50]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+
       </div>
 
-      <el-button @click="goBack"> 返回学生管理 </el-button>
-    </div>
-
-    <!-- 学生基本信息 -->
-    <el-card class="info-card">
-      <template #header>
-        <div class="card-title">
-          <span>基本信息</span>
-
-          <el-tag v-if="student.status === 1" type="success"> 正常 </el-tag>
-
-          <el-tag v-else type="danger"> 禁用 </el-tag>
-        </div>
-      </template>
-
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="学号">
-          {{ student.studentNo || '-' }}
-        </el-descriptions-item>
-
-        <el-descriptions-item label="姓名">
-          {{ student.realName || '-' }}
-        </el-descriptions-item>
-
-        <el-descriptions-item label="用户名">
-          {{ student.username || '-' }}
-        </el-descriptions-item>
-
-        <el-descriptions-item label="班级">
-          {{ student.className || '-' }}
-        </el-descriptions-item>
-
-        <el-descriptions-item label="手机号">
-          {{ student.phone || '-' }}
-        </el-descriptions-item>
-
-        <el-descriptions-item label="综合评分">
-          <span class="total-score">
-            {{ totalScore }}
-          </span>
-          分
-        </el-descriptions-item>
-      </el-descriptions>
     </el-card>
 
-    <!-- 成绩统计 -->
-    <div class="stat-cards">
-      <el-card class="stat-card">
-        <div class="stat-icon blue">⭐</div>
 
-        <div>
-          <p>综合评分</p>
-          <strong>{{ totalScore }}</strong>
-          <span>分</span>
-        </div>
-      </el-card>
+    <!-- =========================
+         新增弹窗
+    ========================== -->
+    <el-dialog
+      v-model="dialogVisible"
+      title="成绩调整"
+      width="600px"
+      destroy-on-close
+    >
 
-      <el-card class="stat-card">
-        <div class="stat-icon green">✓</div>
+      <el-form
+        :model="form"
+        label-width="100px"
+      >
 
-        <div>
-          <p>已通过加分</p>
-          <strong>{{ approvedApplyCount }}</strong>
-          <span>次</span>
-        </div>
-      </el-card>
+        <!-- 学生 -->
+        <el-form-item label="学生">
 
-      <el-card class="stat-card">
-        <div class="stat-icon orange">⏳</div>
+          <el-select
+            v-model="form.studentId"
+            placeholder="请选择学生"
+            filterable
+            clearable
+            remote
+            :remote-method="searchStudents"
+            :loading="studentLoading"
+            style="width: 100%"
+          >
 
-        <div>
-          <p>待审核申请</p>
-          <strong>{{ pendingApplyCount }}</strong>
-          <span>次</span>
-        </div>
-      </el-card>
+            <el-option
+              v-for="s in studentList"
+              :key="s.id"
+              :label="`${s.realName}(${s.studentNo})`"
+              :value="s.id"
+            />
 
-      <el-card class="stat-card">
-        <div class="stat-icon red">×</div>
+          </el-select>
 
-        <div>
-          <p>拒绝申请</p>
-          <strong>{{ rejectedApplyCount }}</strong>
-          <span>次</span>
-        </div>
-      </el-card>
-    </div>
+        </el-form-item>
 
-    <!-- 成绩明细 -->
-    <el-card class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span>成绩明细</span>
 
-          <span class="section-count"> 共 {{ scoreList.length }} 条 </span>
-        </div>
+        <!-- 调整类型 -->
+        <el-form-item label="调整类型">
+
+          <el-radio-group
+            v-model="form.adjustType"
+          >
+
+            <el-radio :label="1">
+              加分
+            </el-radio>
+
+            <el-radio :label="-1">
+              减分
+            </el-radio>
+
+          </el-radio-group>
+
+        </el-form-item>
+
+
+        <!-- 分数 -->
+        <el-form-item label="分数">
+
+          <el-input-number
+            v-model="form.score"
+            :min="0.01"
+            :step="0.5"
+            :precision="2"
+          />
+
+        </el-form-item>
+
+
+        <!-- 原因 -->
+        <el-form-item label="调整原因">
+
+          <el-input
+            v-model="form.reason"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="填写调整原因"
+          />
+
+        </el-form-item>
+
+      </el-form>
+
+
+      <!-- =========================
+           弹窗底部
+      ========================== -->
+      <template #footer>
+
+        <el-button
+          @click="dialogVisible = false"
+        >
+          取消
+        </el-button>
+
+        <el-button
+          type="primary"
+          :loading="submitLoading"
+          @click="submit"
+        >
+          确认调整
+        </el-button>
+
       </template>
 
-      <el-table :data="scoreList" border stripe v-loading="scoreLoading">
-        <el-table-column type="index" label="#" width="60" align="center" />
+    </el-dialog>
 
-        <el-table-column prop="ruleName" label="加分项目" min-width="180" />
-
-        <el-table-column prop="score" label="获得分数" width="120" align="center">
-          <template #default="scope">
-            <span class="score-plus"> +{{ scope.row.score }} </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="sourceType" label="来源" width="120">
-          <template #default="scope">
-            <el-tag v-if="scope.row.sourceType === 'apply'" type="success" size="small">
-              加分申请
-            </el-tag>
-
-            <el-tag v-else size="small">
-              {{ scope.row.sourceType || '-' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="管理员状态" width="120" align="center">
-          <template #default="scope">
-            <el-tag v-if="Number(scope.row.adminHidden ?? scope.row.adminhidden ?? 0) === 1" type="danger">
-              已隐藏
-            </el-tag>
-            <el-tag v-else type="success"> 正常 </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="createTime" label="获得时间" min-width="180" />
-      </el-table>
-
-      <el-empty v-if="!scoreLoading && scoreList.length === 0" description="暂无成绩记录" />
-    </el-card>
-
-    <!-- 加分申请记录 -->
-    <el-card class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span>加分申请记录</span>
-
-          <span class="section-count"> 共 {{ applyList.length }} 条 </span>
-        </div>
-      </template>
-
-      <el-table :data="applyList" border stripe v-loading="applyLoading">
-        <el-table-column type="index" label="#" width="60" align="center" />
-
-        <el-table-column prop="activityName" label="活动" min-width="180" />
-
-        <el-table-column prop="ruleName" label="申请项目" min-width="150" />
-
-        <el-table-column prop="applyScore" label="申请分数" width="110" align="center">
-          <template #default="scope">
-            <span class="apply-score"> {{ scope.row.applyScore }} 分 </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="状态" width="120" align="center">
-          <template #default="scope">
-            <el-tag v-if="scope.row.status === 0" type="warning"> 待审核 </el-tag>
-
-            <el-tag v-else-if="scope.row.status === 1" type="success"> 已通过 </el-tag>
-
-            <el-tag v-else-if="scope.row.status === 2" type="danger"> 已拒绝 </el-tag>
-
-            <el-tag v-else type="info"> 未知状态 </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="申请说明" min-width="240">
-          <template #default="scope">
-            <el-tooltip
-              v-if="scope.row.description"
-              :content="scope.row.description"
-              placement="top"
-            >
-              <span class="description">
-                {{ scope.row.description }}
-              </span>
-            </el-tooltip>
-
-            <span v-else class="empty-text"> - </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="createTime" label="申请时间" min-width="180" />
-      </el-table>
-
-      <el-empty v-if="!applyLoading && applyList.length === 0" description="暂无加分申请记录" />
-    </el-card>
   </div>
 </template>
 
+
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+
+import {
+  ref,
+  onMounted
+} from 'vue'
+
+import {
+  ElMessage
+} from 'element-plus'
 
 import request from '@/utils/request'
 
-const route = useRoute()
-const router = useRouter()
 
-// 当前学生 ID
-const studentId = Number(route.params.id)
+/*
+ * =========================================================
+ * 调整记录
+ * =========================================================
+ */
 
-// =========================
-// 学生基本信息
-// =========================
+const loading = ref(false)
 
-const student = ref({
-  id: null,
-  studentNo: '',
-  username: '',
-  realName: '',
-  phone: '',
-  className: '',
-  status: 1,
+const list = ref([])
+
+const page = ref(1)
+
+const pageSize = ref(10)
+
+const total = ref(0)
+
+
+/*
+ * =========================================================
+ * 新增弹窗
+ * =========================================================
+ */
+
+const dialogVisible = ref(false)
+
+const submitLoading = ref(false)
+
+
+const form = ref({
+  studentId: null,
+  adjustType: 1,
+  score: 0,
+  reason: ''
 })
 
-// =========================
-// 成绩
-// =========================
 
-const scoreList = ref([])
+/*
+ * =========================================================
+ * 学生选择
+ * =========================================================
+ */
 
-const scoreLoading = ref(false)
+const studentList = ref([])
 
-const totalScore = ref(0)
+const studentLoading = ref(false)
 
-// =========================
-// 加分申请
-// =========================
 
-const applyList = ref([])
+/*
+ * =========================================================
+ * 计算表格序号
+ * =========================================================
+ */
 
-const applyLoading = ref(false)
+function indexMethod(index) {
 
-// =========================
-// 统计
-// =========================
+  return (
+    (page.value - 1) *
+    pageSize.value +
+    index +
+    1
+  )
 
-const approvedApplyCount = computed(() => {
-  return applyList.value.filter((item) => item.status === 1).length
-})
+}
 
-const pendingApplyCount = computed(() => {
-  return applyList.value.filter((item) => item.status === 0).length
-})
 
-const rejectedApplyCount = computed(() => {
-  return applyList.value.filter((item) => item.status === 2).length
-})
+/*
+ * =========================================================
+ * 打开新增弹窗
+ * =========================================================
+ */
 
-// =========================
-// 查询学生信息
-// =========================
+function openDialog() {
 
-function loadStudent() {
-  if (!studentId) {
-    ElMessage.error('学生信息不存在')
-    return
+  form.value = {
+    studentId: null,
+    adjustType: 1,
+    score: 0,
+    reason: ''
   }
 
-  request
-    .get('/user/student/list')
-    .then((res) => {
-      const list = res.data.data || []
+  studentList.value = []
 
-      const data = list.find((item) => Number(item.id) === studentId)
+  dialogVisible.value = true
 
-      if (!data) {
-        ElMessage.error('找不到该学生')
-        return
+  /*
+   * 打开弹窗时先加载第一页学生
+   */
+  loadStudents()
+
+}
+
+
+/*
+ * =========================================================
+ * 加载学生
+ *
+ * 注意：
+ *
+ * 这里也使用分页。
+ *
+ * 不再一次性加载所有学生。
+ * =========================================================
+ */
+
+async function loadStudents(
+  keyword = ''
+) {
+
+  studentLoading.value = true
+
+  try {
+
+    const res =
+      await request.get(
+        '/user/student/list',
+        {
+          params: {
+            page: 1,
+            pageSize: 20,
+            studentNo: keyword,
+            realName: keyword
+          }
+        }
+      )
+
+
+    const data =
+      res.data.data
+
+
+    if (
+      data &&
+      Array.isArray(data.records)
+    ) {
+
+      studentList.value =
+        data.records
+
+    } else {
+
+      studentList.value = []
+
+    }
+
+  } catch (e) {
+
+    console.error(
+      '获取学生失败',
+      e
+    )
+
+    ElMessage.error(
+      '获取学生列表失败'
+    )
+
+  } finally {
+
+    studentLoading.value = false
+
+  }
+
+}
+
+
+/*
+ * =========================================================
+ * 学生远程搜索
+ * =========================================================
+ */
+
+function searchStudents(keyword) {
+
+  if (
+    keyword === undefined
+    || keyword === null
+  ) {
+
+    keyword = ''
+
+  }
+
+
+  loadStudents(
+    keyword.trim()
+  )
+
+}
+
+
+/*
+ * =========================================================
+ * 加载成绩调整记录
+ * =========================================================
+ */
+
+async function loadList() {
+
+  loading.value = true
+
+  try {
+
+    const res =
+      await request.get(
+        '/admin/scoreAdjustment/list',
+        {
+          params: {
+            page: page.value,
+            pageSize: pageSize.value
+          }
+        }
+      )
+
+
+    console.log(
+      '成绩调整分页数据：',
+      res
+    )
+
+
+    const data =
+      res.data.data
+
+
+    /*
+     * 后端分页返回：
+     *
+     * {
+     *   records: [],
+     *   total: 100,
+     *   current: 1,
+     *   size: 10,
+     *   pages: 10
+     * }
+     */
+
+    if (
+      data &&
+      Array.isArray(data.records)
+    ) {
+
+      list.value =
+        data.records
+
+      total.value =
+        Number(data.total || 0)
+
+    } else {
+
+      /*
+       * 防止后端暂时还是返回数组
+       */
+      if (
+        Array.isArray(data)
+      ) {
+
+        list.value = data
+
+        total.value =
+          data.length
+
+      } else {
+
+        list.value = []
+
+        total.value = 0
+
       }
 
-      student.value = data
-    })
-    .catch((err) => {
-      console.error(err)
+    }
 
-      ElMessage.error('获取学生信息失败')
-    })
+  } catch (e) {
+
+    console.error(
+      '获取调整记录失败',
+      e
+    )
+
+    ElMessage.error(
+      '获取调整记录失败'
+    )
+
+  } finally {
+
+    loading.value = false
+
+  }
+
 }
 
-// =========================
-// 查询成绩
-// =========================
 
-function loadScore() {
-  scoreLoading.value = true
+/*
+ * =========================================================
+ * 切换每页数量
+ * =========================================================
+ */
 
-  request
-    .get(`/scoreStatistics/admin/${studentId}`)
-    .then((res) => {
-      console.log('管理员成绩明细接口返回：', res.data)
+function handleSizeChange(size) {
 
-      const data = res.data?.data || res.data || {}
+  pageSize.value = size
 
-      totalScore.value = data.totalScore || 0
+  page.value = 1
 
-      scoreList.value = data.detail || data.list || []
-    })
-    .catch((err) => {
-      console.error(err)
+  loadList()
 
-      ElMessage.error('获取成绩失败')
-
-      scoreList.value = []
-    })
-    .finally(() => {
-      scoreLoading.value = false
-    })
 }
 
-// =========================
-// 查询加分申请
-// =========================
 
-function loadApply() {
-  applyLoading.value = true
+/*
+ * =========================================================
+ * 切换页码
+ * =========================================================
+ */
 
-  request
-    .get(`/scoreApply/student/${studentId}`)
-    .then((res) => {
-      console.log('当前学生申请记录：', res)
+function handleCurrentChange(current) {
 
-      applyList.value =
-        res.data.data || []
-    })
-    .catch((err) => {
-      console.error(err)
+  page.value = current
 
-      ElMessage.error('获取申请记录失败')
+  loadList()
 
-      applyList.value = []
-    })
-    .finally(() => {
-      applyLoading.value = false
-    })
 }
 
-// =========================
-// 返回
-// =========================
 
-function goBack() {
-  router.push('/admin/student')
+/*
+ * =========================================================
+ * 提交成绩调整
+ * =========================================================
+ */
+
+async function submit() {
+
+  if (
+    !form.value.studentId
+  ) {
+
+    ElMessage.warning(
+      '请选择学生'
+    )
+
+    return
+
+  }
+
+
+  if (
+    !form.value.score
+    || form.value.score <= 0
+  ) {
+
+    ElMessage.warning(
+      '请填写正确的分数'
+    )
+
+    return
+
+  }
+
+
+  if (
+    !form.value.reason
+    || !form.value.reason.trim()
+  ) {
+
+    ElMessage.warning(
+      '请填写调整原因'
+    )
+
+    return
+
+  }
+
+
+  submitLoading.value = true
+
+  try {
+
+    await request.post(
+      '/admin/scoreAdjustment/add',
+      form.value
+    )
+
+
+    ElMessage.success(
+      '调整成功'
+    )
+
+
+    dialogVisible.value =
+      false
+
+
+    /*
+     * 回到第一页
+     */
+    page.value = 1
+
+
+    /*
+     * 重新加载
+     */
+    await loadList()
+
+  } catch (err) {
+
+    console.error(
+      '成绩调整失败',
+      err
+    )
+
+
+    ElMessage.error(
+      err.response?.data?.msg
+      ||
+      err.response?.data?.message
+      ||
+      '操作失败'
+    )
+
+  } finally {
+
+    submitLoading.value = false
+
+  }
+
 }
 
-// =========================
-// 页面加载
-// =========================
+
+/*
+ * =========================================================
+ * 初始化
+ * =========================================================
+ */
 
 onMounted(() => {
-  loadStudent()
-  loadScore()
-  loadApply()
+
+  loadList()
+
 })
+
 </script>
 
+
 <style scoped>
-.student-detail-page {
+
+.adjust-page {
   padding: 30px;
-  background: #f5f7fa;
-  min-height: calc(100vh - 60px);
 }
 
-/* 页面头部 */
-
-.page-header {
+.header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.page-header h2 {
-  margin: 0 0 8px;
-  font-size: 26px;
-  color: #303133;
-}
-
-.page-header p {
-  margin: 0;
-  color: #909399;
-}
-
-/* 基本信息 */
-
-.info-card {
-  margin-bottom: 20px;
-}
-
-.card-title {
+.pagination-wrapper {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 17px;
-  font-weight: bold;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-bottom: 10px;
 }
 
-.total-score {
-  color: #409eff;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-/* 统计卡片 */
-
-.stat-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  border: none;
-}
-
-.stat-card :deep(.el-card__body) {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 22px;
-}
-
-.stat-icon {
-  width: 55px;
-  height: 55px;
-  border-radius: 12px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 26px;
-}
-
-.stat-icon.blue {
-  background: #ecf5ff;
-}
-
-.stat-icon.green {
-  background: #f0f9eb;
-}
-
-.stat-icon.orange {
-  background: #fdf6ec;
-}
-
-.stat-icon.red {
-  background: #fef0f0;
-}
-
-.stat-card p {
-  margin: 0 0 5px;
-  color: #909399;
-}
-
-.stat-card strong {
-  font-size: 28px;
-  color: #303133;
-}
-
-.stat-card span {
-  margin-left: 4px;
-  color: #909399;
-}
-
-/* 内容卡片 */
-
-.section-card {
-  margin-bottom: 20px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  font-size: 17px;
-  font-weight: bold;
-}
-
-.section-count {
-  color: #909399;
-  font-size: 14px;
-  font-weight: normal;
-}
-
-/* 成绩 */
-
-.score-plus {
-  color: #67c23a;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.apply-score {
-  color: #409eff;
-  font-weight: bold;
-}
-
-/* 申请说明 */
-
-.description {
-  display: inline-block;
-  max-width: 220px;
-
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-
-  cursor: pointer;
-}
-
-.empty-text {
-  color: #c0c4cc;
-}
-
-/* 响应式 */
-
-@media (max-width: 1100px) {
-  .stat-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 700px) {
-  .student-detail-page {
-    padding: 15px;
-  }
-
-  .stat-cards {
-    grid-template-columns: 1fr;
-  }
-}
 </style>
