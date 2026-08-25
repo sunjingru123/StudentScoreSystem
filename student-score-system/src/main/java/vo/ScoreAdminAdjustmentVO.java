@@ -16,19 +16,15 @@ public class ScoreAdminAdjustmentVO {
 
     private String studentNo;
 
-    private Long adminId;
-
-    private String adminName;
-
-    /**
-     * 1 加分
-     * -1 减分
-     */
-    private Short adjustType;
+    private Integer adjustType;
 
     private BigDecimal score;
 
     private String reason;
+
+    private Long adminId;
+
+    private String adminName;
 
     private LocalDateTime createTime;
 }

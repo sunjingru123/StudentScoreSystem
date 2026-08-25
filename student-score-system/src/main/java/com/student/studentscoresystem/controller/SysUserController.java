@@ -40,112 +40,43 @@ public class SysUserController {
      * 查询全部学生
      * =========================================================
      *
-     * GET /user/student/list
+     * 学生名单直接来自 sys_user
+     *
+     * 规则：
+     * 1. studentNo 不为空 = 学生
+     * 2. 管理员通常没有 studentNo，因此自动排除
+     * 3. 不依赖 sys_user_position
+     * 4. Excel 导入多少学生，这里就显示多少学生
      */
     @GetMapping("/student/list")
     public Result<List<StudentVO>> studentList() {
 
-        /*
-         * 1. 查询“学生”岗位
-         */
-        SysPosition position =
-                positionMapper.selectOne(
-                        new LambdaQueryWrapper<SysPosition>()
-                                .eq(
-                                        SysPosition::getName,
-                                        "学生"
-                                )
+        List<SysUser> users =
+                sysUserMapper.selectList(
+                        new LambdaQueryWrapper<SysUser>()
+                                .isNotNull(SysUser::getStudentNo)
+                                .orderByAsc(SysUser::getStudentNo)
                 );
 
-        if (position == null) {
-            System.out.println(
-                    "========== 学生岗位不存在 =========="
-            );
-
-            return Result.success(
-                    new ArrayList<>()
-            );
-        }
-
-        System.out.println(
-                "========== 学生岗位ID："
-                        + position.getId()
-                        + " =========="
-        );
-
-
-        /*
-         * 2. 查询学生岗位关系
-         */
-        List<SysUserPosition> relations =
-                userPositionMapper.selectList(
-                        new LambdaQueryWrapper<SysUserPosition>()
-                                .eq(
-                                        SysUserPosition::getPositionId,
-                                        position.getId()
-                                )
-                );
-
-        System.out.println(
-                "========== 学生关系数量："
-                        + relations.size()
-                        + " =========="
-        );
-
-
-        /*
-         * 3. 组装学生
-         */
         List<StudentVO> result =
                 new ArrayList<>();
 
+        for (SysUser user : users) {
 
-        for (SysUserPosition relation : relations) {
-
-            if (relation == null) {
-                continue;
-            }
-
-            Long userId =
-                    relation.getUserId();
-
-            if (userId == null) {
-                continue;
-            }
-
-
-            SysUser user =
-                    sysUserMapper.selectById(
-                            userId
-                    );
-
-
-            /*
-             * 防止关系表存在脏数据
-             */
             if (user == null) {
-                System.out.println(
-                        "学生关系对应用户不存在，userId="
-                                + userId
-                );
-
                 continue;
             }
 
-
-            StudentVO vo =
-                    buildStudentVO(user);
+            StudentVO vo = buildStudentVO(user);
 
             result.add(vo);
         }
 
-
         System.out.println(
-                "========== 最终学生数量："
+                "========== 学生管理查询数量："
                         + result.size()
                         + " =========="
         );
-
 
         return Result.success(result);
     }
@@ -309,6 +240,25 @@ public class SysUserController {
      *
      * POST /user/student/add
      */
+    /**
+     * =========================================================
+     * 添加学生
+     * =========================================================
+     *
+     * 学生创建后：
+     *
+     * 1. 写入 sys_user
+     * 2. 默认就是学生
+     * 3. 不创建 sys_user_position
+     * 4. 不创建 sys_user_department
+     *
+     * 以后如果这个学生加入某个部门，
+     * 再通过部门成员 Excel 导入：
+     *
+     * 部门 + 学号 + 姓名 + 职位
+     *
+     * 创建部门和职位关系。
+     */
     @PostMapping("/student/add")
     public Result<Void> addStudent(
             @RequestBody
@@ -321,55 +271,156 @@ public class SysUserController {
 
         System.out.println(dto);
 
+        /*
+         * =====================================================
+         * 1. 基本校验
+         * =====================================================
+         */
+
+        if (
+                dto.getStudentNo() == null
+                        || dto.getStudentNo().trim().isEmpty()
+        ) {
+            return Result.error("学号不能为空");
+        }
+
+        if (
+                dto.getRealName() == null
+                        || dto.getRealName().trim().isEmpty()
+        ) {
+            return Result.error("姓名不能为空");
+        }
 
         /*
-         * 1. 创建用户
+         * =====================================================
+         * 2. 检查学号是否已经存在
+         * =====================================================
          */
+
+        SysUser existUser =
+                sysUserMapper.selectOne(
+                        new LambdaQueryWrapper<SysUser>()
+                                .eq(
+                                        SysUser::getStudentNo,
+                                        dto.getStudentNo().trim()
+                                )
+                                .last("LIMIT 1")
+                );
+
+        if (existUser != null) {
+
+            return Result.error(
+                    "该学号已经存在：" +
+                            dto.getStudentNo()
+            );
+        }
+
+        /*
+         * =====================================================
+         * 3. 创建学生
+         * =====================================================
+         */
+
         SysUser user =
                 new SysUser();
 
+        /*
+         * 学号
+         */
         user.setStudentNo(
-                dto.getStudentNo()
+                dto.getStudentNo().trim()
         );
 
-        user.setUsername(
-                dto.getUsername()
-        );
+        /*
+         * 如果没有填写用户名，
+         * 默认使用学号。
+         */
+        if (
+                dto.getUsername() == null
+                        || dto.getUsername().trim().isEmpty()
+        ) {
 
-        user.setPassword(
-                dto.getPassword()
-        );
+            user.setUsername(
+                    dto.getStudentNo().trim()
+            );
 
+        } else {
+
+            user.setUsername(
+                    dto.getUsername().trim()
+            );
+        }
+
+        /*
+         * 如果没有填写密码，
+         * 默认使用学号。
+         */
+        if (
+                dto.getPassword() == null
+                        || dto.getPassword().trim().isEmpty()
+        ) {
+
+            user.setPassword(
+                    dto.getStudentNo().trim()
+            );
+
+        } else {
+
+            user.setPassword(
+                    dto.getPassword()
+            );
+        }
+
+        /*
+         * 姓名
+         */
         user.setRealName(
-                dto.getRealName()
+                dto.getRealName().trim()
         );
 
+        /*
+         * 性别
+         */
         user.setGender(
                 dto.getGender()
         );
 
+        /*
+         * 手机号
+         */
         user.setPhone(
                 dto.getPhone()
         );
 
+        /*
+         * 邮箱
+         */
         user.setEmail(
                 dto.getEmail()
         );
 
+        /*
+         * 班级
+         */
         user.setClassName(
                 dto.getClassName()
         );
 
+        /*
+         * 默认启用
+         */
         user.setStatus(
                 (short) 1
         );
 
+        /*
+         * =====================================================
+         * 4. 插入 sys_user
+         * =====================================================
+         */
 
         int insert =
-                sysUserMapper.insert(
-                        user
-                );
-
+                sysUserMapper.insert(user);
 
         if (insert <= 0) {
 
@@ -378,66 +429,36 @@ public class SysUserController {
             );
         }
 
-
         /*
-         * 2. 查询学生岗位
+         * =====================================================
+         * 注意：
+         *
+         * 这里故意不创建：
+         *
+         * sys_user_position
+         *
+         * 也不创建：
+         *
+         * sys_user_department
+         *
+         * 因为普通学生不需要部门职位。
+         *
+         * 学生加入部门以后，
+         * 再通过部门成员 Excel 导入。
+         * =====================================================
          */
-        SysPosition studentPosition =
-                positionMapper.selectOne(
-                        new LambdaQueryWrapper<SysPosition>()
-                                .eq(
-                                        SysPosition::getName,
-                                        "学生"
-                                )
-                );
 
-
-        if (studentPosition == null) {
-
-            /*
-             * 用户已经创建了，
-             * 但岗位不存在。
-             *
-             * 这里直接提示。
-             */
-            return Result.error(
-                    "学生岗位不存在，请先创建“学生”岗位"
-            );
-        }
-
-
-        /*
-         * 3. 建立学生岗位关系
-         */
-        SysUserPosition relation =
-                new SysUserPosition();
-
-        relation.setUserId(
-                user.getId()
+        System.out.println(
+                "========== 学生创建成功 =========="
         );
 
-        relation.setPositionId(
-                studentPosition.getId()
+        System.out.println(
+                "id = " + user.getId()
         );
 
-        relation.setDepartmentId(
-                1L
+        System.out.println(
+                "studentNo = " + user.getStudentNo()
         );
-
-
-        int relationInsert =
-                userPositionMapper.insert(
-                        relation
-                );
-
-
-        if (relationInsert <= 0) {
-
-            return Result.error(
-                    "学生岗位绑定失败"
-            );
-        }
-
 
         return Result.success(null);
     }
