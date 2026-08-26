@@ -116,23 +116,60 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             );
         }
 
-        /**
-         * 防止整个 Excel 中出现重复学号
+        /*
+         * =========================================================
+         * 1. 查找“学生”岗位
+         * =========================================================
          *
-         * 因为现在是多 Sheet，
-         * 所以这个 Set 必须放在所有 Sheet 数据的外面。
+         * Excel 导入的所有学生，
+         * 都自动绑定这个岗位。
+         *
+         * 注意：
+         * 这里使用 LIMIT 1，
+         * 防止数据库里暂时存在多个“学生”岗位导致
+         * selectOne() 报错。
+         */
+        SysPosition studentPosition =
+                sysPositionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(
+                                        SysPosition::getName,
+                                        "学生"
+                                )
+                                .eq(
+                                        SysPosition::getStatus,
+                                        (short) 1
+                                )
+                                .orderByAsc(
+                                        SysPosition::getId
+                                )
+                                .last(
+                                        "LIMIT 1"
+                                )
+                );
+
+        if (studentPosition == null) {
+
+            throw new RuntimeException(
+                    "系统中不存在有效的“学生”岗位，请先创建学生岗位"
+            );
+        }
+
+        /*
+         * =========================================================
+         * 2. 防止 Excel 内部重复学号
+         * =========================================================
          */
         Set<String> excelStudentNos =
                 new HashSet<>();
 
-        /**
-         * EasyExcel 读取多 Sheet 后，
-         * 这里只能保证数据行编号顺序。
-         *
-         * 第一行通常是表头，所以从 2 开始。
-         */
         int rowNumber = 1;
 
+        /*
+         * =========================================================
+         * 3. 遍历 Excel
+         * =========================================================
+         */
         for (StudentExcelRow row : rows) {
 
             rowNumber++;
@@ -160,10 +197,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String className =
                     trim(row.getClassName());
 
-            /**
-             * =================================================
-             * 1. 学号
-             * =================================================
+            /*
+             * =====================================================
+             * 4. 学号校验
+             * =====================================================
              */
             if (isEmpty(studentNo)) {
 
@@ -179,10 +216,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 2. 姓名
-             * =================================================
+            /*
+             * =====================================================
+             * 5. 姓名校验
+             * =====================================================
              */
             if (isEmpty(realName)) {
 
@@ -198,10 +235,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 3. 班级
-             * =================================================
+            /*
+             * =====================================================
+             * 6. 班级校验
+             * =====================================================
              */
             if (isEmpty(className)) {
 
@@ -217,10 +254,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 4. Excel 内部重复学号
-             * =================================================
+            /*
+             * =====================================================
+             * 7. Excel 内部重复学号
+             * =====================================================
              */
             if (!excelStudentNos.add(studentNo)) {
 
@@ -237,10 +274,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 5. 查询数据库
-             * =================================================
+            /*
+             * =====================================================
+             * 8. 查询系统用户
+             * =====================================================
              */
             SysUser user =
                     sysUserMapper.selectOne(
@@ -249,115 +286,241 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                             SysUser::getStudentNo,
                                             studentNo
                                     )
-                                    .last("LIMIT 1")
+                                    .last(
+                                            "LIMIT 1"
+                                    )
                     );
 
             LocalDateTime now =
                     LocalDateTime.now();
 
-            /**
-             * =================================================
-             * 6. 学生不存在 → 新增
-             * =================================================
+            /*
+             * =====================================================
+             * 9. 学生不存在 → 新增
+             * =====================================================
              */
             if (user == null) {
 
                 user = new SysUser();
 
-                /**
+                /*
                  * 学号
                  */
-                user.setStudentNo(studentNo);
+                user.setStudentNo(
+                        studentNo
+                );
 
-                /**
+                /*
                  * 登录账号 = 学号
                  */
-                user.setUsername(studentNo);
+                user.setUsername(
+                        studentNo
+                );
 
-                /**
+                /*
                  * 默认密码 = 学号
-                 *
-                 * 例如：
-                 *
-                 * 账号：2025404558
-                 * 密码：2025404558
                  */
-                user.setPassword(studentNo);
+                user.setPassword(
+                        studentNo
+                );
 
-                /**
+                /*
                  * 姓名
                  */
-                user.setRealName(realName);
+                user.setRealName(
+                        realName
+                );
 
-                /**
+                /*
                  * 班级
                  */
-                user.setClassName(className);
+                user.setClassName(
+                        className
+                );
 
-                /**
+                /*
                  * 默认启用
                  */
-                user.setStatus((short) 1);
+                user.setStatus(
+                        (short) 1
+                );
 
-                /**
+                /*
                  * 时间
                  */
-                user.setCreateTime(now);
-                user.setUpdateTime(now);
+                user.setCreateTime(
+                        now
+                );
 
-                /**
-                 * 插入数据库
+                user.setUpdateTime(
+                        now
+                );
+
+                /*
+                 * 插入用户
                  */
-                sysUserMapper.insert(user);
+                int insert =
+                        sysUserMapper.insert(
+                                user
+                        );
 
-                successCount++;
+                if (insert <= 0) {
 
-                continue;
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "学生创建失败：" +
+                                            studentNo
+                            )
+                    );
+
+                    continue;
+                }
+
+            } else {
+
+                /*
+                 * =================================================
+                 * 10. 学生已经存在 → 更新
+                 * =================================================
+                 */
+
+                /*
+                 * 用户名保证为学号
+                 */
+                user.setUsername(
+                        studentNo
+                );
+
+                /*
+                 * 如果密码为空，
+                 * 默认使用学号。
+                 */
+                if (isEmpty(user.getPassword())) {
+
+                    user.setPassword(
+                            studentNo
+                    );
+                }
+
+                /*
+                 * 更新姓名
+                 */
+                user.setRealName(
+                        realName
+                );
+
+                /*
+                 * 更新班级
+                 */
+                user.setClassName(
+                        className
+                );
+
+                /*
+                 * 状态为空 → 启用
+                 */
+                if (user.getStatus() == null) {
+
+                    user.setStatus(
+                            (short) 1
+                    );
+                }
+
+                user.setUpdateTime(
+                        now
+                );
+
+                sysUserMapper.updateById(
+                        user
+                );
             }
 
-            /**
-             * =================================================
-             * 7. 学生已经存在 → 更新
-             * =================================================
+            /*
+             * =====================================================
+             * 11. 自动绑定“学生”岗位
+             * =====================================================
+             *
+             * 这是这次最重要的修改。
+             *
+             * Excel 中导入的每一个学生，
+             * 都必须在 sys_user_position 中存在：
+             *
+             * user_id     = 当前学生ID
+             * position_id = 学生岗位ID
+             *
+             * 如果已经绑定，就不重复插入。
              */
+            SysUserPosition userPosition =
+                    sysUserPositionMapper.selectOne(
+                            new LambdaQueryWrapper<SysUserPosition>()
+                                    .eq(
+                                            SysUserPosition::getUserId,
+                                            user.getId()
+                                    )
+                                    .eq(
+                                            SysUserPosition::getPositionId,
+                                            studentPosition.getId()
+                                    )
+                                    .last(
+                                            "LIMIT 1"
+                                    )
+                    );
 
-            /**
-             * 保证用户名不是 null
+            /*
+             * =====================================================
+             * 12. 没有学生岗位关系 → 创建
+             * =====================================================
              */
-            user.setUsername(studentNo);
+            if (userPosition == null) {
 
-            /**
-             * 如果密码为空，
-             * 自动使用学号作为密码。
-             */
-            if (isEmpty(user.getPassword())) {
+                userPosition = new SysUserPosition();
 
-                user.setPassword(studentNo);
+                userPosition.setUserId(
+                        user.getId()
+                );
+
+                userPosition.setPositionId(
+                        studentPosition.getId()
+                );
+
+                // 学生默认所属部门
+                userPosition.setDepartmentId(
+                        1L
+                );
+
+                userPosition.setCreateTime(
+                        now
+                );
+
+                int positionInsert =
+                        sysUserPositionMapper.insert(
+                                userPosition
+                        );
+
+                if (positionInsert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "学生岗位绑定失败：" +
+                                            studentNo
+                            )
+                    );
+
+                    continue;
+                }
             }
 
-            /**
-             * 更新姓名
+            /*
+             * =====================================================
+             * 13. 当前学生处理成功
+             * =====================================================
              */
-            user.setRealName(realName);
-
-            /**
-             * 更新班级
-             */
-            user.setClassName(className);
-
-            /**
-             * 如果状态为空，
-             * 默认启用。
-             */
-            if (user.getStatus() == null) {
-
-                user.setStatus((short) 1);
-            }
-
-            user.setUpdateTime(now);
-
-            sysUserMapper.updateById(user);
-
             successCount++;
         }
 
@@ -377,6 +540,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
      * Excel：
      *
      * 部门 | 学号 | 姓名 | 职位
+     *
      *
      * 职位：
      *
