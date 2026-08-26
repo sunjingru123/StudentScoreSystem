@@ -392,7 +392,181 @@ public class SysUserController {
         );
     }
 
+    /**
+     * =========================================================
+     * 获取全部学生
+     * =========================================================
+     *
+     * 给：
+     * 1. 成绩管理
+     * 2. 成绩调整
+     * 3. 下拉选择学生
+     *
+     * 使用。
+     *
+     * GET /user/student/all
+     *
+     * 返回：
+     *
+     * [
+     *   {
+     *      id: 8,
+     *      studentNo: "2025405884",
+     *      realName: "阿拉帕提",
+     *      username: "...",
+     *      className: "...",
+     *      phone: "...",
+     *      status: 1
+     *   }
+     * ]
+     */
+    @GetMapping("/student/all")
+    public Result<List<StudentVO>> allStudents() {
 
+        /*
+         * =====================================================
+         * 1. 查询“学生”岗位
+         * =====================================================
+         */
+
+        SysPosition studentPosition =
+                positionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(
+                                        SysPosition::getName,
+                                        "学生"
+                                )
+                );
+
+        if (studentPosition == null) {
+
+            return Result.success(
+                    new ArrayList<>()
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 2. 查询所有学生岗位关系
+         * =====================================================
+         */
+
+        List<SysUserPosition> relations =
+                userPositionMapper.selectList(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getPositionId,
+                                        studentPosition.getId()
+                                )
+                );
+
+        if (
+                relations == null
+                        || relations.isEmpty()
+        ) {
+
+            return Result.success(
+                    new ArrayList<>()
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 3. 获取学生 userId
+         * =====================================================
+         */
+
+        List<Long> userIds =
+                new ArrayList<>();
+
+        for (
+                SysUserPosition relation
+                : relations
+        ) {
+
+            if (relation == null) {
+                continue;
+            }
+
+            if (relation.getUserId() == null) {
+                continue;
+            }
+
+            userIds.add(
+                    relation.getUserId()
+            );
+        }
+
+
+        if (userIds.isEmpty()) {
+
+            return Result.success(
+                    new ArrayList<>()
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 4. 查询所有学生
+         * =====================================================
+         */
+
+        List<SysUser> users =
+                sysUserMapper.selectList(
+                        new LambdaQueryWrapper<SysUser>()
+                                .in(
+                                        SysUser::getId,
+                                        userIds
+                                )
+                                .orderByAsc(
+                                        SysUser::getStudentNo
+                                )
+                );
+
+
+        /*
+         * =====================================================
+         * 5. SysUser -> StudentVO
+         * =====================================================
+         */
+
+        List<StudentVO> result =
+                new ArrayList<>();
+
+
+        if (
+                users == null
+                        || users.isEmpty()
+        ) {
+
+            return Result.success(
+                    result
+            );
+        }
+
+
+        for (
+                SysUser user
+                : users
+        ) {
+
+            if (user == null) {
+                continue;
+            }
+
+            result.add(
+                    buildStudentVO(user)
+            );
+        }
+
+
+        return Result.success(
+                result
+        );
+    }
     /**
      * =========================================================
      * 搜索学生
