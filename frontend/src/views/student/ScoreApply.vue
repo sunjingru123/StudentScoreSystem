@@ -898,42 +898,37 @@ function removeDepartmentFile() {
  */
 
 async function submitCertificate() {
-  if (!certificateFormRef.value) {
-    return
+  console.log("开始提交，当前表单数据:", certificateForm);
+
+  // 检查关键数据
+  if (!certificateForm.ruleId) {
+    ElMessage.warning("必须选择加分项目！");
+    return;
   }
 
-  const valid = await certificateFormRef.value.validate()
-
-  if (!valid) {
-    return
-  }
-
-  certificateSubmitting.value = true
+  certificateSubmitting.value = true;
 
   try {
     const data = {
       ruleId: certificateForm.ruleId,
-
-      applyScore: certificateForm.applyScore,
-
-      description: certificateForm.description,
-
+      applyScore: certificateForm.applyScore || 0,
+      description: certificateForm.description || "无说明",
       materialFile: certificateFile.value ? certificateFile.value.name : null,
-    }
+    };
 
-    await request.post('/scoreApply/add', data)
+    console.log("正在向后端发送 POST 请求...");
+    // 强制发送请求，不再依赖 certificateFormRef.value.validate()
+    const res = await request.post('/scoreApply/add', data);
 
-    ElMessage.success('个人证书申报提交成功，等待档案部审核')
-
-    resetCertificate()
-
-    await loadMyApply()
+    console.log("后端返回结果:", res.data);
+    ElMessage.success('提交成功');
+    resetCertificate();
+    loadMyApply();
   } catch (error) {
-    console.error(error)
-
-    ElMessage.error(error?.response?.data?.message || '提交失败')
+    console.error("请求过程发生错误:", error);
+    ElMessage.error('提交失败，请看控制台错误');
   } finally {
-    certificateSubmitting.value = false
+    certificateSubmitting.value = false;
   }
 }
 
@@ -1134,22 +1129,24 @@ async function loadMyApply() {
 
 /*
  * ============================
- * 初始化
+ * 初始化 (修改为不使用 await 阻塞)
  * ============================
  */
+onMounted(() => {
+  // 1. 发起权限检查 (就算这个失败了，也不影响后面)
+  loadPermission().catch(e => console.error("权限接口报错:", e))
 
-onMounted(async () => {
-  await loadPermission()
+  // 2. 加载加分规则
+  loadScoreRules().catch(e => console.error("规则接口报错:", e))
 
-  await loadScoreRules()
-
-  await loadMyApply()
+  // 3. 【核心】发起我的申报记录请求
+  loadMyApply().catch(e => console.error("列表接口报错:", e))
 
   /*
    * 只有副部长 / 部长才加载审核列表
    */
   if (permission.canDepartmentAudit) {
-    await loadAuditList()
+    loadAuditList()
   }
 })
 </script>
