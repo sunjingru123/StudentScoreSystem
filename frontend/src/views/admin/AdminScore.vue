@@ -14,14 +14,6 @@
         </p>
       </div>
 
-      <el-button
-        type="primary"
-        :loading="loading"
-        @click="loadStudents"
-      >
-        刷新
-      </el-button>
-
     </div>
 
 
@@ -42,7 +34,7 @@
             placeholder="学号 / 姓名 / 班级"
             clearable
             style="width: 280px"
-            @keyup.enter="search"
+            @keyup.enter="handleSearch"
           />
 
         </el-form-item>
@@ -52,13 +44,14 @@
 
           <el-button
             type="primary"
-            @click="search"
+            @click="handleSearch"
           >
             搜索
           </el-button>
 
+
           <el-button
-            @click="reset"
+            @click="handleReset"
           >
             重置
           </el-button>
@@ -79,21 +72,24 @@
     >
 
       <el-table
-        :data="filteredStudents"
+        :data="students"
         border
         stripe
         v-loading="loading"
         style="width: 100%"
       >
 
+        <!-- 序号 -->
         <el-table-column
           type="index"
           label="#"
           width="60"
           align="center"
+          :index="studentIndexMethod"
         />
 
 
+        <!-- 学号 -->
         <el-table-column
           prop="studentNo"
           label="学号"
@@ -101,6 +97,7 @@
         />
 
 
+        <!-- 姓名 -->
         <el-table-column
           prop="realName"
           label="姓名"
@@ -108,6 +105,7 @@
         />
 
 
+        <!-- 班级 -->
         <el-table-column
           prop="className"
           label="班级"
@@ -115,6 +113,7 @@
         />
 
 
+        <!-- 综合评分 -->
         <el-table-column
           label="综合评分"
           width="130"
@@ -124,7 +123,9 @@
           <template #default="{ row }">
 
             <span class="score">
+
               {{ formatScore(row.totalScore) }}
+
             </span>
 
           </template>
@@ -132,33 +133,7 @@
         </el-table-column>
 
 
-        <el-table-column
-          label="账号状态"
-          width="110"
-          align="center"
-        >
-
-          <template #default="{ row }">
-
-            <el-tag
-              v-if="Number(row.status) === 1"
-              type="success"
-            >
-              正常
-            </el-tag>
-
-            <el-tag
-              v-else
-              type="danger"
-            >
-              禁用
-            </el-tag>
-
-          </template>
-
-        </el-table-column>
-
-
+        <!-- 操作 -->
         <el-table-column
           label="操作"
           width="150"
@@ -184,14 +159,38 @@
 
 
       <!-- =====================================================
+           学生列表分页
+      ====================================================== -->
+      <div
+        v-if="!loading && studentTotal > 0"
+        class="pagination-wrapper"
+      >
+
+        <el-pagination
+          v-model:current-page="studentPage"
+          v-model:page-size="studentPageSize"
+
+          :page-sizes="[10, 20, 30, 50]"
+
+          :total="studentTotal"
+
+          layout="total, sizes, prev, pager, next, jumper"
+
+          background
+
+          @size-change="handleStudentSizeChange"
+
+          @current-change="handleStudentCurrentChange"
+        />
+
+      </div>
+
+
+      <!-- =====================================================
            空数据
       ====================================================== -->
       <el-empty
-        v-if="
-          !loading
-          &&
-          filteredStudents.length === 0
-        "
+        v-if="!loading && students.length === 0"
         description="暂无学生数据"
       />
 
@@ -205,11 +204,12 @@
       v-model="drawerVisible"
       title="学生成绩明细"
       size="720px"
+      destroy-on-close
     >
 
       <!-- ===================================================
            学生信息
-      ==================================================== -->
+      =================================================== -->
       <div
         v-if="currentStudent"
         class="student-info"
@@ -254,19 +254,6 @@
         </div>
 
 
-        <div>
-
-          <span>
-            用户名：
-          </span>
-
-          <strong>
-            {{ currentStudent.username || '-' }}
-          </strong>
-
-        </div>
-
-
         <div class="total-score">
 
           综合评分：
@@ -285,7 +272,7 @@
 
       <!-- ===================================================
            成绩明细
-      ==================================================== -->
+      =================================================== -->
       <el-table
         :data="scoreDetails"
         border
@@ -294,14 +281,17 @@
         style="width: 100%"
       >
 
+        <!-- 序号 -->
         <el-table-column
           type="index"
           label="#"
-          width="55"
+          width="60"
           align="center"
+          :index="scoreIndexMethod"
         />
 
 
+        <!-- 评分项目 -->
         <el-table-column
           prop="ruleName"
           label="评分项目"
@@ -310,6 +300,7 @@
         />
 
 
+        <!-- 分数 -->
         <el-table-column
           label="分数"
           width="100"
@@ -339,6 +330,7 @@
         </el-table-column>
 
 
+        <!-- 来源 -->
         <el-table-column
           label="来源"
           width="100"
@@ -353,6 +345,7 @@
         </el-table-column>
 
 
+        <!-- 状态 -->
         <el-table-column
           label="状态"
           width="100"
@@ -380,10 +373,10 @@
         </el-table-column>
 
 
+        <!-- 操作 -->
         <el-table-column
           label="操作"
           width="110"
-          fixed="right"
           align="center"
         >
 
@@ -416,16 +409,31 @@
 
 
       <!-- ===================================================
-           无成绩
-      ==================================================== -->
-      <el-empty
-        v-if="
-          !detailLoading
-          &&
-          scoreDetails.length === 0
-        "
-        description="暂无成绩明细"
-      />
+           成绩明细分页
+      =================================================== -->
+      <div
+        v-if="!detailLoading && scoreTotal > 0"
+        class="detail-pagination-wrapper"
+      >
+
+        <el-pagination
+          v-model:current-page="scorePage"
+          v-model:page-size="scorePageSize"
+
+          :page-sizes="[5, 10, 20, 30]"
+
+          :total="scoreTotal"
+
+          layout="total, sizes, prev, pager, next, jumper"
+
+          background
+
+          @size-change="handleScoreSizeChange"
+
+          @current-change="handleScoreCurrentChange"
+        />
+
+      </div>
 
     </el-drawer>
 
@@ -437,7 +445,6 @@
 
 import {
   ref,
-  computed,
   onMounted
 } from 'vue'
 
@@ -453,279 +460,383 @@ import {
   showScore
 } from '@/api/adminScore'
 
-import request from '@/api/request'
+import request from '@/utils/request'
 
 
 /* =========================================================
- * 学生列表
+ * 基础状态
  * ========================================================= */
 
-const loading =
-  ref(false)
+const loading = ref(false)
 
-const students =
-  ref([])
+const detailLoading = ref(false)
 
 
 /* =========================================================
  * 搜索
  * ========================================================= */
 
-const keyword =
-  ref('')
+const keyword = ref('')
 
 
 /* =========================================================
- * 成绩详情
+ * 学生列表
  * ========================================================= */
 
-const drawerVisible =
-  ref(false)
-
-const detailLoading =
-  ref(false)
-
-const currentStudent =
-  ref(null)
-
-const scoreDetails =
-  ref([])
-
-const currentTotal =
-  ref(0)
+const students = ref([])
 
 
 /* =========================================================
- * 搜索后的学生
+ * 学生分页
  * ========================================================= */
 
-const filteredStudents =
-  computed(() => {
+const studentPage = ref(1)
 
-    const key =
-      keyword.value
-        .trim()
-        .toLowerCase()
+const studentPageSize = ref(10)
 
-
-    if (!key) {
-
-      return students.value
-
-    }
-
-
-    return students.value.filter(
-      student => {
-
-        return (
-
-          String(
-            student.studentNo || ''
-          )
-            .toLowerCase()
-            .includes(key)
-
-          ||
-
-          String(
-            student.realName || ''
-          )
-            .toLowerCase()
-            .includes(key)
-
-          ||
-
-          String(
-            student.className || ''
-          )
-            .toLowerCase()
-            .includes(key)
-
-        )
-
-      }
-    )
-
-  })
+const studentTotal = ref(0)
 
 
 /* =========================================================
- * 获取学生列表
- *
- * 使用：
- *
- * GET /user/student/all
- *
- * 注意：
- *
- * 这个接口返回全部学生，
- * 不走学生管理页面的分页。
+ * 成绩抽屉
  * ========================================================= */
 
-async function loadStudents() {
-  loading.value = true
+const drawerVisible = ref(false)
 
-  try {
-    const res = await request.get('/user/student/list')
+const currentStudent = ref(null)
 
-    console.log('学生列表原始返回：', res)
 
-    const data = res.data?.data
+/* =========================================================
+ * 成绩明细
+ * ========================================================= */
 
-    let list = []
+const scoreDetails = ref([])
 
-    // 兼容分页接口
-    if (data && Array.isArray(data.records)) {
-      list = data.records
-    }
-    // 兼容旧接口直接返回数组
-    else if (Array.isArray(data)) {
-      list = data
-    }
-    // 兼容 axios 返回数组
-    else if (Array.isArray(res.data)) {
-      list = res.data
-    }
+const currentTotal = ref(0)
 
-    console.log('解析后的学生列表：', list)
 
-    if (!Array.isArray(list)) {
-      throw new Error('学生列表数据格式异常')
-    }
+/* =========================================================
+ * 成绩明细分页
+ * ========================================================= */
 
-    const result = []
+const scorePage = ref(1)
 
-    for (const student of list) {
-      let total = 0
+const scorePageSize = ref(10)
 
-      try {
-        const totalRes = await getAdminStudentTotal(student.id)
+const scoreTotal = ref(0)
 
-        const totalData = totalRes.data?.data
 
-        if (
-          typeof totalData === 'object' &&
-          totalData !== null
-        ) {
-          total =
-            totalData.totalScore ??
-            totalData.score ??
-            0
-        } else {
-          total =
-            totalData ??
-            totalRes.data ??
-            0
-        }
+/* =========================================================
+ * 学生列表序号
+ * ========================================================= */
 
-      } catch (e) {
-        console.error(
-          `获取学生 ${student.id} 总成绩失败：`,
-          e
-        )
-      }
+function studentIndexMethod(index) {
 
-      result.push({
-        ...student,
-        totalScore: total
-      })
-    }
+  return (
+    (studentPage.value - 1)
+    *
+    studentPageSize.value
+    +
+    index
+    +
+    1
+  )
 
-    students.value = result
-
-  } catch (error) {
-    console.error(
-      '获取学生列表失败：',
-      error
-    )
-
-    students.value = []
-
-    ElMessage.error(
-      error.response?.data?.msg ||
-      error.response?.data?.message ||
-      error.message ||
-      '学生列表加载失败'
-    )
-
-  } finally {
-    loading.value = false
-  }
 }
 
 
 /* =========================================================
- * 加载所有学生综合成绩
+ * 成绩明细序号
  * ========================================================= */
 
-async function loadStudentTotals() {
+function scoreIndexMethod(index) {
 
-  const studentList =
-    students.value
+  return (
+    (scorePage.value - 1)
+    *
+    scorePageSize.value
+    +
+    index
+    +
+    1
+  )
+
+}
 
 
-  if (
-    !studentList
-    ||
-    studentList.length === 0
-  ) {
+/* =========================================================
+ * 加载学生列表
+ *
+ * 真正的后端分页
+ * ========================================================= */
 
-    return
+async function loadStudents() {
+
+  loading.value = true
+
+  try {
+
+    /*
+     * =====================================================
+     * 重点：
+     *
+     * pageNum
+     * pageSize
+     *
+     * 交给后端分页
+     * =====================================================
+     */
+
+    const res =
+      await request.get(
+        '/user/student/list',
+        {
+          params: {
+
+            pageNum:
+            studentPage.value,
+
+            pageSize:
+            studentPageSize.value,
+
+            keyword:
+              keyword.value.trim() || undefined
+
+          }
+
+        }
+      )
+
+
+    console.log(
+      '学生列表原始返回：',
+      res
+    )
+
+
+    const data =
+      res.data?.data
+
+
+    let records = []
+
+    let total = 0
+
+
+    /*
+     * =====================================================
+     * MyBatis-Plus 分页格式
+     *
+     * {
+     *   records: [],
+     *   total: 100,
+     *   pages: 10,
+     *   current: 1,
+     *   size: 10
+     * }
+     * =====================================================
+     */
+
+    if (
+      data
+      &&
+      Array.isArray(data.records)
+    ) {
+
+      records =
+        data.records
+
+      total =
+        Number(
+          data.total || 0
+        )
+
+    }
+
+
+    /*
+     * =====================================================
+     * 兼容旧接口直接返回数组
+     * =====================================================
+     */
+
+    else if (
+      Array.isArray(data)
+    ) {
+
+      records =
+        data
+
+      /*
+       * 旧接口没有 total，
+       * 只能按照当前数组数量处理。
+       */
+
+      total =
+        data.length
+
+    }
+
+
+    /*
+     * =====================================================
+     * 兼容 res.data 直接数组
+     * =====================================================
+     */
+
+    else if (
+      Array.isArray(res.data)
+    ) {
+
+      records =
+        res.data
+
+      total =
+        res.data.length
+
+    }
+
+
+    /*
+     * =====================================================
+     * 数据异常
+     * =====================================================
+     */
+
+    if (!Array.isArray(records)) {
+
+      throw new Error(
+        '学生列表数据格式异常'
+      )
+
+    }
+
+
+    /*
+     * =====================================================
+     * 先显示学生基本信息
+     * =====================================================
+     */
+
+    students.value =
+      records.map(
+        student => ({
+
+          ...student,
+
+          totalScore:
+            0
+
+        })
+      )
+
+
+    studentTotal.value =
+      total
+
+
+    /*
+     * =====================================================
+     * 并行加载当前页学生综合成绩
+     * =====================================================
+     */
+
+    await loadCurrentPageScores()
+
+  } catch (error) {
+
+    console.error(
+      '学生列表加载失败：',
+      error
+    )
+
+    students.value =
+      []
+
+    studentTotal.value =
+      0
+
+    ElMessage.error(
+      error.response?.data?.msg
+      ||
+      error.response?.data?.message
+      ||
+      error.message
+      ||
+      '学生列表加载失败'
+    )
+
+  } finally {
+
+    loading.value = false
 
   }
 
+}
 
-  await Promise.all(
 
-    studentList.map(
+/* =========================================================
+ * 加载当前页学生综合成绩
+ * ========================================================= */
+
+async function loadCurrentPageScores() {
+
+  const promises =
+    students.value.map(
       async student => {
 
         try {
 
-          const totalRes =
+          const res =
             await getAdminStudentTotal(
               student.id
             )
 
 
           const data =
-            totalRes?.data?.data
+            res.data?.data
 
 
           /*
            * 兼容：
            *
-           * Result.success(数字)
+           * { totalScore: 85 }
            *
-           * Result.success({totalScore: xx})
+           * 或
+           *
+           * 85
            */
 
           if (
-            data !== null
+            data
             &&
             typeof data === 'object'
-            &&
-            data.totalScore !== undefined
           ) {
 
             student.totalScore =
               data.totalScore
+              ??
+              data.score
+              ??
+              0
 
           } else {
 
             student.totalScore =
-              data ?? 0
+              data
+              ??
+              res.data
+              ??
+              0
 
           }
 
         } catch (error) {
 
           console.error(
-            `学生 ${student.id} 获取综合成绩失败：`,
+            `获取学生 ${student.id} 成绩失败：`,
             error
           )
-
 
           student.totalScore =
             0
@@ -735,7 +846,41 @@ async function loadStudentTotals() {
       }
     )
 
+
+  await Promise.all(
+    promises
   )
+
+}
+
+
+/* =========================================================
+ * 学生分页：修改每页数量
+ * ========================================================= */
+
+async function handleStudentSizeChange(size) {
+
+  studentPageSize.value =
+    size
+
+  studentPage.value =
+    1
+
+  await loadStudents()
+
+}
+
+
+/* =========================================================
+ * 学生分页：切换页码
+ * ========================================================= */
+
+async function handleStudentCurrentChange(page) {
+
+  studentPage.value =
+    page
+
+  await loadStudents()
 
 }
 
@@ -744,13 +889,12 @@ async function loadStudentTotals() {
  * 搜索
  * ========================================================= */
 
-function search() {
+async function handleSearch() {
 
-  /*
-   * computed 自动过滤。
-   *
-   * 这里不需要重新请求服务器。
-   */
+  studentPage.value =
+    1
+
+  await loadStudents()
 
 }
 
@@ -759,16 +903,21 @@ function search() {
  * 重置
  * ========================================================= */
 
-function reset() {
+async function handleReset() {
 
   keyword.value =
     ''
+
+  studentPage.value =
+    1
+
+  await loadStudents()
 
 }
 
 
 /* =========================================================
- * 查看成绩
+ * 打开成绩详情
  * ========================================================= */
 
 async function openDetail(student) {
@@ -776,139 +925,171 @@ async function openDetail(student) {
   currentStudent.value =
     student
 
-
   drawerVisible.value =
     true
+
+
+  /*
+   * 每次打开学生成绩，
+   * 默认第一页
+   */
+
+  scorePage.value =
+    1
+
+  scorePageSize.value =
+    10
+
+  scoreTotal.value =
+    0
+
+  scoreDetails.value =
+    []
+
+  currentTotal.value =
+    student.totalScore
+    ??
+    0
+
+
+  await loadScoreDetail()
+
+}
+
+
+/* =========================================================
+ * 加载成绩明细
+ * ========================================================= */
+
+async function loadScoreDetail() {
+
+  if (
+    !currentStudent.value
+    ||
+    !currentStudent.value.id
+  ) {
+
+    return
+
+  }
 
 
   detailLoading.value =
     true
 
 
-  scoreDetails.value =
-    []
-
-
-  currentTotal.value =
-    student.totalScore ?? 0
-
-
   try {
 
-    const [
-      detailRes,
-      totalRes
-    ] =
-      await Promise.all([
+    /*
+     * =====================================================
+     * 这里优先使用你前面已经使用过的分页接口。
+     *
+     * 如果 getAdminStudentScores 内部目前还没有分页参数，
+     * 后面只需要改 api/adminScore.js。
+     * =====================================================
+     */
 
-        getAdminStudentScores(
-          student.id
-        ),
+    const res =
+      await getAdminStudentScores(
+        currentStudent.value.id,
+        {
+          pageNum:
+          scorePage.value,
 
-        getAdminStudentTotal(
-          student.id
-        )
+          pageSize:
+          scorePageSize.value
+        }
+      )
 
-      ])
+
+    console.log(
+      '成绩明细原始返回：',
+      res
+    )
+
+
+    const data =
+      res.data?.data
 
 
     /*
      * =====================================================
-     * 解析成绩明细
+     * MyBatis-Plus 分页
      * =====================================================
      */
 
-    const detailData =
-      detailRes?.data?.data
-
-
     if (
-      Array.isArray(detailData)
+      data
+      &&
+      Array.isArray(data.records)
     ) {
 
       scoreDetails.value =
-        detailData
+        data.records
+
+      scoreTotal.value =
+        Number(
+          data.total || 0
+        )
 
     }
+
+
+    /*
+     * =====================================================
+     * 旧接口直接数组
+     * =====================================================
+     */
 
     else if (
-      detailData
-      &&
-      Array.isArray(
-        detailData.records
-      )
+      Array.isArray(data)
     ) {
 
       scoreDetails.value =
-        detailData.records
+        data
+
+      scoreTotal.value =
+        data.length
 
     }
+
 
     else {
 
       scoreDetails.value =
         []
 
-    }
-
-
-    /*
-     * =====================================================
-     * 解析总成绩
-     * =====================================================
-     */
-
-    const totalData =
-      totalRes?.data?.data
-
-
-    if (
-      totalData
-      &&
-      typeof totalData === 'object'
-      &&
-      totalData.totalScore !== undefined
-    ) {
-
-      currentTotal.value =
-        totalData.totalScore
-
-    }
-
-    else {
-
-      currentTotal.value =
-        totalData ?? 0
+      scoreTotal.value =
+        0
 
     }
 
 
     /*
-     * 同步学生列表中的总成绩
+     * =====================================================
+     * 同时刷新当前学生总成绩
+     * =====================================================
      */
 
-    student.totalScore =
-      currentTotal.value
-
+    await refreshCurrentTotal()
 
   } catch (error) {
 
     console.error(
-      '成绩详情加载失败：',
+      '成绩加载失败：',
       error
     )
 
+    scoreDetails.value =
+      []
 
-    console.error(
-      '成绩详情后端返回：',
-      error?.response?.data
-    )
-
+    scoreTotal.value =
+      0
 
     ElMessage.error(
-      error?.response?.data?.msg
+      error.response?.data?.msg
       ||
-      error?.response?.data?.message
+      error.response?.data?.message
       ||
       '成绩加载失败'
     )
@@ -919,6 +1100,135 @@ async function openDetail(student) {
       false
 
   }
+
+}
+
+
+/* =========================================================
+ * 刷新当前学生总成绩
+ * ========================================================= */
+
+async function refreshCurrentTotal() {
+
+  if (
+    !currentStudent.value
+  ) {
+
+    return
+
+  }
+
+
+  try {
+
+    const res =
+      await getAdminStudentTotal(
+        currentStudent.value.id
+      )
+
+
+    const data =
+      res.data?.data
+
+
+    let total =
+      0
+
+
+    if (
+      data
+      &&
+      typeof data === 'object'
+    ) {
+
+      total =
+        data.totalScore
+        ??
+        data.score
+        ??
+        0
+
+    } else {
+
+      total =
+        data
+        ??
+        res.data
+        ??
+        0
+
+    }
+
+
+    currentTotal.value =
+      total
+
+
+    currentStudent.value.totalScore =
+      total
+
+
+    /*
+     * 同步学生列表中的总成绩
+     */
+
+    const student =
+      students.value.find(
+        item =>
+          Number(item.id)
+          ===
+          Number(
+            currentStudent.value.id
+          )
+      )
+
+
+    if (student) {
+
+      student.totalScore =
+        total
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      '刷新综合成绩失败：',
+      error
+    )
+
+  }
+
+}
+
+
+/* =========================================================
+ * 成绩分页：修改每页数量
+ * ========================================================= */
+
+async function handleScoreSizeChange(size) {
+
+  scorePageSize.value =
+    size
+
+  scorePage.value =
+    1
+
+  await loadScoreDetail()
+
+}
+
+
+/* =========================================================
+ * 成绩分页：切换页码
+ * ========================================================= */
+
+async function handleScoreCurrentChange(page) {
+
+  scorePage.value =
+    page
+
+  await loadScoreDetail()
 
 }
 
@@ -944,51 +1254,50 @@ async function handleHide(row) {
     )
 
 
-    /*
-     * 隐藏成绩
-     */
-
     await hideScore(
       row.id
     )
-
-
-    /*
-     * 当前学生 ID
-     */
-
-    const studentId =
-      getStudentId(row)
-
-
-    /*
-     * 重新加载成绩明细和总成绩
-     */
-
-    await reloadCurrentStudent(
-      studentId
-    )
-
-
-    /*
-     * 刷新学生列表
-     */
-
-    await loadStudents()
 
 
     ElMessage.success(
       '成绩已隐藏'
     )
 
-  } catch (error) {
 
     /*
-     * Element Plus 点击取消
-     * 通常返回：
-     *
-     * 'cancel'
+     * 如果当前页最后一条被隐藏，
+     * 可能导致当前页没有数据。
      */
+
+    await loadScoreDetail()
+
+
+    /*
+     * 刷新学生列表中的总成绩
+     */
+
+    await refreshCurrentTotal()
+
+
+    /*
+     * 如果当前页超过实际页数，
+     * 自动回到上一页
+     */
+
+    if (
+      scoreDetails.value.length === 0
+      &&
+      scorePage.value > 1
+    ) {
+
+      scorePage.value =
+        scorePage.value - 1
+
+      await loadScoreDetail()
+
+    }
+
+  } catch (error) {
 
     if (
       error === 'cancel'
@@ -1006,12 +1315,7 @@ async function handleHide(row) {
       error
     )
 
-
     ElMessage.error(
-      error?.response?.data?.msg
-      ||
-      error?.response?.data?.message
-      ||
       '隐藏失败'
     )
 
@@ -1041,42 +1345,20 @@ async function handleShow(row) {
     )
 
 
-    /*
-     * 恢复
-     */
-
     await showScore(
       row.id
     )
 
 
-    /*
-     * 获取学生 ID
-     */
-
-    const studentId =
-      getStudentId(row)
-
-
-    /*
-     * 重新加载
-     */
-
-    await reloadCurrentStudent(
-      studentId
-    )
-
-
-    /*
-     * 刷新学生列表
-     */
-
-    await loadStudents()
-
-
     ElMessage.success(
       '成绩已恢复'
     )
+
+
+    await loadScoreDetail()
+
+
+    await refreshCurrentTotal()
 
   } catch (error) {
 
@@ -1096,186 +1378,8 @@ async function handleShow(row) {
       error
     )
 
-
     ElMessage.error(
-      error?.response?.data?.msg
-      ||
-      error?.response?.data?.message
-      ||
       '恢复失败'
-    )
-
-  }
-
-}
-
-
-/* =========================================================
- * 获取成绩记录对应的学生 ID
- * ========================================================= */
-
-function getStudentId(row) {
-
-  if (
-    row?.studentId !== undefined
-    &&
-    row?.studentId !== null
-  ) {
-
-    return row.studentId
-
-  }
-
-
-  if (
-    row?.userId !== undefined
-    &&
-    row?.userId !== null
-  ) {
-
-    return row.userId
-
-  }
-
-
-  /*
-   * 最后的兼容：
-   *
-   * 某些接口可能直接把学生 ID 放在 id。
-   */
-
-  return row?.id
-
-}
-
-
-/* =========================================================
- * 重新加载当前学生成绩
- * ========================================================= */
-
-async function reloadCurrentStudent(
-  studentId
-) {
-
-  if (
-    studentId === undefined
-    ||
-    studentId === null
-  ) {
-
-    return
-
-  }
-
-
-  try {
-
-    const [
-      detailRes,
-      totalRes
-    ] =
-      await Promise.all([
-
-        getAdminStudentScores(
-          studentId
-        ),
-
-        getAdminStudentTotal(
-          studentId
-        )
-
-      ])
-
-
-    /*
-     * 成绩明细
-     */
-
-    const detailData =
-      detailRes?.data?.data
-
-
-    if (
-      Array.isArray(detailData)
-    ) {
-
-      scoreDetails.value =
-        detailData
-
-    }
-
-    else if (
-      detailData
-      &&
-      Array.isArray(
-        detailData.records
-      )
-    ) {
-
-      scoreDetails.value =
-        detailData.records
-
-    }
-
-    else {
-
-      scoreDetails.value =
-        []
-
-    }
-
-
-    /*
-     * 总成绩
-     */
-
-    const totalData =
-      totalRes?.data?.data
-
-
-    if (
-      totalData
-      &&
-      typeof totalData === 'object'
-      &&
-      totalData.totalScore !== undefined
-    ) {
-
-      currentTotal.value =
-        totalData.totalScore
-
-    }
-
-    else {
-
-      currentTotal.value =
-        totalData ?? 0
-
-    }
-
-
-    /*
-     * 更新当前学生
-     */
-
-    if (
-      currentStudent.value
-      &&
-      Number(currentStudent.value.id)
-      ===
-      Number(studentId)
-    ) {
-
-      currentStudent.value.totalScore =
-        currentTotal.value
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      '刷新当前学生成绩失败：',
-      error
     )
 
   }
@@ -1328,12 +1432,10 @@ function formatSource(
 
 
 /* =========================================================
- * 分数格式
+ * 分数格式化
  * ========================================================= */
 
-function formatScore(
-  score
-) {
+function formatScore(score) {
 
   if (
     score === null
@@ -1396,7 +1498,8 @@ onMounted(() => {
 
   background: #f5f7fa;
 
-  min-height: calc(100vh - 60px);
+  min-height:
+    calc(100vh - 60px);
 
 }
 
@@ -1406,12 +1509,6 @@ onMounted(() => {
  * ========================================================= */
 
 .page-header {
-
-  display: flex;
-
-  justify-content: space-between;
-
-  align-items: center;
 
   margin-bottom: 20px;
 
@@ -1463,7 +1560,7 @@ onMounted(() => {
 
 
 /* =========================================================
- * 综合成绩
+ * 学生综合评分
  * ========================================================= */
 
 .score {
@@ -1478,6 +1575,25 @@ onMounted(() => {
 
 
 /* =========================================================
+ * 学生分页
+ * ========================================================= */
+
+.pagination-wrapper {
+
+  display: flex;
+
+  justify-content: flex-end;
+
+  align-items: center;
+
+  margin-top: 20px;
+
+  padding: 5px 0;
+
+}
+
+
+/* =========================================================
  * 学生信息
  * ========================================================= */
 
@@ -1485,7 +1601,8 @@ onMounted(() => {
 
   display: grid;
 
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:
+    1fr 1fr;
 
   gap: 15px;
 
@@ -1501,57 +1618,88 @@ onMounted(() => {
 }
 
 
-.student-info strong {
-
-  color: #303133;
-
-}
-
-
 .total-score {
 
-  grid-column: 1 / 3;
+  grid-column:
+    1 / 3;
 
   padding: 14px;
 
-  background: #f0f9ff;
+  background:
+    #f0f9ff;
 
-  border-radius: 8px;
+  border-radius:
+    8px;
 
-  color: #606266;
+  color:
+    #606266;
 
 }
 
 
 .total-score strong {
 
-  color: #409eff;
+  color:
+    #409eff;
 
-  font-size: 25px;
+  font-size:
+    25px;
 
-  margin-left: 8px;
+  margin-left:
+    8px;
 
 }
 
 
 /* =========================================================
- * 分数
+ * 成绩分页
  * ========================================================= */
 
-.score-plus {
+.detail-pagination-wrapper {
 
-  color: #67c23a;
+  display: flex;
 
-  font-weight: 600;
+  justify-content:
+    flex-end;
+
+  align-items:
+    center;
+
+  margin-top:
+    20px;
+
+  padding:
+    5px 0;
 
 }
 
 
+/* =========================================================
+ * 加分
+ * ========================================================= */
+
+.score-plus {
+
+  color:
+    #67c23a;
+
+  font-weight:
+    600;
+
+}
+
+
+/* =========================================================
+ * 减分
+ * ========================================================= */
+
 .score-minus {
 
-  color: #f56c6c;
+  color:
+    #f56c6c;
 
-  font-weight: 600;
+  font-weight:
+    600;
 
 }
 
