@@ -66,7 +66,7 @@ public class SysUserController {
      */
     @GetMapping("/student/list")
     public Result<Page<StudentVO>> studentList(
-            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String studentNo,
             @RequestParam(required = false) String realName,
@@ -80,8 +80,8 @@ public class SysUserController {
          * =====================================================
          */
 
-        if (page < 1) {
-            page = 1;
+        if (pageNum < 1) {
+            pageNum = 1;
         }
 
         if (pageSize < 1) {
@@ -92,19 +92,10 @@ public class SysUserController {
             pageSize = 100;
         }
 
+
         /*
          * =====================================================
          * 2. 查询所有“学生”岗位
-         *
-         * 注意：
-         * 这里绝对不能 selectOne()
-         *
-         * 因为你的数据库现在已经存在：
-         *
-         * 6  学生
-         * 7  学生
-         *
-         * 所以必须 selectList()
          * =====================================================
          */
 
@@ -121,9 +112,6 @@ public class SysUserController {
                                 )
                 );
 
-        /*
-         * 没有学生岗位
-         */
         if (
                 studentPositions == null
                         || studentPositions.isEmpty()
@@ -131,15 +119,16 @@ public class SysUserController {
 
             return Result.success(
                     emptyStudentPage(
-                            page,
+                            pageNum,
                             pageSize
                     )
             );
         }
 
+
         /*
          * =====================================================
-         * 3. 得到所有“学生”岗位 ID
+         * 3. 获取所有学生岗位 ID
          * =====================================================
          */
 
@@ -165,15 +154,16 @@ public class SysUserController {
 
             return Result.success(
                     emptyStudentPage(
-                            page,
+                            pageNum,
                             pageSize
                     )
             );
         }
 
+
         /*
          * =====================================================
-         * 4. 查询所有绑定“学生”岗位的用户关系
+         * 4. 查询所有学生岗位关系
          * =====================================================
          */
 
@@ -193,21 +183,16 @@ public class SysUserController {
 
             return Result.success(
                     emptyStudentPage(
-                            page,
+                            pageNum,
                             pageSize
                     )
             );
         }
 
+
         /*
          * =====================================================
-         * 5. 得到学生用户 ID
-         * =====================================================
-         *
-         * 使用 List 去重。
-         *
-         * 因为同一个学生可能因为历史数据，
-         * 同时绑定了两个“学生”岗位。
+         * 5. 获取学生 userId，并去重
          * =====================================================
          */
 
@@ -228,7 +213,6 @@ public class SysUserController {
             }
 
             if (!userIds.contains(userId)) {
-
                 userIds.add(userId);
             }
         }
@@ -237,38 +221,53 @@ public class SysUserController {
 
             return Result.success(
                     emptyStudentPage(
-                            page,
+                            pageNum,
                             pageSize
                     )
             );
         }
 
+
         /*
          * =====================================================
-         * 6. 查询学生
+         * 6. 创建真正的 MyBatis-Plus 分页对象
+         *
+         * 注意：
+         *
+         * 这里必须使用 pageNum
          * =====================================================
          */
 
         Page<SysUser> userPage =
                 new Page<>(
-                        page,
+                        pageNum,
                         pageSize
                 );
+
+
+        /*
+         * =====================================================
+         * 7. 查询条件
+         * =====================================================
+         */
 
         LambdaQueryWrapper<SysUser> wrapper =
                 new LambdaQueryWrapper<>();
 
+
         /*
-         * 只查询已经绑定“学生”岗位的用户
+         * 只查询学生
          */
+
         wrapper.in(
                 SysUser::getId,
                 userIds
         );
 
+
         /*
          * =====================================================
-         * 学号搜索
+         * 8. 学号搜索
          * =====================================================
          */
 
@@ -283,9 +282,10 @@ public class SysUserController {
             );
         }
 
+
         /*
          * =====================================================
-         * 姓名搜索
+         * 9. 姓名搜索
          * =====================================================
          */
 
@@ -300,9 +300,10 @@ public class SysUserController {
             );
         }
 
+
         /*
          * =====================================================
-         * 班级搜索
+         * 10. 班级搜索
          * =====================================================
          */
 
@@ -317,9 +318,10 @@ public class SysUserController {
             );
         }
 
+
         /*
          * =====================================================
-         * 状态搜索
+         * 11. 状态搜索
          * =====================================================
          */
 
@@ -331,9 +333,12 @@ public class SysUserController {
             );
         }
 
+
         /*
          * =====================================================
-         * 按学号排序
+         * 12. 固定排序
+         *
+         * 必须有稳定排序，否则分页可能出现重复数据。
          * =====================================================
          */
 
@@ -341,9 +346,14 @@ public class SysUserController {
                 SysUser::getStudentNo
         );
 
+        wrapper.orderByAsc(
+                SysUser::getId
+        );
+
+
         /*
          * =====================================================
-         * 执行分页查询
+         * 13. 真正执行分页
          * =====================================================
          */
 
@@ -353,9 +363,10 @@ public class SysUserController {
                         wrapper
                 );
 
+
         /*
          * =====================================================
-         * 7. SysUser -> StudentVO
+         * 14. Entity -> VO
          * =====================================================
          */
 
@@ -368,6 +379,7 @@ public class SysUserController {
 
         List<StudentVO> voList =
                 new ArrayList<>();
+
 
         for (
                 SysUser user
@@ -383,9 +395,23 @@ public class SysUserController {
             );
         }
 
+
+        /*
+         * =====================================================
+         * 15. 设置当前页数据
+         * =====================================================
+         */
+
         voPage.setRecords(
                 voList
         );
+
+
+        /*
+         * =====================================================
+         * 16. 返回
+         * =====================================================
+         */
 
         return Result.success(
                 voPage
@@ -425,20 +451,32 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 1. 查询“学生”岗位
+         * 1. 查询所有有效的“学生”岗位
+         *
+         * 不能 selectOne()
+         *
+         * 因为数据库可能存在多个“学生”岗位。
          * =====================================================
          */
 
-        SysPosition studentPosition =
-                positionMapper.selectOne(
+        List<SysPosition> studentPositions =
+                positionMapper.selectList(
                         new LambdaQueryWrapper<SysPosition>()
                                 .eq(
                                         SysPosition::getName,
                                         "学生"
                                 )
+                                .eq(
+                                        SysPosition::getStatus,
+                                        (short) 1
+                                )
                 );
 
-        if (studentPosition == null) {
+
+        if (
+                studentPositions == null
+                        || studentPositions.isEmpty()
+        ) {
 
             return Result.success(
                     new ArrayList<>()
@@ -448,18 +486,56 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 2. 查询所有学生岗位关系
+         * 2. 获取所有学生岗位 ID
+         * =====================================================
+         */
+
+        List<Long> positionIds =
+                new ArrayList<>();
+
+
+        for (
+                SysPosition position
+                : studentPositions
+        ) {
+
+            if (position == null) {
+                continue;
+            }
+
+            if (position.getId() == null) {
+                continue;
+            }
+
+            positionIds.add(
+                    position.getId()
+            );
+        }
+
+
+        if (positionIds.isEmpty()) {
+
+            return Result.success(
+                    new ArrayList<>()
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 3. 查询所有学生岗位关系
          * =====================================================
          */
 
         List<SysUserPosition> relations =
                 userPositionMapper.selectList(
                         new LambdaQueryWrapper<SysUserPosition>()
-                                .eq(
+                                .in(
                                         SysUserPosition::getPositionId,
-                                        studentPosition.getId()
+                                        positionIds
                                 )
                 );
+
 
         if (
                 relations == null
@@ -474,12 +550,15 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 3. 获取学生 userId
+         * 4. 学生 userId
+         *
+         * 去重
          * =====================================================
          */
 
         List<Long> userIds =
                 new ArrayList<>();
+
 
         for (
                 SysUserPosition relation
@@ -490,13 +569,17 @@ public class SysUserController {
                 continue;
             }
 
-            if (relation.getUserId() == null) {
+            Long userId =
+                    relation.getUserId();
+
+            if (userId == null) {
                 continue;
             }
 
-            userIds.add(
-                    relation.getUserId()
-            );
+            if (!userIds.contains(userId)) {
+
+                userIds.add(userId);
+            }
         }
 
 
@@ -510,7 +593,7 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 4. 查询所有学生
+         * 5. 查询学生
          * =====================================================
          */
 
@@ -529,7 +612,7 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 5. SysUser -> StudentVO
+         * 6. 转 VO
          * =====================================================
          */
 

@@ -1,584 +1,218 @@
 <template>
-  <div class="student-page">
-
-    <!-- =====================================================
-         页面标题
-    ====================================================== -->
+  <div class="score-page">
+    <!-- 页面标题 -->
     <div class="page-header">
-
       <div>
-        <h2>学生管理</h2>
-        <p>管理学生信息、综合评分及成绩明细</p>
+        <h2>成绩管理</h2>
+        <p>查看和管理学生综合测评成绩</p>
       </div>
-
-      <el-button
-        type="primary"
-        @click="loadStudentList"
-        :loading="loading"
-      >
-        <el-icon>
-          <Refresh />
-        </el-icon>
-        刷新
-      </el-button>
-
     </div>
 
-
-    <!-- =====================================================
-         搜索区域
-    ====================================================== -->
-    <el-card
-      class="search-card"
-      shadow="never"
-    >
-
-      <div class="search-row">
-
-        <el-input
-          v-model="search.studentNo"
-          placeholder="请输入学号"
-          clearable
-          class="search-item"
-          @keyup.enter="handleSearch"
-        />
-
-        <el-input
-          v-model="search.realName"
-          placeholder="请输入姓名"
-          clearable
-          class="search-item"
-          @keyup.enter="handleSearch"
-        />
-
-        <el-input
-          v-model="search.className"
-          placeholder="请输入班级"
-          clearable
-          class="search-item"
-          @keyup.enter="handleSearch"
-        />
-
-        <el-select
-          v-model="search.status"
-          placeholder="账号状态"
-          clearable
-          class="search-item"
-        >
-
-          <el-option
-            label="正常"
-            :value="1"
+    <!-- 搜索 -->
+    <el-card shadow="never" class="search-card">
+      <el-form :inline="true">
+        <el-form-item label="搜索">
+          <el-input
+            v-model="keyword"
+            placeholder="学号 / 姓名 / 班级"
+            clearable
+            style="width: 280px"
+            @keyup.enter="handleSearch"
           />
+        </el-form-item>
 
-          <el-option
-            label="禁用"
-            :value="0"
-          />
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">
+            搜索
+          </el-button>
 
-        </el-select>
-
-
-        <el-button
-          type="primary"
-          @click="handleSearch"
-        >
-          搜索
-        </el-button>
-
-        <el-button
-          @click="resetSearch"
-        >
-          重置
-        </el-button>
-
-      </div>
-
+          <el-button @click="handleReset">
+            重置
+          </el-button>
+        </el-form-item>
+      </el-form>
     </el-card>
 
-
-    <!-- =====================================================
-         学生列表
-    ====================================================== -->
-    <el-card
-      class="table-card"
-      shadow="never"
-    >
-
+    <!-- 学生列表 -->
+    <el-card shadow="never" class="table-card">
       <el-table
-        v-loading="loading"
-        :data="list"
-        stripe
+        :data="students"
         border
-        style="width: 100%"
+        stripe
+        v-loading="loading"
+        row-key="id"
       >
-
-        <!-- =================================================
-             序号
-        ================================================== -->
         <el-table-column
           type="index"
           label="#"
           width="60"
-          align="center"
-          :index="studentIndexMethod"
+          :index="indexMethod"
         />
 
-
-        <!-- =================================================
-             学号
-        ================================================== -->
         <el-table-column
           prop="studentNo"
           label="学号"
-          min-width="130"
+          width="150"
         />
 
-
-        <!-- =================================================
-             姓名
-        ================================================== -->
         <el-table-column
           prop="realName"
           label="姓名"
-          min-width="100"
+          width="120"
         />
 
-
-        <!-- =================================================
-             用户名
-        ================================================== -->
-        <el-table-column
-          prop="username"
-          label="用户名"
-          min-width="120"
-        />
-
-
-        <!-- =================================================
-             班级
-        ================================================== -->
         <el-table-column
           prop="className"
           label="班级"
-          min-width="150"
         />
 
-
-        <!-- =================================================
-             手机号
-        ================================================== -->
         <el-table-column
-          prop="phone"
-          label="手机号"
-          min-width="130"
-        />
-
-
-        <!-- =================================================
-             可见加分
-        ================================================== -->
-        <el-table-column
-          label="可见加分"
-          min-width="100"
-          align="center"
+          label="综合评分"
+          width="130"
         >
-
           <template #default="{ row }">
-
-            <span class="bonus-score">
-              {{ formatScoreWithPrefix(row.bonusScore, '+') }}
+            <span class="score">
+              {{ row.totalScore ?? 0 }}
             </span>
-
           </template>
-
         </el-table-column>
 
-
-        <!-- =================================================
-             可见减分
-        ================================================== -->
-        <el-table-column
-          label="可见减分"
-          min-width="100"
-          align="center"
-        >
-
-          <template #default="{ row }">
-
-            <span class="deduct-score">
-              {{ formatScoreWithPrefix(row.deductScore, '-') }}
-            </span>
-
-          </template>
-
-        </el-table-column>
-
-
-        <!-- =================================================
-             当前上限
-        ================================================== -->
-        <el-table-column
-          label="当前上限"
-          min-width="100"
-          align="center"
-        >
-
-          <template #default="{ row }">
-
-            <el-tag
-              v-if="row.actualLimit !== null && row.actualLimit !== undefined"
-              type="warning"
-            >
-              {{ formatScore(row.actualLimit) }} 分
-            </el-tag>
-
-            <span v-else>
-              ...
-            </span>
-
-          </template>
-
-        </el-table-column>
-
-
-        <!-- =================================================
-             最终成绩
-        ================================================== -->
-        <el-table-column
-          label="最终成绩"
-          min-width="110"
-          align="center"
-        >
-
-          <template #default="{ row }">
-
-            <span class="total-score">
-              {{ formatScore(row.totalScore) }}
-            </span>
-
-          </template>
-
-        </el-table-column>
-
-
-        <!-- =================================================
-             账号状态
-        ================================================== -->
-        <el-table-column
-          label="账号状态"
-          width="100"
-          align="center"
-        >
-
-          <template #default="{ row }">
-
-            <el-tag
-              v-if="Number(row.status) === 1"
-              type="success"
-            >
-              正常
-            </el-tag>
-
-            <el-tag
-              v-else
-              type="danger"
-            >
-              禁用
-            </el-tag>
-
-          </template>
-
-        </el-table-column>
-
-
-        <!-- =================================================
-             操作
-        ================================================== -->
         <el-table-column
           label="操作"
-          min-width="320"
+          width="150"
           fixed="right"
-          align="center"
         >
-
           <template #default="{ row }">
-
             <el-button
-              size="small"
               type="primary"
-              plain
-              @click="showDetail(row)"
-            >
-              查看详情
-            </el-button>
-
-
-            <el-button
-              size="small"
-              type="success"
-              plain
-              @click="showScore(row)"
+              link
+              @click="openDetail(row)"
             >
               查看成绩
             </el-button>
-
-
-            <el-button
-              v-if="Number(row.status) === 1"
-              size="small"
-              type="danger"
-              plain
-              @click="disableStudent(row)"
-            >
-              禁用
-            </el-button>
-
-
-            <el-button
-              v-else
-              size="small"
-              type="success"
-              plain
-              @click="enableStudent(row)"
-            >
-              启用
-            </el-button>
-
           </template>
-
         </el-table-column>
-
       </el-table>
 
-
-      <!-- =====================================================
-           学生列表分页
-      ====================================================== -->
-      <div
-        v-if="!loading && studentTotal > 0"
-        class="student-pagination-wrapper"
-      >
-
-        <el-pagination
-          v-model:current-page="studentPage"
-          v-model:page-size="studentPageSize"
-          :page-sizes="[10, 20, 30, 50]"
-          :total="studentTotal"
-          layout="total, sizes, prev, pager, next, jumper"
-          background
-          @size-change="handleStudentSizeChange"
-          @current-change="handleStudentCurrentChange"
-        />
-
-      </div>
-
-
-      <!-- =================================================
-           空数据
-      ================================================== -->
+      <!-- 空数据 -->
       <el-empty
-        v-if="!loading && list.length === 0"
+        v-if="!loading && students.length === 0"
         description="暂无学生数据"
       />
 
+      <!-- 分页 -->
+      <div
+        v-if="total > 0"
+        class="pagination-wrapper"
+      >
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 30, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          background
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
-
-
-    <!-- =====================================================
-         成绩明细弹窗
-    ====================================================== -->
-    <el-dialog
-      v-model="scoreVisible"
+    <!-- 成绩详情 -->
+    <el-drawer
+      v-model="drawerVisible"
       title="学生成绩明细"
-      width="1100px"
-      destroy-on-close
+      size="720px"
     >
-
-      <!-- =================================================
-           学生综合成绩
-      ================================================== -->
       <div
         v-if="currentStudent"
-        class="score-summary"
+        class="student-info"
       >
-
-        <div class="student-name">
-          {{ currentStudent.realName }}
-        </div>
-
-
-        <div class="summary-item">
-
-          <span>
-            基础上限
-          </span>
+        <div>
+          <span>姓名：</span>
 
           <strong>
-            {{ formatScore(currentStudent.baseLimit) }} 分
+            {{ currentStudent.realName }}
           </strong>
-
         </div>
 
-
-        <div class="summary-item">
-
-          <span>
-            当前最高上限
-          </span>
+        <div>
+          <span>学号：</span>
 
           <strong>
-            {{ formatScore(currentStudent.actualLimit) }} 分
+            {{ currentStudent.studentNo }}
           </strong>
-
         </div>
 
-
-        <div class="summary-item">
-
-          <span>
-            可见加分
-          </span>
-
-          <strong class="bonus-score">
-            +{{ formatScore(currentStudent.bonusScore) }}
-          </strong>
-
-        </div>
-
-
-        <div class="summary-item">
-
-          <span>
-            可见减分
-          </span>
-
-          <strong class="deduct-score">
-            -{{ formatScore(currentStudent.deductScore) }}
-          </strong>
-
-        </div>
-
-
-        <div class="summary-item final">
-
-          <span>
-            最终成绩
-          </span>
+        <div>
+          <span>班级：</span>
 
           <strong>
-            {{ formatScore(currentStudent.totalScore) }} 分
+            {{ currentStudent.className }}
           </strong>
-
         </div>
 
+        <div class="total-score">
+          综合评分：
+
+          <strong>
+            {{ currentTotal }}
+          </strong>
+        </div>
       </div>
-
 
       <el-divider />
 
-
-      <!-- =================================================
-           成绩明细表
-      ================================================== -->
       <el-table
-        v-loading="scoreLoading"
-        :data="scoreList"
+        :data="scoreDetails"
         border
         stripe
-        style="width: 100%"
+        v-loading="detailLoading"
       >
-
-        <!-- =================================================
-             成绩序号
-        ================================================== -->
-        <el-table-column
-          type="index"
-          label="#"
-          width="60"
-          align="center"
-          :index="scoreIndexMethod"
-        />
-
-
-        <!-- =================================================
-             加分项目
-        ================================================== -->
         <el-table-column
           prop="ruleName"
-          label="加分项目"
-          min-width="180"
-          show-overflow-tooltip
+          label="评分项目"
+          min-width="150"
         />
 
-
-        <!-- =================================================
-             分值
-        ================================================== -->
         <el-table-column
-          label="分值"
+          label="分数"
           width="100"
-          align="center"
         >
-
           <template #default="{ row }">
-
             <span
               :class="
                 Number(row.score) >= 0
-                  ? 'bonus-score'
-                  : 'deduct-score'
+                  ? 'score-plus'
+                  : 'score-minus'
               "
             >
-
               {{
-                Number(row.score) > 0
-                  ? '+' + formatScore(row.score)
-                  : formatScore(row.score)
+                Number(row.score) >= 0 ? '+' : ''
               }}
 
+              {{ row.score }}
             </span>
-
           </template>
-
         </el-table-column>
 
-
-        <!-- =================================================
-             来源
-        ================================================== -->
         <el-table-column
-          prop="sourceType"
           label="来源"
-          width="120"
-        />
-
-
-        <!-- =================================================
-             时间
-        ================================================== -->
-        <el-table-column
-          prop="createTime"
-          label="时间"
-          min-width="170"
-        />
-
-
-        <!-- =================================================
-             管理员状态
-        ================================================== -->
-        <el-table-column
-          label="管理员状态"
-          width="120"
-          align="center"
+          width="100"
         >
-
           <template #default="{ row }">
+            {{ formatSource(row.sourceType) }}
+          </template>
+        </el-table-column>
 
+        <el-table-column
+          label="状态"
+          width="100"
+        >
+          <template #default="{ row }">
             <el-tag
               v-if="Number(row.adminHidden) === 1"
-              type="info"
+              type="danger"
             >
               已隐藏
             </el-tag>
@@ -589,1544 +223,811 @@
             >
               正常
             </el-tag>
-
           </template>
-
         </el-table-column>
 
-
-        <!-- =================================================
-             管理员操作
-        ================================================== -->
         <el-table-column
-          label="管理员操作"
-          width="140"
-          fixed="right"
-          align="center"
+          label="操作"
+          width="110"
         >
-
           <template #default="{ row }">
-
             <el-button
-              v-if="Number(row.adminHidden) === 1"
-              size="small"
-              type="warning"
-              plain
-              @click="showHiddenScore(row)"
-            >
-              恢复
-            </el-button>
-
-
-            <el-button
-              v-else
-              size="small"
+              v-if="Number(row.adminHidden) === 0"
               type="danger"
-              plain
-              @click="hideScore(row)"
+              link
+              @click="handleHide(row)"
             >
               隐藏
             </el-button>
 
+            <el-button
+              v-else
+              type="success"
+              link
+              @click="handleShow(row)"
+            >
+              恢复
+            </el-button>
           </template>
-
         </el-table-column>
-
       </el-table>
-
-
-      <!-- =================================================
-           成绩明细分页
-      ================================================== -->
-      <div
-        v-if="scoreTotal > 0"
-        class="score-pagination-wrapper"
-      >
-
-        <el-pagination
-          v-model:current-page="scorePage"
-          v-model:page-size="scorePageSize"
-          :page-sizes="[5, 10, 20, 30]"
-          :total="scoreTotal"
-          layout="total, sizes, prev, pager, next, jumper"
-          background
-          @size-change="handleScoreSizeChange"
-          @current-change="handleScoreCurrentChange"
-        />
-
-      </div>
-
-
-      <!-- =================================================
-           成绩为空
-      ================================================== -->
-      <el-empty
-        v-if="!scoreLoading && scoreList.length === 0"
-        description="暂无成绩明细"
-      />
-
-
-      <!-- =================================================
-           弹窗底部
-      ================================================== -->
-      <template #footer>
-
-        <el-button
-          @click="closeScoreDialog"
-        >
-          关闭
-        </el-button>
-
-      </template>
-
-    </el-dialog>
-
+    </el-drawer>
   </div>
 </template>
 
-
 <script setup>
-
 import {
   ref,
-  onMounted
+  onMounted,
 } from 'vue'
 
 import {
   ElMessage,
-  ElMessageBox
+  ElMessageBox,
 } from 'element-plus'
 
 import {
-  Refresh
-} from '@element-plus/icons-vue'
+  getAdminStudentScores,
+  getAdminStudentTotal,
+  hideScore,
+  showScore,
+} from '@/api/adminScore'
 
-import {
-  useRouter
-} from 'vue-router'
-
-import request from '@/utils/request'
-
-
-/* =========================================================
- * Router
- * ========================================================= */
-
-const router = useRouter()
+import request from '@/api/request'
 
 
-/* =========================================================
- * 学生列表
- * ========================================================= */
-
-const list = ref([])
+/*
+ * =========================================================
+ * 学生分页
+ * =========================================================
+ */
 
 const loading = ref(false)
 
+const students = ref([])
 
-/* =========================================================
- * 学生列表分页
- * ========================================================= */
+const total = ref(0)
 
-const studentPage = ref(1)
+const pageNum = ref(1)
 
-const studentPageSize = ref(10)
+const pageSize = ref(10)
 
-const studentTotal = ref(0)
+const keyword = ref('')
 
 
-/* =========================================================
- * 搜索条件
- * ========================================================= */
-
-const search = ref({
-
-  studentNo: '',
-
-  realName: '',
-
-  className: '',
-
-  status: null
-
-})
-
-
-/* =========================================================
- * 学生列表序号
- * ========================================================= */
-
-function studentIndexMethod(index) {
-
-  return (
-    (studentPage.value - 1)
-    *
-    studentPageSize.value
-    +
-    index
-    +
-    1
-  )
-
-}
-
-
-/* =========================================================
- * 学生列表：修改每页数量
- * ========================================================= */
-
-async function handleStudentSizeChange(size) {
-
-  studentPageSize.value =
-    size
-
-  studentPage.value =
-    1
-
-  await loadStudentList()
-
-}
-
-
-/* =========================================================
- * 学生列表：切换页码
- * ========================================================= */
-
-async function handleStudentCurrentChange(current) {
-
-  studentPage.value =
-    current
-
-  await loadStudentList()
-
-}
-
-
-/* =========================================================
- * 加载学生列表
- *
- * 这里使用真正的后端分页。
- *
- * 后端接口：
- *
- * GET /user/student/list
- *
- * 参数：
- *
- * page
- * pageSize
- * studentNo
- * realName
- * className
- * status
- *
- * ========================================================= */
-
-async function loadStudentList() {
-
-  loading.value = true
-
-  try {
-
-    const res =
-      await request.get(
-        '/user/student/list',
-        {
-          params: {
-
-            page:
-            studentPage.value,
-
-            pageSize:
-            studentPageSize.value,
-
-            studentNo:
-              search.value.studentNo || undefined,
-
-            realName:
-              search.value.realName || undefined,
-
-            className:
-              search.value.className || undefined,
-
-            status:
-              search.value.status === null
-                ? undefined
-                : search.value.status
-
-          }
-
-        }
-      )
-
-
-    console.log(
-      '学生分页数据：',
-      res
-    )
-
-
-    const data =
-      res.data?.data
-
-
-    /* =====================================================
-     * 新接口：
-     *
-     * MyBatis-Plus Page
-     * ===================================================== */
-
-    if (
-      data
-      &&
-      Array.isArray(data.records)
-    ) {
-
-      /*
-       * 当前页学生
-       */
-
-      list.value =
-        data.records.map(
-          item => ({
-
-            ...item,
-
-            totalScore: null,
-
-            baseLimit: null,
-
-            bonusScore: null,
-
-            deductScore: null,
-
-            actualLimit: null
-
-          })
-        )
-
-
-      /*
-       * 总学生数量
-       */
-
-      studentTotal.value =
-        Number(
-          data.total || 0
-        )
-
-
-      /*
-       * 同步后端当前页
-       */
-
-      if (
-        data.current !== undefined
-        &&
-        data.current !== null
-      ) {
-
-        studentPage.value =
-          Number(
-            data.current
-          )
-
-      }
-
-
-      /*
-       * 同步后端每页大小
-       */
-
-      if (
-        data.size !== undefined
-        &&
-        data.size !== null
-      ) {
-
-        studentPageSize.value =
-          Number(
-            data.size
-          )
-
-      }
-
-    }
-
-
-    /* =====================================================
-     * 兼容旧接口：
-     *
-     * data = []
-     * ===================================================== */
-
-    else if (
-      Array.isArray(data)
-    ) {
-
-      list.value =
-        data.map(
-          item => ({
-
-            ...item,
-
-            totalScore: null,
-
-            baseLimit: null,
-
-            bonusScore: null,
-
-            deductScore: null,
-
-            actualLimit: null
-
-          })
-        )
-
-
-      studentTotal.value =
-        list.value.length
-
-    }
-
-
-    /* =====================================================
-     * 异常数据
-     * ===================================================== */
-
-    else {
-
-      list.value =
-        []
-
-      studentTotal.value =
-        0
-
-    }
-
-
-    /*
-     * 基础学生信息先显示
-     */
-
-    loading.value =
-      false
-
-
-    /*
-     * 加载当前页学生综合成绩
-     */
-
-    loadAllScoresParallel()
-
-  } catch (error) {
-
-    console.error(
-      '获取学生列表失败',
-      error
-    )
-
-    list.value =
-      []
-
-    studentTotal.value =
-      0
-
-    loading.value =
-      false
-
-    ElMessage.error(
-      '获取学生列表失败'
-    )
-
-  }
-
-}
-
-
-/* =========================================================
- * 并行加载学生综合成绩
- *
- * 只加载当前页学生。
- * ========================================================= */
-
-async function loadAllScoresParallel() {
-
-  if (
-    !list.value
-    ||
-    list.value.length === 0
-  ) {
-
-    return
-
-  }
-
-
-  const promises =
-    list.value.map(
-      async student => {
-
-        try {
-
-          const res =
-            await request.get(
-              `/scoreStatistics/admin/${student.id}`
-            )
-
-
-          const data =
-            res.data?.data
-
-
-          student.totalScore =
-            data?.totalScore ?? 0
-
-
-          student.baseLimit =
-            data?.baseLimit ?? 40
-
-
-          student.bonusScore =
-            data?.bonusScore ?? 0
-
-
-          student.deductScore =
-            data?.deductScore ?? 0
-
-
-          student.actualLimit =
-            data?.actualLimit ?? 40
-
-        } catch (error) {
-
-          console.error(
-            `获取学生 ${student.id} 成绩失败`,
-            error
-          )
-
-
-          student.totalScore =
-            0
-
-          student.baseLimit =
-            40
-
-          student.bonusScore =
-            0
-
-          student.deductScore =
-            0
-
-          student.actualLimit =
-            40
-
-        }
-
-      }
-    )
-
-
-  await Promise.all(
-    promises
-  )
-
-}
-
-
-/* =========================================================
- * 搜索
- * ========================================================= */
-
-async function handleSearch() {
-
-  studentPage.value =
-    1
-
-  await loadStudentList()
-
-}
-
-
-/* =========================================================
- * 重置搜索
- * ========================================================= */
-
-async function resetSearch() {
-
-  search.value = {
-
-    studentNo: '',
-
-    realName: '',
-
-    className: '',
-
-    status: null
-
-  }
-
-
-  studentPage.value =
-    1
-
-
-  await loadStudentList()
-
-}
-
-
-/* =========================================================
- * 查看学生详情
- * ========================================================= */
-
-function showDetail(row) {
-
-  router.push(
-    `/admin/student/${row.id}`
-  )
-
-}
-
-
-/* =========================================================
+/*
  * =========================================================
- * 成绩明细弹窗
+ * 成绩详情
  * =========================================================
- * ========================================================= */
+ */
 
-const scoreVisible = ref(false)
+const detailLoading = ref(false)
 
-const scoreLoading = ref(false)
-
-const scoreList = ref([])
+const drawerVisible = ref(false)
 
 const currentStudent = ref(null)
 
+const scoreDetails = ref([])
 
-/* =========================================================
- * 成绩明细分页参数
- * ========================================================= */
-
-const scorePage = ref(1)
-
-const scorePageSize = ref(10)
-
-const scoreTotal = ref(0)
+const currentTotal = ref(0)
 
 
-/* =========================================================
- * 成绩明细序号
- * ========================================================= */
-
-function scoreIndexMethod(index) {
-
-  return (
-    (scorePage.value - 1)
-    *
-    scorePageSize.value
-    +
-    index
-    +
-    1
-  )
-
-}
-
-
-/* =========================================================
- * 查看成绩
- * ========================================================= */
-
-async function showScore(student) {
-
-  /*
-   * 保存当前学生
-   */
-
-  currentStudent.value =
-    student
-
-
-  /*
-   * 打开弹窗
-   */
-
-  scoreVisible.value =
-    true
-
-
-  /*
-   * 每次打开学生成绩，
-   * 都从第一页开始。
-   */
-
-  scorePage.value =
-    1
-
-
-  scorePageSize.value =
-    10
-
-
-  scoreTotal.value =
-    0
-
-
-  scoreList.value =
-    []
-
-
-  /*
-   * 加载第一页
-   */
-
-  await loadScoreDetail()
-
-}
-
-
-/* =========================================================
- * 加载成绩明细
+/*
+ * =========================================================
+ * 加载学生列表
  *
- * 后端接口：
+ * 重点：
  *
- * /scoreStatistics/admin/{studentId}/detail
+ * 这里绝对不能再使用：
  *
- * 参数：
+ * /user/student/all
  *
- * pageNum
- * pageSize
+ * 必须使用：
  *
- * ========================================================= */
+ * /user/student/list
+ *
+ * 并且把 page 和 pageSize 传给后端。
+ * =========================================================
+ */
 
-async function loadScoreDetail() {
-
-  if (
-    !currentStudent.value
-    ||
-    !currentStudent.value.id
-  ) {
-
-    return
-
-  }
-
-
-  scoreLoading.value =
-    true
-
+async function loadStudents() {
+  loading.value = true
 
   try {
-
-    const res =
-      await request.get(
-        `/scoreStatistics/admin/${currentStudent.value.id}/detail`,
-        {
-          params: {
-
-            pageNum:
-            scorePage.value,
-
-            pageSize:
-            scorePageSize.value
-
-          }
-
-        }
-      )
+    const params = {
+      page: pageNum.value,
+      pageSize: pageSize.value,
+    }
 
 
-    console.log(
-      '成绩明细分页数据：',
-      res
-    )
+    /*
+     * 如果有搜索关键字，
+     * 后端分别搜索学号、姓名、班级。
+     *
+     * 这里统一使用 keyword。
+     *
+     * 后端没有 keyword 参数，
+     * 所以三个字段都传。
+     */
 
+    const key = keyword.value.trim()
 
-    const data =
-      res.data?.data
+    if (key) {
+      params.studentNo = key
+      params.realName = key
+      params.className = key
+    }
 
 
     /*
      * =====================================================
-     * MyBatis-Plus Page
+     * 真正调用分页接口
      * =====================================================
      */
 
-    if (
-      data
-      &&
-      Array.isArray(data.records)
-    ) {
-
-      scoreList.value =
-        data.records
+    const res = await request.get(
+      '/user/student/list',
+      {
+        params,
+      },
+    )
 
 
-      scoreTotal.value =
-        Number(
-          data.total || 0
-        )
+    console.log(
+      '成绩管理学生分页接口返回：',
+      res,
+    )
 
 
-      /*
-       * 防止当前页超过实际页数
-       */
+    /*
+     * =====================================================
+     * 兼容你的 Result<Page<StudentVO>>
+     *
+     * 后端实际结构一般是：
+     *
+     * {
+     *   code: 200,
+     *   message: "...",
+     *   data: {
+     *     records: [],
+     *     total: 100,
+     *     current: 1,
+     *     size: 10
+     *   }
+     * }
+     * =====================================================
+     */
 
-      if (
-        data.pages
-        &&
-        scorePage.value > Number(data.pages)
-      ) {
-
-        scorePage.value =
-          Number(data.pages)
-
-        await loadScoreDetail()
-
-        return
-
-      }
-
-    }
+    const pageData =
+      res.data?.data ||
+      res.data ||
+      {}
 
 
-    else {
+    /*
+     * 学生列表
+     */
 
-      scoreList.value =
-        []
+    const list =
+      Array.isArray(pageData.records)
+        ? pageData.records
+        : []
 
-      scoreTotal.value =
-        0
 
-    }
+    /*
+     * 总学生数量
+     */
+
+    const totalCount =
+      Number(pageData.total ?? 0)
+
+
+    students.value = list
+
+    total.value = totalCount
+
+
+    /*
+     * =====================================================
+     * 给当前页学生加载综合成绩
+     *
+     * 注意：
+     *
+     * 这里只给“当前页”的学生请求成绩。
+     *
+     * 不再把全部学生加载进前端。
+     * =====================================================
+     */
+
+    await loadCurrentPageTotals()
 
   } catch (error) {
 
     console.error(
-      '获取成绩明细失败',
-      error
+      '学生分页加载失败：',
+      error,
     )
 
-
-    scoreList.value =
-      []
-
-    scoreTotal.value =
-      0
-
-
     ElMessage.error(
-      '获取成绩明细失败'
+      '学生列表加载失败',
     )
 
   } finally {
 
-    scoreLoading.value =
-      false
-
+    loading.value = false
   }
-
 }
 
 
-/* =========================================================
- * 成绩明细每页数量
- * ========================================================= */
-
-async function handleScoreSizeChange(size) {
-
-  scorePageSize.value =
-    size
-
-
-  scorePage.value =
-    1
-
-
-  await loadScoreDetail()
-
-}
-
-
-/* =========================================================
- * 成绩明细页码
- * ========================================================= */
-
-async function handleScoreCurrentChange(current) {
-
-  scorePage.value =
-    current
-
-
-  await loadScoreDetail()
-
-}
-
-
-/* =========================================================
- * 关闭成绩弹窗
- * ========================================================= */
-
-function closeScoreDialog() {
-
-  scoreVisible.value =
-    false
-
-
-  scoreList.value =
-    []
-
-  scoreTotal.value =
-    0
-
-  scorePage.value =
-    1
-
-  currentStudent.value =
-    null
-
-}
-
-
-/* =========================================================
- * 隐藏成绩
- * ========================================================= */
-
-async function hideScore(record) {
-
-  try {
-
-    await ElMessageBox.confirm(
-
-      '隐藏后该成绩不再参与计算。确定继续吗？',
-
-      '提示',
-
-      {
-        type: 'warning'
-      }
-
-    )
-
-
-    await request.put(
-      `/scoreRecord/admin/hide/${record.id}`
-    )
-
-
-    ElMessage.success(
-      '已隐藏'
-    )
-
-
-    /*
-     * 刷新当前页成绩明细
-     */
-
-    await loadScoreDetail()
-
-
-    /*
-     * 更新当前学生综合成绩
-     */
-
-    await refreshCurrentStudentScore()
-
-  } catch (e) {
-
-    /*
-     * 用户取消不提示
-     */
-
-  }
-
-}
-
-
-/* =========================================================
- * 恢复成绩
- * ========================================================= */
-
-async function showHiddenScore(record) {
-
-  try {
-
-    await ElMessageBox.confirm(
-
-      '恢复后该成绩重新参与计算。确定继续吗？',
-
-      '提示',
-
-      {
-        type: 'warning'
-      }
-
-    )
-
-
-    await request.put(
-      `/scoreRecord/admin/show/${record.id}`
-    )
-
-
-    ElMessage.success(
-      '已恢复'
-    )
-
-
-    /*
-     * 刷新当前页
-     */
-
-    await loadScoreDetail()
-
-
-    /*
-     * 更新综合成绩
-     */
-
-    await refreshCurrentStudentScore()
-
-  } catch (e) {
-
-    /*
-     * 用户取消
-     */
-
-  }
-
-}
-
-
-/* =========================================================
- * 刷新当前学生综合成绩
- * ========================================================= */
-
-async function refreshCurrentStudentScore() {
+/*
+ * =========================================================
+ * 加载当前页综合成绩
+ * =========================================================
+ */
+
+async function loadCurrentPageTotals() {
 
   if (
-    !currentStudent.value
+    !students.value ||
+    students.value.length === 0
   ) {
-
     return
-
   }
 
 
-  try {
+  /*
+   * 并行请求当前页学生成绩
+   */
 
-    const res =
-      await request.get(
-        `/scoreStatistics/admin/${currentStudent.value.id}`
-      )
+  await Promise.all(
+    students.value.map(
+      async (student) => {
 
+        try {
 
-    const data =
-      res.data?.data
-
-
-    if (!data) {
-
-      return
-
-    }
+          const res =
+            await getAdminStudentTotal(
+              student.id,
+            )
 
 
-    Object.assign(
-      currentStudent.value,
-      {
+          student.totalScore =
+            res.data?.data ??
+            res.data ??
+            0
 
-        totalScore:
-          data.totalScore ?? 0,
+        } catch (error) {
 
-        baseLimit:
-          data.baseLimit ?? 40,
+          console.error(
+            '获取学生总成绩失败：',
+            student.id,
+            error,
+          )
 
-        bonusScore:
-          data.bonusScore ?? 0,
-
-        deductScore:
-          data.deductScore ?? 0,
-
-        actualLimit:
-          data.actualLimit ?? 40
-
-      }
-    )
-
-
-    /*
-     * 同时更新当前列表中的学生
-     */
-
-    const student =
-      list.value.find(
-        item =>
-          Number(item.id)
-          ===
-          Number(currentStudent.value.id)
-      )
-
-
-    if (student) {
-
-      Object.assign(
-        student,
-        {
-
-          totalScore:
-            data.totalScore ?? 0,
-
-          baseLimit:
-            data.baseLimit ?? 40,
-
-          bonusScore:
-            data.bonusScore ?? 0,
-
-          deductScore:
-            data.deductScore ?? 0,
-
-          actualLimit:
-            data.actualLimit ?? 40
-
+          student.totalScore = 0
         }
-      )
+      },
+    ),
+  )
+}
 
-    }
+
+/*
+ * =========================================================
+ * 搜索
+ * =========================================================
+ */
+
+function handleSearch() {
+
+  /*
+   * 搜索必须从第一页开始
+   */
+
+  pageNum.value = 1
+
+  loadStudents()
+}
+
+
+/*
+ * =========================================================
+ * 重置
+ * =========================================================
+ */
+
+function handleReset() {
+
+  keyword.value = ''
+
+  pageNum.value = 1
+
+  pageSize.value = 10
+
+  loadStudents()
+}
+
+
+/*
+ * =========================================================
+ * 页码变化
+ *
+ * 关键！
+ *
+ * 点击第2页：
+ *
+ * pageNum = 2
+ *
+ * 然后重新请求：
+ *
+ * /user/student/list?page=2&pageSize=10
+ *
+ * =========================================================
+ */
+
+function handlePageChange(page) {
+
+  pageNum.value = page
+
+  loadStudents()
+}
+
+
+/*
+ * =========================================================
+ * 每页数量变化
+ * =========================================================
+ */
+
+function handleSizeChange(size) {
+
+  pageSize.value = size
+
+  /*
+   * 修改每页数量后重新从第一页开始
+   */
+
+  pageNum.value = 1
+
+  loadStudents()
+}
+
+
+/*
+ * =========================================================
+ * 表格序号
+ *
+ * 第1页：
+ * 1 2 3 ...
+ *
+ * 第2页：
+ * 11 12 13 ...
+ *
+ * =========================================================
+ */
+
+function indexMethod(index) {
+
+  return (
+    (pageNum.value - 1) *
+    pageSize.value +
+    index +
+    1
+  )
+}
+
+
+/*
+ * =========================================================
+ * 查看成绩
+ * =========================================================
+ */
+
+async function openDetail(student) {
+
+  currentStudent.value = student
+
+  drawerVisible.value = true
+
+  detailLoading.value = true
+
+  scoreDetails.value = []
+
+  currentTotal.value =
+    student.totalScore ?? 0
+
+
+  try {
+
+    /*
+     * 注意：
+     *
+     * 成绩详情接口必须传当前学生 ID。
+     */
+
+    const [
+      detailRes,
+      totalRes,
+    ] = await Promise.all([
+      getAdminStudentScores(
+        student.id,
+      ),
+
+      getAdminStudentTotal(
+        student.id,
+      ),
+    ])
+
+
+    scoreDetails.value =
+      detailRes.data?.data ||
+      detailRes.data ||
+      []
+
+
+    currentTotal.value =
+      totalRes.data?.data ??
+      totalRes.data ??
+      0
 
   } catch (error) {
 
     console.error(
-      '刷新综合成绩失败',
-      error
+      '成绩加载失败：',
+      error,
     )
-
-  }
-
-}
-
-
-/* =========================================================
- * 禁用学生
- * ========================================================= */
-
-async function disableStudent(student) {
-
-  try {
-
-    await ElMessageBox.confirm(
-
-      `确定禁用“${student.realName}”吗？`,
-
-      '提示',
-
-      {
-        type: 'warning'
-      }
-
-    )
-
-
-    await request.put(
-      `/user/student/disable/${student.id}`
-    )
-
-
-    ElMessage.success(
-      '已禁用'
-    )
-
-
-    /*
-     * 重新加载当前页
-     */
-
-    await loadStudentList()
-
-  } catch (e) {
-
-    /*
-     * 用户取消
-     */
-
-  }
-
-}
-
-
-/* =========================================================
- * 启用学生
- * ========================================================= */
-
-async function enableStudent(student) {
-
-  try {
-
-    await request.put(
-      `/user/student/enable/${student.id}`
-    )
-
-
-    ElMessage.success(
-      '已启用'
-    )
-
-
-    /*
-     * 重新加载当前页
-     */
-
-    await loadStudentList()
-
-  } catch (error) {
-
-    console.error(
-      '启用学生失败',
-      error
-    )
-
 
     ElMessage.error(
-      error.response?.data?.msg
-      ||
-      error.response?.data?.message
-      ||
-      '启用失败'
+      '成绩加载失败',
     )
 
-  }
+  } finally {
 
+    detailLoading.value = false
+  }
 }
 
 
-/* =========================================================
- * 分数格式化
- * ========================================================= */
+/*
+ * =========================================================
+ * 隐藏成绩
+ * =========================================================
+ */
 
-function formatScore(score) {
+async function handleHide(row) {
 
-  if (
-    score === null
-    ||
-    score === undefined
-  ) {
+  try {
 
-    return '...'
+    await ElMessageBox.confirm(
+      '隐藏后，学生和辅导员将无法看到这条成绩明细，确定继续吗？',
+      '隐藏成绩',
+      {
+        type: 'warning',
+      },
+    )
 
+
+    /*
+     * 隐藏当前成绩记录
+     */
+
+    await hideScore(
+      row.id,
+    )
+
+
+    /*
+     * 当前学生 ID
+     */
+
+    const studentId =
+      currentStudent.value?.id
+
+
+    if (!studentId) {
+      return
+    }
+
+
+    /*
+     * 重新加载当前学生成绩
+     */
+
+    await refreshCurrentStudentScore(
+      studentId,
+    )
+
+
+    /*
+     * 重新加载当前页学生
+     */
+
+    await loadStudents()
+
+
+    ElMessage.success(
+      '成绩已隐藏',
+    )
+
+  } catch (error) {
+
+    /*
+     * 用户点击取消
+     */
+
+    if (
+      error === 'cancel'
+    ) {
+      return
+    }
+
+
+    console.error(
+      '隐藏成绩失败：',
+      error,
+    )
+
+    ElMessage.error(
+      '隐藏失败',
+    )
   }
-
-
-  const value =
-    Number(score)
-
-
-  if (
-    Number.isNaN(value)
-  ) {
-
-    return '...'
-
-  }
-
-
-  if (
-    Number.isInteger(value)
-  ) {
-
-    return value
-
-  }
-
-
-  return value.toFixed(2)
-
 }
 
 
-/* =========================================================
- * 带正负号的分数
- * ========================================================= */
+/*
+ * =========================================================
+ * 恢复成绩
+ * =========================================================
+ */
 
-function formatScoreWithPrefix(
-  score,
-  prefix
+async function handleShow(row) {
+
+  try {
+
+    await ElMessageBox.confirm(
+      '恢复后，学生和辅导员将重新看到这条成绩明细，确定继续吗？',
+      '恢复成绩',
+      {
+        type: 'info',
+      },
+    )
+
+
+    await showScore(
+      row.id,
+    )
+
+
+    const studentId =
+      currentStudent.value?.id
+
+
+    if (!studentId) {
+      return
+    }
+
+
+    await refreshCurrentStudentScore(
+      studentId,
+    )
+
+
+    await loadStudents()
+
+
+    ElMessage.success(
+      '成绩已恢复',
+    )
+
+  } catch (error) {
+
+    if (
+      error === 'cancel'
+    ) {
+      return
+    }
+
+
+    console.error(
+      '恢复成绩失败：',
+      error,
+    )
+
+    ElMessage.error(
+      '恢复失败',
+    )
+  }
+}
+
+
+/*
+ * =========================================================
+ * 刷新当前学生成绩
+ * =========================================================
+ */
+
+async function refreshCurrentStudentScore(
+  studentId,
+) {
+
+  const [
+    detailRes,
+    totalRes,
+  ] = await Promise.all([
+    getAdminStudentScores(
+      studentId,
+    ),
+
+    getAdminStudentTotal(
+      studentId,
+    ),
+  ])
+
+
+  scoreDetails.value =
+    detailRes.data?.data ||
+    detailRes.data ||
+    []
+
+
+  currentTotal.value =
+    totalRes.data?.data ??
+    totalRes.data ??
+    0
+
+
+  /*
+   * 更新抽屉里的当前学生
+   */
+
+  if (
+    currentStudent.value &&
+    currentStudent.value.id ===
+    studentId
+  ) {
+
+    currentStudent.value.totalScore =
+      currentTotal.value
+  }
+}
+
+
+/*
+ * =========================================================
+ * 来源名称
+ * =========================================================
+ */
+
+function formatSource(
+  sourceType,
 ) {
 
   if (
-    score === null
-    ||
-    score === undefined
+    sourceType === 'apply'
   ) {
-
-    return '...'
-
+    return '自主申请'
   }
 
 
-  return (
-    prefix
-    +
-    formatScore(score)
-  )
+  if (
+    sourceType === 'system'
+  ) {
+    return '系统'
+  }
 
+
+  if (
+    sourceType === 'admin'
+  ) {
+    return '管理员'
+  }
+
+
+  return sourceType || '-'
 }
 
 
-/* =========================================================
+/*
+ * =========================================================
  * 初始化
- * ========================================================= */
+ * =========================================================
+ */
 
 onMounted(() => {
 
-  loadStudentList()
+  loadStudents()
 
 })
-
 </script>
 
-
 <style scoped>
-
-.student-page {
-
+.score-page {
   padding: 24px;
-
-  background: #f5f7fa;
-
-  min-height:
-    calc(100vh - 60px);
-
 }
 
-
-/* =========================================================
- * 页面标题
- * ========================================================= */
+/* 页面标题 */
 
 .page-header {
-
-  display: flex;
-
-  justify-content:
-    space-between;
-
-  align-items:
-    center;
-
   margin-bottom: 20px;
-
 }
-
 
 .page-header h2 {
-
-  margin:
-    0 0 6px;
-
+  margin: 0;
   font-size: 24px;
-
   color: #303133;
-
 }
-
 
 .page-header p {
-
-  margin: 0;
-
+  margin: 8px 0 0;
   color: #909399;
-
   font-size: 14px;
-
 }
 
-
-/* =========================================================
- * 搜索
- * ========================================================= */
+/* 搜索 */
 
 .search-card {
-
-  margin-bottom: 20px;
-
+  margin-bottom: 18px;
 }
 
-
-.search-row {
-
-  display: flex;
-
-  gap: 12px;
-
-  align-items:
-    center;
-
-  flex-wrap:
-    wrap;
-
-}
-
-
-.search-item {
-
-  width: 180px;
-
-}
-
-
-/* =========================================================
- * 表格
- * ========================================================= */
+/* 表格 */
 
 .table-card {
-
   border-radius: 8px;
-
 }
 
+/* 分页 */
 
-/* =========================================================
- * 分数颜色
- * ========================================================= */
+.pagination-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 20px 0 4px;
+}
 
-.bonus-score {
+/* 总分 */
 
-  color: #67c23a;
-
+.score {
+  font-size: 18px;
   font-weight: 600;
-
+  color: #409eff;
 }
 
+/* 学生信息 */
 
-.deduct-score {
-
-  color: #f56c6c;
-
-  font-weight: 600;
-
+.student-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  padding: 5px 0;
 }
 
+.student-info span {
+  color: #909399;
+}
 
 .total-score {
+  grid-column: 1 / 3;
+  padding: 14px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  color: #606266;
+}
 
+.total-score strong {
   color: #409eff;
-
-  font-size: 18px;
-
-  font-weight: 700;
-
+  font-size: 25px;
+  margin-left: 8px;
 }
 
+/* 分数 */
 
-/* =========================================================
- * 学生列表分页
- * ========================================================= */
-
-.student-pagination-wrapper {
-
-  display: flex;
-
-  justify-content:
-    flex-end;
-
-  align-items:
-    center;
-
-  margin-top: 20px;
-
-  padding-bottom: 5px;
-
+.score-plus {
+  color: #67c23a;
+  font-weight: 600;
 }
 
-
-/* =========================================================
- * 成绩概览
- * ========================================================= */
-
-.score-summary {
-
-  display: flex;
-
-  align-items:
-    center;
-
-  gap: 28px;
-
-  padding:
-    10px 0;
-
-  flex-wrap:
-    wrap;
-
+.score-minus {
+  color: #f56c6c;
+  font-weight: 600;
 }
-
-
-.student-name {
-
-  font-size: 20px;
-
-  font-weight: 700;
-
-  color: #303133;
-
-  margin-right: 10px;
-
-}
-
-
-.summary-item {
-
-  display: flex;
-
-  flex-direction:
-    column;
-
-  gap: 5px;
-
-  color: #909399;
-
-  font-size: 13px;
-
-}
-
-
-.summary-item strong {
-
-  font-size: 17px;
-
-  color: #303133;
-
-}
-
-
-.summary-item.final strong {
-
-  color: #409eff;
-
-  font-size: 22px;
-
-}
-
-
-/* =========================================================
- * 成绩明细分页
- * ========================================================= */
-
-.score-pagination-wrapper {
-
-  display: flex;
-
-  justify-content:
-    flex-end;
-
-  align-items:
-    center;
-
-  margin-top: 20px;
-
-  padding-bottom: 5px;
-
-}
-
 </style>
