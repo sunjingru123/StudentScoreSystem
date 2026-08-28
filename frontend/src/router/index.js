@@ -23,7 +23,6 @@ import ExcelImport from '@/views/admin/ExcelImport.vue'
 import TeacherLayout from '@/layout/TeacherLayout.vue'
 import TeacherHome from '@/views/teacher/TeacherHome.vue'
 import TeacherAudit from '@/views/teacher/TeacherAudit.vue'
-import TeacherStudent from '@/views/teacher/TeacherStudent.vue'
 import TeacherActivity from '@/views/teacher/TeacherActivity.vue'
 import TeacherScore from '@/views/teacher/TeacherScore.vue'
 import TeacherMessage from '@/views/teacher/TeacherMessage.vue'
@@ -69,8 +68,9 @@ const router = createRouter({
           component: () => import('@/views/student/DepartmentApply.vue'),
         },
         {
-          path: 'department-audit',
-          component: () => import('@/views/home/DepartmentAudit.vue'),
+          path: 'department-final-audit',
+          name: 'TeacherDepartmentFinalAudit',
+          component: () => import('@/views/home/DepartmentFinalAudit.vue'),
         },
         {
           path: 'department-final-audit',
@@ -115,18 +115,37 @@ const router = createRouter({
       name: 'Teacher',
       component: TeacherLayout,
       children: [
-        { path: '', name: 'TeacherHome', component: TeacherHome },
-        // 修复：去掉开头/，使用相对路径
+        {
+          path: '',
+          name: 'TeacherHome',
+          component: TeacherHome,
+        },
+
+        // 部门申报终审
         {
           path: 'department-score-audit',
           name: 'CounselorDepartmentScoreAudit',
-          component: () => import('@/views/teacher/DepartmentScoreAudit.vue'),
+          component: () =>
+            import('@/views/teacher/DepartmentScoreAudit.vue'),
         },
-        { path: 'audit', name: 'TeacherAudit', component: TeacherAudit },
-        { path: 'student', name: 'TeacherStudent', component: TeacherStudent },
-        { path: 'activity', name: 'TeacherActivity', component: TeacherActivity },
-        { path: 'score', name: 'TeacherScore', component: TeacherScore },
-        { path: 'message', name: 'TeacherMessage', component: TeacherMessage },
+
+        {
+          path: 'activity',
+          name: 'TeacherActivity',
+          component: TeacherActivity,
+        },
+
+        {
+          path: 'score',
+          name: 'TeacherScore',
+          component: TeacherScore,
+        },
+
+        {
+          path: 'message',
+          name: 'TeacherMessage',
+          component: TeacherMessage,
+        },
       ],
     },
   ],

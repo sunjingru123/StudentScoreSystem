@@ -1,19 +1,28 @@
 <template>
   <div class="audit-page">
+
     <!-- 页面标题 -->
     <el-card class="title-card">
       <div class="title-box">
         <div>
-          <h2>加分审核</h2>
-          <p>审核学生提交的综合测评加分申请</p>
+          <h2>最终审核</h2>
+          <p>审核部长初审通过的部门加分申请</p>
         </div>
 
-        <el-button :icon="Refresh" @click="loadList"> 刷新 </el-button>
+        <el-button
+          type="primary"
+          :icon="Refresh"
+          :loading="loading"
+          @click="loadList"
+        >
+          刷新
+        </el-button>
       </div>
     </el-card>
 
-    <!-- 统计卡片 -->
+    <!-- 统计 -->
     <div class="statistics">
+
       <el-card class="stat-card">
         <div class="stat-icon all">
           <el-icon size="28">
@@ -22,20 +31,7 @@
         </div>
 
         <div class="stat-content">
-          <span>全部申请</span>
-          <strong>{{ allCount }}</strong>
-        </div>
-      </el-card>
-
-      <el-card class="stat-card">
-        <div class="stat-icon pending">
-          <el-icon size="28">
-            <Clock />
-          </el-icon>
-        </div>
-
-        <div class="stat-content">
-          <span>待审核</span>
+          <span>待最终审核</span>
           <strong>{{ pendingCount }}</strong>
         </div>
       </el-card>
@@ -48,31 +44,25 @@
         </div>
 
         <div class="stat-content">
-          <span>已通过</span>
-          <strong>{{ approvedCount }}</strong>
+          <span>本页申请</span>
+          <strong>{{ list.length }}</strong>
         </div>
       </el-card>
 
-      <el-card class="stat-card">
-        <div class="stat-icon rejected">
-          <el-icon size="28">
-            <CircleClose />
-          </el-icon>
-        </div>
-
-        <div class="stat-content">
-          <span>已拒绝</span>
-          <strong>{{ rejectedCount }}</strong>
-        </div>
-      </el-card>
     </div>
 
     <!-- 审核列表 -->
     <el-card class="table-card">
+
       <template #header>
         <div class="toolbar">
-          <!-- 搜索 -->
-          <el-input v-model="keyword" placeholder="搜索学生姓名" clearable style="width: 220px">
+
+          <el-input
+            v-model="keyword"
+            placeholder="搜索学生姓名 / 部门"
+            clearable
+            style="width: 240px"
+          >
             <template #prefix>
               <el-icon>
                 <Search />
@@ -80,19 +70,16 @@
             </template>
           </el-input>
 
-          <!-- 状态筛选 -->
-          <el-select v-model="statusFilter" placeholder="申请状态" clearable style="width: 150px">
-            <el-option label="待审核" :value="0" />
-
-            <el-option label="已通过" :value="1" />
-
-            <el-option label="已拒绝" :value="2" />
-          </el-select>
-
           <div class="toolbar-right">
-            <span class="selected-text"> 已选择 {{ selectedRows.length }} 条 </span>
+            <span class="selected-text">
+              已选择 {{ selectedRows.length }} 条
+            </span>
 
-            <el-button type="success" :disabled="selectedRows.length === 0" @click="batchPass">
+            <el-button
+              type="success"
+              :disabled="selectedRows.length === 0"
+              @click="batchPass"
+            >
               <el-icon>
                 <CircleCheck />
               </el-icon>
@@ -100,46 +87,67 @@
               一键通过
             </el-button>
           </div>
+
         </div>
       </template>
 
       <!-- 表格 -->
       <el-table
         ref="tableRef"
+        v-loading="loading"
         :data="filteredList"
         border
         stripe
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
-        <!-- 全选 -->
-        <el-table-column type="selection" width="55" align="center" />
+
+        <!-- 选择 -->
+        <el-table-column
+          type="selection"
+          width="55"
+          align="center"
+        />
 
         <!-- 学生 -->
-        <el-table-column prop="studentName" label="学生" min-width="110">
-          <template #default="scope">
-            <div class="student-cell">
-              <el-avatar :size="36">
-                {{ scope.row.studentName?.substring(0, 1) }}
-              </el-avatar>
+        <el-table-column
+          prop="studentName"
+          label="学生"
+          min-width="110"
+        />
 
-              <span>
-                {{ scope.row.studentName }}
-              </span>
-            </div>
-          </template>
-        </el-table-column>
+        <!-- 部门 -->
+        <el-table-column
+          prop="departmentName"
+          label="部门"
+          min-width="120"
+        />
 
         <!-- 活动 -->
-        <el-table-column prop="activityName" label="活动" min-width="150" />
+        <el-table-column
+          prop="activityName"
+          label="活动"
+          min-width="160"
+        />
 
         <!-- 项目 -->
-        <el-table-column prop="ruleName" label="加分项目" min-width="120" />
+        <el-table-column
+          prop="ruleName"
+          label="加分项目"
+          min-width="130"
+        />
 
         <!-- 分数 -->
-        <el-table-column prop="applyScore" label="申请分数" width="110" align="center">
+        <el-table-column
+          prop="applyScore"
+          label="申请分数"
+          width="110"
+          align="center"
+        >
           <template #default="scope">
-            <span class="score"> +{{ scope.row.applyScore }} </span>
+            <span class="score">
+              +{{ scope.row.applyScore }}
+            </span>
           </template>
         </el-table-column>
 
@@ -151,61 +159,127 @@
           show-overflow-tooltip
         />
 
-        <!-- 时间 -->
-        <el-table-column prop="createTime" label="申请时间" width="180" />
+        <!-- 申请时间 -->
+        <el-table-column
+          prop="createTime"
+          label="申请时间"
+          width="180"
+        />
 
         <!-- 状态 -->
-        <el-table-column label="状态" width="110" align="center">
+        <el-table-column
+          label="状态"
+          width="120"
+          align="center"
+        >
           <template #default="scope">
-            <el-tag v-if="scope.row.status === 0" type="warning"> 待审核 </el-tag>
 
-            <el-tag v-else-if="scope.row.status === 1" type="success"> 已通过 </el-tag>
+            <el-tag
+              v-if="scope.row.status === 0"
+              type="warning"
+            >
+              待最终审核
+            </el-tag>
 
-            <el-tag v-else-if="scope.row.status === 2" type="danger"> 已拒绝 </el-tag>
+            <el-tag
+              v-else-if="scope.row.status === 1"
+              type="success"
+            >
+              已通过
+            </el-tag>
+
+            <el-tag
+              v-else-if="scope.row.status === 2"
+              type="danger"
+            >
+              已拒绝
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              {{ scope.row.status }}
+            </el-tag>
+
           </template>
         </el-table-column>
 
         <!-- 操作 -->
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column
+          label="操作"
+          width="180"
+          fixed="right"
+          align="center"
+        >
+
           <template #default="scope">
-            <!-- 待审核 -->
+
             <template v-if="scope.row.status === 0">
-              <el-button type="success" link @click="pass(scope.row)"> 通过 </el-button>
 
-              <el-button type="danger" link @click="reject(scope.row)"> 驳回 </el-button>
+              <el-button
+                type="success"
+                link
+                @click="pass(scope.row)"
+              >
+                通过
+              </el-button>
+
+              <el-button
+                type="danger"
+                link
+                @click="reject(scope.row)"
+              >
+                驳回
+              </el-button>
+
             </template>
 
-            <!-- 已审核 -->
-            <template v-else>
-              <span class="processed"> 已处理 </span>
-            </template>
+            <span
+              v-else
+              class="processed"
+            >
+              已处理
+            </span>
+
           </template>
+
         </el-table-column>
+
       </el-table>
 
       <!-- 空数据 -->
-      <el-empty v-if="filteredList.length === 0" description="暂无申请记录" />
-      <el-pagination
-        v-model:current-page="pageNum"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-sizes="[10, 20, 50]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @current-change="loadList"
-        @size-change="handleSizeChange"
+      <el-empty
+        v-if="!loading && filteredList.length === 0"
+        description="暂无待最终审核申请"
       />
+
     </el-card>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted
+} from 'vue'
 
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ElMessage,
+  ElMessageBox
+} from 'element-plus'
 
-import { Document, Clock, CircleCheck, CircleClose, Search, Refresh } from '@element-plus/icons-vue'
+import {
+  Document,
+  CircleCheck,
+  Search,
+  Refresh
+} from '@element-plus/icons-vue'
 
 import request from '@/utils/request'
+
 
 /* =========================
    数据
@@ -217,234 +291,505 @@ const selectedRows = ref([])
 
 const keyword = ref('')
 
-const statusFilter = ref(null)
-const pageNum = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-/* =========================
-   加载数据
-========================= */
-function handleSizeChange(size) {
-  pageSize.value = size
-  pageNum.value = 1
-  loadList()
-}
-function loadList() {
-  request
-    .get('/scoreApply/list', {
-      params: {
-        pageNum: pageNum.value,
-        pageSize: pageSize.value,
-      },
-    })
-    .then((res) => {
-      console.log('辅导员审核列表：', res)
+const loading = ref(false)
 
-      const data = res.data.data
-
-      list.value = data?.records || []
-
-      total.value = data?.total || 0
-
-      selectedRows.value = []
-    })
-    .catch((err) => {
-      console.error('获取审核列表失败：', err)
-
-      ElMessage.error('获取申请列表失败')
-    })
-}
 
 /* =========================
-   统计
+   当前辅导员
 ========================= */
 
-const allCount = computed(() => {
-  return list.value.length
-})
+function getCurrentTeacher() {
+
+  const userStr = localStorage.getItem('user')
+
+  if (!userStr) {
+    return null
+  }
+
+  try {
+
+    const user = JSON.parse(userStr)
+
+    console.log('当前辅导员：', user)
+
+    return user
+
+  } catch (error) {
+
+    console.error(
+      '读取当前辅导员失败：',
+      error
+    )
+
+    return null
+  }
+}
+
+
+/* =========================
+   获取最终审核列表
+========================= */
+
+async function loadList() {
+
+  loading.value = true
+
+  try {
+
+    const user = getCurrentTeacher()
+
+    console.log(
+      '开始获取辅导员最终审核列表'
+    )
+
+    console.log(
+      '当前辅导员：',
+      user
+    )
+
+    /*
+     * 注意：
+     *
+     * 这里不能再调用：
+     *
+     * /scoreApply/list
+     *
+     * 那是普通加分申请接口。
+     *
+     * 辅导员最终审核使用：
+     *
+     * /departmentScoreApply/final-audit/list
+     */
+
+    const res = await request.get(
+      '/departmentScoreApply/final-audit/list'
+    )
+
+    console.log(
+      '辅导员最终审核完整响应：',
+      res
+    )
+
+    console.log(
+      '后端 data：',
+      res.data
+    )
+
+    console.log(
+      '最终 data：',
+      res.data?.data
+    )
+
+    const data = res.data?.data
+
+    /*
+     * 后端可能直接返回：
+     *
+     * [
+     *   {...},
+     *   {...}
+     * ]
+     *
+     * 也可能返回分页：
+     *
+     * {
+     *   records: [],
+     *   total: 1
+     * }
+     */
+
+    if (Array.isArray(data)) {
+
+      list.value = data
+
+    } else if (
+      data &&
+      Array.isArray(data.records)
+    ) {
+
+      list.value = data.records
+
+    } else {
+
+      console.warn(
+        '最终审核接口 data 格式：',
+        data
+      )
+
+      list.value = []
+    }
+
+    selectedRows.value = []
+
+    console.log(
+      '最终审核列表：',
+      list.value
+    )
+
+  } catch (error) {
+
+    console.error(
+      '获取辅导员最终审核列表失败：',
+      error
+    )
+
+    list.value = []
+
+    ElMessage.error(
+      '获取最终审核列表失败，请检查后端服务'
+    )
+
+  } finally {
+
+    loading.value = false
+
+  }
+}
+
+
+/* =========================
+   待审核数量
+========================= */
 
 const pendingCount = computed(() => {
-  return list.value.filter((item) => item.status === 0).length
+
+  return list.value.filter(
+    item => item.status === 0
+  ).length
+
 })
 
-const approvedCount = computed(() => {
-  return list.value.filter((item) => item.status === 1).length
-})
-
-const rejectedCount = computed(() => {
-  return list.value.filter((item) => item.status === 2).length
-})
 
 /* =========================
-   搜索 + 筛选
+   搜索
 ========================= */
 
 const filteredList = computed(() => {
-  return list.value.filter((item) => {
-    const matchKeyword =
-      !keyword.value || (item.studentName || '').toLowerCase().includes(keyword.value.toLowerCase())
 
-    const matchStatus =
-      statusFilter.value === null ||
-      statusFilter.value === undefined ||
-      item.status === statusFilter.value
+  const key = keyword.value
+    .trim()
+    .toLowerCase()
 
-    return matchKeyword && matchStatus
+  if (!key) {
+    return list.value
+  }
+
+  return list.value.filter(item => {
+
+    const studentName =
+      item.studentName || ''
+
+    const departmentName =
+      item.departmentName || ''
+
+    const activityName =
+      item.activityName || ''
+
+    return (
+      studentName
+        .toLowerCase()
+        .includes(key) ||
+
+      departmentName
+        .toLowerCase()
+        .includes(key) ||
+
+      activityName
+        .toLowerCase()
+        .includes(key)
+    )
+
   })
+
 })
+
 
 /* =========================
    选择
 ========================= */
 
 function handleSelectionChange(rows) {
-  /*
-   * 只允许选择待审核申请
-   */
 
-  selectedRows.value = rows.filter((row) => row.status === 0)
+  selectedRows.value =
+    rows.filter(
+      row => row.status === 0
+    )
+
 }
+
 
 /* =========================
-   单条通过
+   最终通过
 ========================= */
 
-function pass(row) {
-  ElMessageBox.confirm(`确定通过 ${row.studentName} 的这条加分申请吗？`, '审核确认', {
-    confirmButtonText: '确定通过',
-    cancelButtonText: '取消',
-    type: 'success',
-  })
-    .then(() => {
-      request
-        .post('/scoreApply/audit', {
-          id: row.id,
-          status: 1,
-        })
-        .then(() => {
-          ElMessage.success('审核通过')
-          loadList()
-        })
-        .catch(() => {
-          ElMessage.error('审核失败')
-        })
-    })
-    .catch(() => {})
+async function pass(row) {
+
+  try {
+
+    await ElMessageBox.confirm(
+      `确定通过 ${row.studentName || '该学生'} 的最终审核吗？`,
+      '最终审核确认',
+      {
+        confirmButtonText: '确定通过',
+        cancelButtonText: '取消',
+        type: 'success'
+      }
+    )
+
+    console.log(
+      '准备最终通过：',
+      row
+    )
+
+    /*
+     * 这里调用最终审核接口。
+     *
+     * 如果你的后端最终审核接口就是：
+     *
+     * /departmentScoreApply/final-audit
+     *
+     * 就直接使用。
+     */
+
+    const res = await request.post(
+      '/departmentScoreApply/final-audit',
+      {
+        id: row.id,
+        status: 1
+      }
+    )
+
+    console.log(
+      '最终审核通过响应：',
+      res
+    )
+
+    ElMessage.success(
+      '最终审核通过'
+    )
+
+    await loadList()
+
+  } catch (error) {
+
+    /*
+     * 点击取消不会提示错误
+     */
+
+    if (
+      error !== 'cancel' &&
+      error !== 'close'
+    ) {
+
+      console.error(
+        '最终审核通过失败：',
+        error
+      )
+
+      ElMessage.error(
+        '最终审核失败，请检查后端接口'
+      )
+    }
+
+  }
+
 }
+
 
 /* =========================
-   单条驳回
+   最终驳回
 ========================= */
 
-function reject(row) {
-  ElMessageBox.confirm(`确定驳回 ${row.studentName} 的这条加分申请吗？`, '审核确认', {
-    confirmButtonText: '确定驳回',
-    cancelButtonText: '取消',
-    type: 'warning',
-  })
-    .then(() => {
-      request
-        .post('/scoreApply/audit', {
-          id: row.id,
-          status: 2,
-        })
-        .then(() => {
-          ElMessage.success('申请已驳回')
-          loadList()
-        })
-        .catch(() => {
-          ElMessage.error('驳回失败')
-        })
-    })
-    .catch(() => {})
+async function reject(row) {
+
+  try {
+
+    await ElMessageBox.confirm(
+      `确定驳回 ${row.studentName || '该学生'} 的最终审核吗？`,
+      '最终审核确认',
+      {
+        confirmButtonText: '确定驳回',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    console.log(
+      '准备最终驳回：',
+      row
+    )
+
+    const res = await request.post(
+      '/departmentScoreApply/final-audit',
+      {
+        id: row.id,
+        status: 2
+      }
+    )
+
+    console.log(
+      '最终驳回响应：',
+      res
+    )
+
+    ElMessage.success(
+      '申请已驳回'
+    )
+
+    await loadList()
+
+  } catch (error) {
+
+    if (
+      error !== 'cancel' &&
+      error !== 'close'
+    ) {
+
+      console.error(
+        '最终驳回失败：',
+        error
+      )
+
+      ElMessage.error(
+        '驳回失败，请检查后端接口'
+      )
+    }
+
+  }
+
 }
+
 
 /* =========================
    批量通过
 ========================= */
 
-function batchPass() {
-  const rows = selectedRows.value.filter((row) => row.status === 0)
+async function batchPass() {
+
+  const rows =
+    selectedRows.value.filter(
+      row => row.status === 0
+    )
 
   if (rows.length === 0) {
-    ElMessage.warning('请选择待审核申请')
+
+    ElMessage.warning(
+      '请选择待最终审核申请'
+    )
 
     return
   }
 
-  ElMessageBox.confirm(`确定一次通过选中的 ${rows.length} 条申请吗？`, '批量审核', {
-    confirmButtonText: '全部通过',
-    cancelButtonText: '取消',
-    type: 'success',
-  })
-    .then(async () => {
-      let successCount = 0
+  try {
 
-      for (const row of rows) {
-        try {
-          await request.post('/scoreApply/audit', {
+    await ElMessageBox.confirm(
+      `确定通过选中的 ${rows.length} 条申请吗？`,
+      '批量最终审核',
+      {
+        confirmButtonText: '全部通过',
+        cancelButtonText: '取消',
+        type: 'success'
+      }
+    )
+
+    let successCount = 0
+
+    for (const row of rows) {
+
+      try {
+
+        await request.post(
+          '/departmentScoreApply/final-audit',
+          {
             id: row.id,
-            status: 1,
-          })
-          successCount++
-        } catch (error) {
-          console.error('审核失败：', row.id, error)
-        }
+            status: 1
+          }
+        )
+
+        successCount++
+
+      } catch (error) {
+
+        console.error(
+          '最终审核失败：',
+          row,
+          error
+        )
+
       }
 
-      ElMessage.success(`成功通过 ${successCount} 条申请`)
+    }
 
-      loadList()
-    })
-    .catch(() => {})
+    ElMessage.success(
+      `成功通过 ${successCount} 条申请`
+    )
+
+    await loadList()
+
+  } catch (error) {
+
+    // 用户取消，不处理
+
+  }
+
 }
+
 
 /* =========================
    初始化
 ========================= */
 
 onMounted(() => {
+
   loadList()
+
 })
+
 </script>
 
+
 <style scoped>
+
 .audit-page {
   width: 100%;
 }
 
-/* 标题 */
+
+/* =========================
+   标题
+========================= */
+
 .title-card {
   margin-bottom: 20px;
 }
 
 .title-box {
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
 }
 
 .title-box h2 {
   margin: 0 0 8px;
-
   font-size: 24px;
-
   color: #303133;
 }
 
 .title-box p {
   margin: 0;
-
   color: #909399;
 }
 
-/* 统计 */
+
+/* =========================
+   统计
+========================= */
+
 .statistics {
   display: grid;
 
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns:
+    repeat(2, 1fr);
 
   gap: 20px;
 
@@ -453,7 +798,6 @@ onMounted(() => {
 
 .stat-card {
   display: flex;
-
   align-items: center;
 
   padding: 20px;
@@ -463,29 +807,20 @@ onMounted(() => {
 
 .stat-icon {
   width: 55px;
-
   height: 55px;
 
   border-radius: 12px;
 
   display: flex;
-
   align-items: center;
-
   justify-content: center;
 
   margin-right: 15px;
 }
 
-/* 不同颜色 */
 .stat-icon.all {
   background: #ecf5ff;
   color: #409eff;
-}
-
-.stat-icon.pending {
-  background: #fdf6ec;
-  color: #e6a23c;
 }
 
 .stat-icon.approved {
@@ -493,47 +828,38 @@ onMounted(() => {
   color: #67c23a;
 }
 
-.stat-icon.rejected {
-  background: #fef0f0;
-  color: #f56c6c;
-}
-
 .stat-content {
   display: flex;
-
   flex-direction: column;
-
   gap: 5px;
 }
 
 .stat-content span {
   color: #909399;
-
   font-size: 14px;
 }
 
 .stat-content strong {
   font-size: 28px;
-
   color: #303133;
 }
 
-/* 工具栏 */
+
+/* =========================
+   工具栏
+========================= */
+
 .toolbar {
   display: flex;
-
   align-items: center;
-
-  gap: 12px;
-
   width: 100%;
+  gap: 12px;
 }
 
 .toolbar-right {
   margin-left: auto;
 
   display: flex;
-
   align-items: center;
 
   gap: 15px;
@@ -541,44 +867,59 @@ onMounted(() => {
 
 .selected-text {
   color: #909399;
-
   font-size: 14px;
 }
 
-/* 学生 */
-.student-cell {
-  display: flex;
 
-  align-items: center;
+/* =========================
+   分数
+========================= */
 
-  gap: 10px;
-}
-
-/* 分数 */
 .score {
   color: #409eff;
-
   font-size: 17px;
-
   font-weight: bold;
 }
 
-/* 已处理 */
+
+/* =========================
+   已处理
+========================= */
+
 .processed {
   color: #909399;
-
   font-size: 13px;
 }
 
-/* 空数据 */
+
+/* =========================
+   空数据
+========================= */
+
 .el-empty {
-  padding: 30px 0;
+  padding: 40px 0;
 }
 
-/* 响应式 */
-@media (max-width: 1100px) {
+
+/* =========================
+   响应式
+========================= */
+
+@media (max-width: 700px) {
+
   .statistics {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-right {
+    margin-left: 0;
+  }
+
 }
+
 </style>
