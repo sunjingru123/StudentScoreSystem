@@ -185,6 +185,15 @@
 
       <!-- 空数据 -->
       <el-empty v-if="filteredList.length === 0" description="暂无申请记录" />
+      <el-pagination
+        v-model:current-page="pageNum"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="loadList"
+        @size-change="handleSizeChange"
+      />
     </el-card>
   </div>
 </template>
@@ -209,18 +218,33 @@ const selectedRows = ref([])
 const keyword = ref('')
 
 const statusFilter = ref(null)
-
+const pageNum = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 /* =========================
    加载数据
 ========================= */
-
+function handleSizeChange(size) {
+  pageSize.value = size
+  pageNum.value = 1
+  loadList()
+}
 function loadList() {
   request
-    .get('/scoreApply/list')
+    .get('/scoreApply/list', {
+      params: {
+        pageNum: pageNum.value,
+        pageSize: pageSize.value,
+      },
+    })
     .then((res) => {
       console.log('辅导员审核列表：', res)
 
-      list.value = res.data.data || []
+      const data = res.data.data
+
+      list.value = data?.records || []
+
+      total.value = data?.total || 0
 
       selectedRows.value = []
     })
@@ -293,10 +317,12 @@ function pass(row) {
   })
     .then(() => {
       request
-        .put(`/scoreApply/pass/${row.id}`)
+        .post('/scoreApply/audit', {
+          id: row.id,
+          status: 1,
+        })
         .then(() => {
           ElMessage.success('审核通过')
-
           loadList()
         })
         .catch(() => {
@@ -318,10 +344,12 @@ function reject(row) {
   })
     .then(() => {
       request
-        .put(`/scoreApply/reject/${row.id}`)
+        .post('/scoreApply/audit', {
+          id: row.id,
+          status: 2,
+        })
         .then(() => {
           ElMessage.success('申请已驳回')
-
           loadList()
         })
         .catch(() => {
@@ -354,8 +382,10 @@ function batchPass() {
 
       for (const row of rows) {
         try {
-          await request.put(`/scoreApply/pass/${row.id}`)
-
+          await request.post('/scoreApply/audit', {
+            id: row.id,
+            status: 1,
+          })
           successCount++
         } catch (error) {
           console.error('审核失败：', row.id, error)
