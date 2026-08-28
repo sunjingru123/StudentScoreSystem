@@ -1,25 +1,51 @@
 <template>
   <div class="teacher-home">
-    <!-- 欢迎区域 -->
+
+    <!-- =========================
+         欢迎区域
+    ========================== -->
     <el-card class="welcome-card">
       <div class="welcome-content">
+
         <div class="welcome-left">
-          <div class="welcome-title">👋 欢迎，{{ teacherName }}老师</div>
 
-          <div class="welcome-subtitle">学生综合测评管理工作台</div>
+          <div class="welcome-title">
+            👋 欢迎，{{ teacherName }}老师
+          </div>
 
-          <div class="welcome-tip">今天也辛苦啦，下面是当前需要处理的工作。</div>
+          <div class="welcome-subtitle">
+            学生综合测评管理工作台
+          </div>
+
+          <div class="welcome-tip">
+            今天也辛苦啦，下面是当前需要处理的工作。
+          </div>
+
         </div>
 
-        <div class="welcome-icon">🎓</div>
+        <div class="welcome-icon">
+          🎓
+        </div>
+
       </div>
     </el-card>
 
-    <!-- 数据统计 -->
+
+    <!-- =========================
+         数据统计
+    ========================== -->
     <div class="statistics">
-      <!-- 待审核 -->
-      <el-card class="stat-card clickable" @click="$router.push('/teacher/audit')">
+
+      <!-- =========================
+           待终审
+      ========================== -->
+      <el-card
+        class="stat-card clickable"
+        @click="$router.push('/teacher/department-score-audit')"
+      >
+
         <div class="stat-content">
+
           <div class="stat-icon warning">
             <el-icon>
               <Clock />
@@ -27,20 +53,33 @@
           </div>
 
           <div class="stat-info">
-            <div class="stat-label">待审核申请</div>
+
+            <div class="stat-label">
+              待终审申请
+            </div>
 
             <div class="stat-number">
               {{ pendingCount }}
             </div>
 
-            <div class="stat-desc">等待您处理</div>
+            <div class="stat-desc">
+              等待您处理
+            </div>
+
           </div>
+
         </div>
+
       </el-card>
 
-      <!-- 今日申请 -->
+
+      <!-- =========================
+           今日申请
+      ========================== -->
       <el-card class="stat-card">
+
         <div class="stat-content">
+
           <div class="stat-icon primary">
             <el-icon>
               <Document />
@@ -48,20 +87,33 @@
           </div>
 
           <div class="stat-info">
-            <div class="stat-label">今日申请</div>
+
+            <div class="stat-label">
+              今日申请
+            </div>
 
             <div class="stat-number">
               {{ todayCount }}
             </div>
 
-            <div class="stat-desc">今日新增申请</div>
+            <div class="stat-desc">
+              今日新增部门申报
+            </div>
+
           </div>
+
         </div>
+
       </el-card>
 
-      <!-- 已审核 -->
+
+      <!-- =========================
+           已审核
+      ========================== -->
       <el-card class="stat-card">
+
         <div class="stat-content">
+
           <div class="stat-icon success">
             <el-icon>
               <CircleCheck />
@@ -69,20 +121,37 @@
           </div>
 
           <div class="stat-info">
-            <div class="stat-label">已审核</div>
+
+            <div class="stat-label">
+              已审核
+            </div>
 
             <div class="stat-number">
               {{ auditedCount }}
             </div>
 
-            <div class="stat-desc">已完成审核</div>
+            <div class="stat-desc">
+              部门申报已完成终审
+            </div>
+
           </div>
+
         </div>
+
       </el-card>
 
-      <!-- 学生人数 -->
-      <el-card class="stat-card clickable" @click="$router.push('/teacher/student')">
+
+      <!-- =========================
+           学生人数
+           点击进入成绩查看
+      ========================== -->
+      <el-card
+        class="stat-card clickable"
+        @click="$router.push('/teacher/score')"
+      >
+
         <div class="stat-content">
+
           <div class="stat-icon info">
             <el-icon>
               <User />
@@ -90,123 +159,277 @@
           </div>
 
           <div class="stat-info">
-            <div class="stat-label">学生人数</div>
+
+            <div class="stat-label">
+              学生人数
+            </div>
 
             <div class="stat-number">
               {{ studentCount }}
             </div>
 
-            <div class="stat-desc">当前管理学生</div>
+            <div class="stat-desc">
+              当前管理学生
+            </div>
+
           </div>
+
         </div>
+
       </el-card>
+
     </div>
 
-    <!-- 下方内容 -->
-    <div class="content-grid">
-      <!-- 待审核申请 -->
-      <el-card class="panel">
-        <template #header>
-          <div class="panel-header">
-            <span> 待审核申请 </span>
 
-            <el-button type="primary" link @click="$router.push('/teacher/audit')">
+    <!-- =========================
+         下方内容
+    ========================== -->
+    <div class="content-grid">
+
+
+      <!-- =========================
+           待终审申请
+      ========================== -->
+      <el-card class="panel">
+
+        <template #header>
+
+          <div class="panel-header">
+
+            <span>
+              待终审申请
+            </span>
+
+            <el-button
+              type="primary"
+              link
+              @click="$router.push('/teacher/department-score-audit')"
+            >
               查看全部 →
             </el-button>
+
           </div>
+
         </template>
 
-        <el-table v-loading="loading" :data="pendingList" style="width: 100%">
-          <el-table-column prop="studentName" label="学生" min-width="100" />
 
-          <el-table-column prop="activityName" label="活动" min-width="130" />
+        <el-table
+          v-loading="loading"
+          :data="pendingList"
+          style="width: 100%"
+        >
 
-          <el-table-column prop="ruleName" label="项目" min-width="100" />
+          <!-- 学生 -->
+          <el-table-column
+            prop="studentName"
+            label="学生"
+            min-width="100"
+          />
 
-          <el-table-column prop="applyScore" label="申请分数" width="100">
+
+          <!-- 部门 -->
+          <el-table-column
+            prop="departmentName"
+            label="部门"
+            min-width="100"
+          />
+
+
+          <!-- 申报项目 -->
+          <el-table-column
+            prop="title"
+            label="申报项目"
+            min-width="140"
+          />
+
+
+          <!-- 分数 -->
+          <el-table-column
+            label="分数"
+            width="100"
+          >
+
             <template #default="scope">
-              <span class="score"> +{{ scope.row.applyScore }} </span>
+
+              <span
+                class="score"
+                :class="{
+                  minus:
+                    scope.row.scoreType === -1
+                }"
+              >
+
+                {{
+                  scope.row.scoreType === -1
+                    ? '-'
+                    : '+'
+                }}
+
+                {{ scope.row.score }}
+
+              </span>
+
             </template>
+
           </el-table-column>
 
-          <el-table-column prop="createTime" label="申请时间" min-width="160" />
+
+          <!-- 申请时间 -->
+          <el-table-column
+            prop="createTime"
+            label="申请时间"
+            min-width="170"
+          />
+
         </el-table>
 
-        <!-- 没有数据 -->
-        <el-empty v-if="!loading && pendingList.length === 0" description="暂无待审核申请" />
+
+        <!-- 空数据 -->
+        <el-empty
+          v-if="
+            !loading &&
+            pendingList.length === 0
+          "
+          description="暂无待终审申请"
+        />
+
       </el-card>
 
-      <!-- 快捷入口 -->
+
+      <!-- =========================
+           快捷操作
+      ========================== -->
       <el-card class="panel quick-panel">
+
         <template #header>
-          <div class="panel-title">快捷操作</div>
+
+          <div class="panel-title">
+            快捷操作
+          </div>
+
         </template>
 
+
         <div class="quick-actions">
-          <div class="quick-item" @click="$router.push('/teacher/audit')">
+
+
+          <!-- =========================
+               部门申报审核
+          ========================== -->
+          <div
+            class="quick-item"
+            @click="
+              $router.push(
+                '/teacher/department-score-audit'
+              )
+            "
+          >
+
             <div class="quick-icon audit">
+
               <el-icon>
                 <Checked />
               </el-icon>
+
             </div>
 
             <div>
-              <div class="quick-title">加分审核</div>
 
-              <div class="quick-desc">查看并处理学生申请</div>
+              <div class="quick-title">
+                部门申报审核
+              </div>
+
+              <div class="quick-desc">
+                审核部长初审通过的部门申报
+              </div>
+
             </div>
+
           </div>
 
-          <div class="quick-item" @click="$router.push('/teacher/student')">
+
+          <!-- =========================
+               成绩查看
+          ========================== -->
+          <div
+            class="quick-item"
+            @click="$router.push('/teacher/score')"
+          >
+
             <div class="quick-icon student">
-              <el-icon>
-                <User />
-              </el-icon>
-            </div>
 
-            <div>
-              <div class="quick-title">学生管理</div>
-
-              <div class="quick-desc">查看学生基本信息</div>
-            </div>
-          </div>
-
-          <div class="quick-item" @click="$router.push('/teacher/activity')">
-            <div class="quick-icon activity">
-              <el-icon>
-                <Calendar />
-              </el-icon>
-            </div>
-
-            <div>
-              <div class="quick-title">活动管理</div>
-
-              <div class="quick-desc">查看学生参与活动</div>
-            </div>
-          </div>
-
-          <div class="quick-item" @click="$router.push('/teacher/score')">
-            <div class="quick-icon score">
               <el-icon>
                 <Trophy />
               </el-icon>
+
             </div>
 
             <div>
-              <div class="quick-title">成绩查看</div>
 
-              <div class="quick-desc">查看学生综合测评成绩</div>
+              <div class="quick-title">
+                成绩查看
+              </div>
+
+              <div class="quick-desc">
+                查看学生综合测评加减分及成绩
+              </div>
+
             </div>
+
           </div>
+
+
+          <!-- =========================
+               活动管理
+          ========================== -->
+          <div
+            class="quick-item"
+            @click="$router.push('/teacher/activity')"
+          >
+
+            <div class="quick-icon activity">
+
+              <el-icon>
+                <Calendar />
+              </el-icon>
+
+            </div>
+
+            <div>
+
+              <div class="quick-title">
+                活动管理
+              </div>
+
+              <div class="quick-desc">
+                查看学生参与活动
+              </div>
+
+            </div>
+
+          </div>
+
+
         </div>
+
       </el-card>
+
     </div>
+
   </div>
 </template>
 
+
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+
+import {
+  ref,
+  onMounted
+} from 'vue'
+
+import {
+  useRouter
+} from 'vue-router'
 
 import request from '@/utils/request'
 
@@ -217,158 +440,431 @@ import {
   User,
   Checked,
   Calendar,
-  Trophy,
+  Trophy
 } from '@element-plus/icons-vue'
+
 
 const router = useRouter()
 
-const teacherName = ref('辅导员')
 
-const pendingCount = ref(0)
+/* =========================
+   当前辅导员
+========================= */
 
-const todayCount = ref(0)
+const teacherName =
+  ref('辅导员')
 
-const auditedCount = ref(0)
 
-const studentCount = ref(0)
+/* =========================
+   统计数据
+========================= */
 
-const pendingList = ref([])
+const pendingCount =
+  ref(0)
 
-const loading = ref(false)
+const todayCount =
+  ref(0)
 
-/**
- * 获取当前老师
- */
+const auditedCount =
+  ref(0)
+
+const studentCount =
+  ref(0)
+
+
+/* =========================
+   待终审列表
+========================= */
+
+const pendingList =
+  ref([])
+
+const loading =
+  ref(false)
+
+
+/* ============================================================
+   获取当前辅导员
+============================================================ */
+
 function loadTeacher() {
-  const userStr = localStorage.getItem('user')
+
+  const userStr =
+    localStorage.getItem('user')
+
 
   if (!userStr) {
+
     router.replace('/login')
 
     return
   }
 
+
   try {
-    const user = JSON.parse(userStr)
 
-    console.log('当前辅导员：', user)
+    const user =
+      JSON.parse(userStr)
 
-    teacherName.value = user.realName || user.username || '辅导员'
+
+    console.log(
+      '当前辅导员：',
+      user
+    )
+
+
+    teacherName.value =
+      user.realName ||
+      user.username ||
+      '辅导员'
+
+
   } catch (error) {
-    console.error('读取用户信息失败：', error)
+
+    console.error(
+      '读取用户信息失败：',
+      error
+    )
+
   }
+
 }
 
-/**
- * 获取待审核申请
- */
-function loadPending() {
+
+/* ============================================================
+   获取辅导员待最终审核部门申报
+============================================================ */
+
+async function loadPending() {
+
   loading.value = true
 
-  request
-    .get('/scoreApply/pending')
-    .then((res) => {
-      console.log('待审核申请：', res)
+  try {
 
-      const data = res.data.data || []
+    const res =
+      await request.get(
+        '/departmentScoreApply/final-audit/list'
+      )
 
-      pendingList.value = data
 
-      pendingCount.value = data.length
-    })
-    .catch((error) => {
-      console.error('获取待审核申请失败：', error)
+    console.log(
+      '辅导员最终审核完整响应：',
+      res
+    )
 
-      pendingList.value = []
 
-      pendingCount.value = 0
-    })
-    .finally(() => {
-      loading.value = false
-    })
+    const result =
+      res?.data
+
+
+    console.log(
+      '接口 data：',
+      result
+    )
+
+
+    /*
+     * 情况1
+     *
+     * {
+     *   code: 200,
+     *   data: []
+     * }
+     */
+
+    if (
+      Array.isArray(
+        result?.data
+      )
+    ) {
+
+      pendingList.value =
+        result.data
+
+      pendingCount.value =
+        result.data.length
+
+      return
+
+    }
+
+
+    /*
+     * 情况2
+     *
+     * {
+     *   code: 200,
+     *   data: {
+     *      list: []
+     *   }
+     * }
+     */
+
+    if (
+      Array.isArray(
+        result?.data?.list
+      )
+    ) {
+
+      pendingList.value =
+        result.data.list
+
+      pendingCount.value =
+        result.data.list.length
+
+      return
+
+    }
+
+
+    /*
+     * 情况3
+     *
+     * {
+     *   code: 200,
+     *   data: {
+     *      records: []
+     *   }
+     * }
+     */
+
+    if (
+      Array.isArray(
+        result?.data?.records
+      )
+    ) {
+
+      pendingList.value =
+        result.data.records
+
+      pendingCount.value =
+        result.data.records.length
+
+      return
+
+    }
+
+
+    console.warn(
+      '最终审核接口没有找到数组数据：',
+      result
+    )
+
+
+    pendingList.value = []
+
+    pendingCount.value = 0
+
+
+  } catch (error) {
+
+    console.error(
+      '获取部门最终审核申请失败：',
+      error
+    )
+
+
+    pendingList.value = []
+
+    pendingCount.value = 0
+
+
+  } finally {
+
+    loading.value = false
+
+  }
+
 }
 
-/**
- * 获取全部申请
- *
- * 用于统计已经审核的数量
- */
-function loadAllApply() {
-  request
-    .get('/scoreApply/list')
-    .then((res) => {
-      console.log('全部申请：', res)
 
-      const data = res.data.data || []
+/* ============================================================
+   获取今日部门申报数量
+============================================================ */
 
-      // 已审核
-      auditedCount.value = data.filter((item) => item.status === 1 || item.status === 2).length
+async function loadTodayCount() {
 
-      // 今天
-      const today = new Date()
+  try {
 
-      const year = today.getFullYear()
+    const res =
+      await request.get(
+        '/departmentScoreApply/final-audit/list'
+      )
 
-      const month = String(today.getMonth() + 1).padStart(2, '0')
 
-      const day = String(today.getDate()).padStart(2, '0')
+    const data =
+      res?.data?.data
 
-      const todayStr = `${year}-${month}-${day}`
 
-      todayCount.value = data.filter((item) => {
-        if (!item.createTime) {
-          return false
+    if (
+      !Array.isArray(data)
+    ) {
+
+      todayCount.value = 0
+
+      return
+
+    }
+
+
+    const today =
+      new Date()
+
+
+    const year =
+      today.getFullYear()
+
+
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(
+        2,
+        '0'
+      )
+
+
+    const day =
+      String(
+        today.getDate()
+      ).padStart(
+        2,
+        '0'
+      )
+
+
+    const todayStr =
+      `${year}-${month}-${day}`
+
+
+    todayCount.value =
+      data.filter(
+        item => {
+
+          if (
+            !item.createTime
+          ) {
+
+            return false
+
+          }
+
+
+          return item.createTime
+            .startsWith(
+              todayStr
+            )
+
         }
+      ).length
 
-        return item.createTime.startsWith(todayStr)
-      }).length
-    })
-    .catch((error) => {
-      console.error('获取申请统计失败：', error)
-    })
+
+  } catch (error) {
+
+    console.error(
+      '获取今日部门申报失败：',
+      error
+    )
+
+
+    todayCount.value = 0
+
+  }
+
 }
 
-/**
- * 获取学生人数
- *
- * 注意：
- * 这里先尝试调用老师学生接口。
- *
- * 如果你的后端还没有这个接口，
- * 不会影响首页其它内容。
- */
-function loadStudentCount() {
-  request
-    .get('/user/student/list')
-    .then((res) => {
-      console.log('学生列表：', res)
 
-      const data = res.data.data || []
+/* ============================================================
+   已审核数量
+============================================================ */
 
-      studentCount.value = data.length
-    })
-    .catch((error) => {
-      console.warn('学生数量接口暂不可用：', error)
+function loadAuditedCount() {
 
-      studentCount.value = 0
-    })
+  /*
+   * 当前没有专门的历史接口，
+   * 所以暂时保持 0。
+   */
+
+  auditedCount.value = 0
+
 }
+
+
+/* ============================================================
+   获取学生人数
+============================================================ */
+
+async function loadStudentCount() {
+
+  try {
+
+    const res =
+      await request.get(
+        '/user/student/list'
+      )
+
+
+    const data =
+      res?.data?.data
+
+
+    if (
+      Array.isArray(data)
+    ) {
+
+      studentCount.value =
+        data.length
+
+    } else {
+
+      studentCount.value =
+        0
+
+    }
+
+
+  } catch (error) {
+
+    console.warn(
+      '学生数量接口暂不可用：',
+      error
+    )
+
+
+    studentCount.value = 0
+
+  }
+
+}
+
+
+/* ============================================================
+   页面加载
+============================================================ */
 
 onMounted(() => {
+
   loadTeacher()
 
   loadPending()
 
-  loadAllApply()
+  loadTodayCount()
+
+  loadAuditedCount()
 
   loadStudentCount()
+
 })
+
 </script>
 
+
 <style scoped>
+
 .teacher-home {
   width: 100%;
 }
+
 
 /* =========================
    欢迎区域
@@ -379,12 +875,18 @@ onMounted(() => {
 
   border: none;
 
-  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  background:
+    linear-gradient(
+      135deg,
+      #409eff 0%,
+      #66b1ff 100%
+    );
 
   color: white;
 
   overflow: hidden;
 }
+
 
 .welcome-content {
   min-height: 150px;
@@ -398,6 +900,7 @@ onMounted(() => {
   padding: 10px 20px;
 }
 
+
 .welcome-left {
   display: flex;
 
@@ -406,11 +909,13 @@ onMounted(() => {
   gap: 10px;
 }
 
+
 .welcome-title {
   font-size: 28px;
 
   font-weight: bold;
 }
+
 
 .welcome-subtitle {
   font-size: 18px;
@@ -418,11 +923,13 @@ onMounted(() => {
   opacity: 0.95;
 }
 
+
 .welcome-tip {
   font-size: 14px;
 
   opacity: 0.8;
 }
+
 
 .welcome-icon {
   font-size: 90px;
@@ -432,6 +939,7 @@ onMounted(() => {
   margin-right: 50px;
 }
 
+
 /* =========================
    数据统计
 ========================= */
@@ -439,28 +947,42 @@ onMounted(() => {
 .statistics {
   display: grid;
 
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns:
+    repeat(4, 1fr);
 
   gap: 20px;
 
   margin-bottom: 20px;
 }
 
+
 .stat-card {
   border: none;
 
-  transition: all 0.2s;
+  transition:
+    all 0.2s;
 }
+
 
 .stat-card:hover {
-  transform: translateY(-3px);
+  transform:
+    translateY(-3px);
 
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 6px 20px
+    rgba(
+      0,
+      0,
+      0,
+      0.08
+    );
 }
+
 
 .clickable {
   cursor: pointer;
 }
+
 
 .stat-content {
   display: flex;
@@ -469,6 +991,7 @@ onMounted(() => {
 
   gap: 18px;
 }
+
 
 .stat-icon {
   width: 60px;
@@ -486,11 +1009,13 @@ onMounted(() => {
   font-size: 30px;
 }
 
+
 .stat-icon.warning {
   background: #fdf6ec;
 
   color: #e6a23c;
 }
+
 
 .stat-icon.primary {
   background: #ecf5ff;
@@ -498,17 +1023,20 @@ onMounted(() => {
   color: #409eff;
 }
 
+
 .stat-icon.success {
   background: #f0f9eb;
 
   color: #67c23a;
 }
 
+
 .stat-icon.info {
   background: #f4f4f5;
 
   color: #909399;
 }
+
 
 .stat-label {
   font-size: 14px;
@@ -518,6 +1046,7 @@ onMounted(() => {
   margin-bottom: 5px;
 }
 
+
 .stat-number {
   font-size: 30px;
 
@@ -525,6 +1054,7 @@ onMounted(() => {
 
   color: #303133;
 }
+
 
 .stat-desc {
   font-size: 12px;
@@ -534,6 +1064,7 @@ onMounted(() => {
   margin-top: 2px;
 }
 
+
 /* =========================
    下方区域
 ========================= */
@@ -541,14 +1072,17 @@ onMounted(() => {
 .content-grid {
   display: grid;
 
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns:
+    2fr 1fr;
 
   gap: 20px;
 }
 
+
 .panel {
   border: none;
 }
+
 
 .panel-header {
   display: flex;
@@ -562,14 +1096,16 @@ onMounted(() => {
   font-weight: bold;
 }
 
+
 .panel-title {
   font-size: 17px;
 
   font-weight: bold;
 }
 
+
 /* =========================
-   表格
+   分数
 ========================= */
 
 .score {
@@ -577,6 +1113,12 @@ onMounted(() => {
 
   font-weight: bold;
 }
+
+
+.score.minus {
+  color: #f56c6c;
+}
+
 
 /* =========================
    快捷操作
@@ -589,6 +1131,7 @@ onMounted(() => {
 
   gap: 5px;
 }
+
 
 .quick-item {
   display: flex;
@@ -603,14 +1146,18 @@ onMounted(() => {
 
   cursor: pointer;
 
-  transition: all 0.2s;
+  transition:
+    all 0.2s;
 }
+
 
 .quick-item:hover {
   background: #f5f7fa;
 
-  transform: translateX(3px);
+  transform:
+    translateX(3px);
 }
+
 
 .quick-icon {
   width: 45px;
@@ -628,11 +1175,13 @@ onMounted(() => {
   font-size: 22px;
 }
 
+
 .quick-icon.audit {
   background: #ecf5ff;
 
   color: #409eff;
 }
+
 
 .quick-icon.student {
   background: #f0f9eb;
@@ -640,17 +1189,20 @@ onMounted(() => {
   color: #67c23a;
 }
 
+
 .quick-icon.activity {
   background: #fdf6ec;
 
   color: #e6a23c;
 }
 
+
 .quick-icon.score {
   background: #f4f4f5;
 
   color: #909399;
 }
+
 
 .quick-title {
   font-size: 15px;
@@ -660,6 +1212,7 @@ onMounted(() => {
   color: #303133;
 }
 
+
 .quick-desc {
   font-size: 12px;
 
@@ -668,31 +1221,44 @@ onMounted(() => {
   margin-top: 4px;
 }
 
+
 /* =========================
    响应式
 ========================= */
 
 @media (max-width: 1100px) {
+
   .statistics {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns:
+      repeat(2, 1fr);
   }
+
 
   .content-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
+
 }
 
+
 @media (max-width: 700px) {
+
   .statistics {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
+
 
   .welcome-title {
     font-size: 22px;
   }
 
+
   .welcome-icon {
     display: none;
   }
+
 }
+
 </style>

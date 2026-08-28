@@ -32,31 +32,65 @@ public class ScoreApplyController {
     }
 
     /**
-     * 学生查询自己的申报记录 (对应前端 /scoreApply/my)
+     * 学生查询自己的申报记录
      */
     @GetMapping("/my")
     public Result<List<ScoreApplyVO>> myList(HttpServletRequest request) {
-        // 1. 获取当前 ID
+
+        // 获取当前登录用户ID
         Object userIdObj = request.getAttribute("userId");
-        Long currentStudentId = (userIdObj != null) ? Long.valueOf(userIdObj.toString()) : null;
 
-        System.out.println(">>>>>> [查询列表调试] 当前登录学生ID: " + currentStudentId);
+        if (userIdObj == null) {
+            return Result.fail("请先登录");
+        }
 
-        // 2. 【核心改动】如果数据库里没数据或ID对不上，我们先查出数据库里所有的记录来测试前端显示
-        // 正式环境应该用：.eq(ScoreApply::getStudentId, currentStudentId)
-        // 现在为了让你看到效果，我们暂时注释掉 ID 过滤，查出前 10 条
-        List<ScoreApply> applies = scoreApplyMapper.selectList(
-                new LambdaQueryWrapper<ScoreApply>()
-                        .orderByDesc(ScoreApply::getCreateTime)
-                        .last("LIMIT 10")
+        Long currentStudentId;
+
+        try {
+            currentStudentId = Long.valueOf(userIdObj.toString());
+        } catch (Exception e) {
+            return Result.fail("登录用户信息无效");
+        }
+
+        System.out.println(
+                ">>>>>> [查询个人申报] 当前登录学生ID: "
+                        + currentStudentId
         );
 
-        System.out.println(">>>>>> [数据库查询] 查到记录条数: " + applies.size());
+        /*
+         * ========================================================
+         * 只查询当前登录用户自己的申请
+         * ========================================================
+         *
+         * score_apply.student_id = 当前登录用户ID
+         *
+         * 不能查询全部数据。
+         */
 
-        List<ScoreApplyVO> voList = new ArrayList<>();
+        List<ScoreApply> applies =
+                scoreApplyMapper.selectList(
+                        new LambdaQueryWrapper<ScoreApply>()
+                                .eq(
+                                        ScoreApply::getStudentId,
+                                        currentStudentId
+                                )
+                                .orderByDesc(
+                                        ScoreApply::getCreateTime
+                                )
+                );
+
+        System.out.println(
+                ">>>>>> [个人申报] 当前用户申请数量: "
+                        + applies.size()
+        );
+
+        List<ScoreApplyVO> voList =
+                new ArrayList<>();
+
         for (ScoreApply apply : applies) {
             voList.add(convertToVO(apply));
         }
+
         return Result.success(voList);
     }
 
