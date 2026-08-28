@@ -89,7 +89,44 @@ public class ScoreApplyController {
             return Result.error("数据库写入失败：" + e.getMessage());
         }
     }
+    /**
+     * 辅导员查询全部申请记录
+     */
+    @GetMapping("/list")
+    public Result<Page<ScoreApplyVO>> list(
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "10") long pageSize
+    ) {
 
+        Page<ScoreApply> page =
+                new Page<>(pageNum, pageSize);
+
+        Page<ScoreApply> applyPage =
+                scoreApplyMapper.selectPage(
+                        page,
+                        new LambdaQueryWrapper<ScoreApply>()
+                                .orderByDesc(ScoreApply::getCreateTime)
+                );
+
+        Page<ScoreApplyVO> voPage =
+                new Page<>(
+                        applyPage.getCurrent(),
+                        applyPage.getSize(),
+                        applyPage.getTotal()
+                );
+
+        List<ScoreApplyVO> voList =
+                new ArrayList<>();
+
+        for (ScoreApply apply : applyPage.getRecords()) {
+
+            voList.add(convertToVO(apply));
+        }
+
+        voPage.setRecords(voList);
+
+        return Result.success(voPage);
+    }
     @GetMapping("/pending")
     public Result<Page<ScoreApplyVO>> pending(@RequestParam(defaultValue = "1") long pageNum, @RequestParam(defaultValue = "10") long pageSize) {
         Page<ScoreApply> page = new Page<>(pageNum, pageSize);
