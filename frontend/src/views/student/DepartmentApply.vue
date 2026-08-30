@@ -1,26 +1,51 @@
 <template>
   <div class="score-apply-page">
+
+    <!-- ====================================================== -->
     <!-- 页面标题 -->
+    <!-- ====================================================== -->
+
     <div class="page-header">
+
       <div>
         <h2>综合测评申报</h2>
-        <p>部门学生加减分申报及审核</p>
+
+        <p>
+          部门学生加减分申报及审核
+        </p>
       </div>
 
-      <el-button :loading="loadingPermission" @click="loadPermission">
+      <el-button
+        :loading="loadingPermission"
+        @click="loadPermission"
+      >
         刷新
       </el-button>
+
     </div>
+
 
     <!-- ====================================================== -->
     <!-- 我的部门身份 -->
     <!-- ====================================================== -->
 
-    <el-card class="apply-card" shadow="never">
+    <el-card
+      class="apply-card"
+      shadow="never"
+    >
+
       <div class="card-header">
+
         <div>
-          <h3>我的部门身份</h3>
-          <p>显示你当前加入的部门以及担任的职务。</p>
+
+          <h3>
+            我的部门身份
+          </h3>
+
+          <p>
+            显示你当前加入的部门以及担任的职务。
+          </p>
+
         </div>
 
         <el-button
@@ -30,18 +55,25 @@
         >
           刷新
         </el-button>
+
       </div>
+
+
+      <!-- 有部门身份 -->
 
       <div
         v-if="permission.departments.length > 0"
         class="department-list"
       >
+
         <div
           v-for="item in permission.departments"
           :key="item.departmentId"
           class="department-item"
         >
+
           <div class="department-info">
+
             <div class="department-name">
               {{ item.departmentName }}
             </div>
@@ -57,25 +89,41 @@
             >
               {{ item.position }}
             </el-tag>
+
           </div>
 
+
           <div class="department-tip">
-            <span v-if="item.position === '干事'">
+
+            <span
+              v-if="item.position === '干事'"
+            >
               你可以提交本部门学生加减分申报
             </span>
 
-            <span v-else>
+            <span
+              v-else
+            >
               你可以提交本部门学生加减分申报，并审核本部门其他成员提交的申报
             </span>
+
           </div>
+
         </div>
+
       </div>
+
+
+      <!-- 没有部门身份 -->
 
       <el-empty
         v-else
         description="当前没有部门干部身份"
       />
+
     </el-card>
+
+
 
     <!-- ====================================================== -->
     <!-- 部门申报审核 -->
@@ -86,13 +134,21 @@
       class="apply-card"
       shadow="never"
     >
+
       <div class="card-header">
+
         <div>
-          <h3>部门申报审核</h3>
+
+          <h3>
+            部门申报审核
+          </h3>
+
           <p>
             你是副部长或部长，可以审核本部门其他干部提交的学生加减分申报。
           </p>
+
         </div>
+
 
         <el-button
           size="small"
@@ -101,20 +157,43 @@
         >
           刷新
         </el-button>
+
       </div>
+
+
+      <!-- 审核表格 -->
 
       <el-table
         v-loading="auditLoading"
         :data="auditList"
         border
         stripe
+        empty-text="暂无待审核部门申报"
       >
+
+        <!-- 序号 -->
+
         <el-table-column
-          type="index"
           label="#"
           width="60"
           align="center"
-        />
+        >
+
+          <template #default="{ $index }">
+
+            {{
+              (myApplyPageNum - 1) *
+              myApplyPageSize +
+              $index +
+              1
+            }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 加减分项目 -->
 
         <el-table-column
           prop="title"
@@ -122,65 +201,130 @@
           min-width="180"
         />
 
+
+        <!-- 被加减分学生 -->
+
         <el-table-column
           label="被加减分学生"
           width="130"
           align="center"
         >
+
           <template #default="{ row }">
+
             {{ row.studentName || row.studentId }}
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 部门 -->
 
         <el-table-column
           label="部门"
           width="140"
           align="center"
         >
+
           <template #default="{ row }">
+
             {{ row.departmentName || row.departmentId }}
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 类型 -->
 
         <el-table-column
           label="类型"
-          width="90"
+          width="100"
           align="center"
         >
+
           <template #default="{ row }">
+
+            <!-- 加分 -->
+
             <el-tag
-              v-if="Number(row.scoreType) === 1"
+              v-if="isBonus(row)"
               type="success"
             >
               加分
             </el-tag>
 
+
+            <!-- 减分 -->
+
             <el-tag
-              v-else
+              v-else-if="isDeduct(row)"
               type="danger"
             >
               减分
             </el-tag>
+
+
+            <!-- 未知 -->
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知
+            </el-tag>
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 分值 -->
 
         <el-table-column
           label="分值"
           width="90"
           align="center"
         >
+
           <template #default="{ row }">
+
+            <!-- 加分 -->
+
             <span
-              :class="
-                Number(row.scoreType) === 1
-                  ? 'bonus'
-                  : 'deduct'
-              "
+              v-if="isBonus(row)"
+              class="bonus"
             >
-              {{ Number(row.scoreType) === 1 ? '+' : '-' }}{{ row.score }}
+              +{{ row.score }}
             </span>
+
+
+            <!-- 减分 -->
+
+            <span
+              v-else-if="isDeduct(row)"
+              class="deduct"
+            >
+              -{{ row.score }}
+            </span>
+
+
+            <!-- 未知 -->
+
+            <span
+              v-else
+              class="unknown-score"
+            >
+              {{ row.score }}
+            </span>
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 项目说明 -->
 
         <el-table-column
           prop="description"
@@ -189,11 +333,17 @@
           show-overflow-tooltip
         />
 
+
+        <!-- 申报时间 -->
+
         <el-table-column
           prop="createTime"
           label="申报时间"
-          width="170"
+          width="180"
         />
+
+
+        <!-- 操作 -->
 
         <el-table-column
           label="操作"
@@ -201,7 +351,9 @@
           fixed="right"
           align="center"
         >
+
           <template #default="{ row }">
+
             <el-button
               type="success"
               size="small"
@@ -210,6 +362,7 @@
               通过
             </el-button>
 
+
             <el-button
               type="danger"
               size="small"
@@ -217,15 +370,25 @@
             >
               驳回
             </el-button>
+
           </template>
+
         </el-table-column>
+
       </el-table>
 
+
       <el-empty
-        v-if="!auditLoading && auditList.length === 0"
+        v-if="
+          !auditLoading &&
+          auditList.length === 0
+        "
         description="暂无待审核部门申报"
       />
+
     </el-card>
+
+
 
     <!-- ====================================================== -->
     <!-- 部门学生加减分申报 -->
@@ -236,18 +399,32 @@
       class="apply-card"
       shadow="never"
     >
+
       <div class="card-header">
+
         <div>
-          <h3>部门学生加减分申报</h3>
+
+          <h3>
+            部门学生加减分申报
+          </h3>
+
           <p>
             部门干部可以根据本部门加减分模板，对学生进行加分或扣分申报。
           </p>
+
         </div>
+
 
         <el-tag type="success">
           部门审核 → 辅导员审核
         </el-tag>
+
       </div>
+
+
+      <!-- ================================================== -->
+      <!-- 部门申报表单 -->
+      <!-- ================================================== -->
 
       <el-form
         ref="departmentFormRef"
@@ -256,30 +433,48 @@
         label-width="110px"
         class="apply-form"
       >
+
+
+        <!-- ================================================== -->
         <!-- 所属部门 -->
+        <!-- ================================================== -->
+
         <el-form-item
           label="所属部门"
           prop="departmentId"
         >
+
           <el-select
             v-model="departmentForm.departmentId"
             placeholder="请选择申报部门"
             style="width: 100%"
+            clearable
           >
+
             <el-option
               v-for="item in permission.departments"
               :key="item.departmentId"
-              :label="`${item.departmentName}（${item.position}）`"
+              :label="
+                `${item.departmentName}（${item.position}）`
+              "
               :value="item.departmentId"
             />
+
           </el-select>
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 被加减分学生 -->
+        <!-- ================================================== -->
+
         <el-form-item
           label="被加减分学生"
           prop="studentId"
         >
+
           <el-select
             v-model="departmentForm.studentId"
             filterable
@@ -287,90 +482,210 @@
             placeholder="请选择需要加分或扣分的学生"
             style="width: 100%"
           >
+
             <el-option
               v-for="item in studentList"
               :key="item.id"
-              :label="`${item.realName || item.username}（${item.studentNo || item.id}）`"
+              :label="
+                `${item.realName || item.username}（${item.studentNo || item.id}）`
+              "
               :value="item.id"
             />
+
           </el-select>
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 部门模板 -->
+        <!-- ================================================== -->
+
         <el-form-item
           label="加减分项目"
           prop="templateId"
         >
+
           <el-select
             v-model="departmentForm.templateId"
             filterable
             clearable
             :disabled="!departmentForm.departmentId"
+            :loading="templateLoading"
             placeholder="请先选择部门，再选择加减分项目"
             style="width: 100%"
           >
+
             <el-option
               v-for="item in departmentTemplateList"
               :key="item.id"
-              :label="`${item.name}（${Number(item.scoreType) === 1 ? '+' : '-'}${item.score}分）`"
+              :label="getTemplateLabel(item)"
               :value="item.id"
-            />
+            >
+
+              <div class="template-option">
+
+                <span class="template-name">
+                  {{ item.name }}
+                </span>
+
+
+                <!-- 加分模板 -->
+
+                <span
+                  v-if="isBonus(item)"
+                  class="template-bonus"
+                >
+                  +{{ item.score }}分
+                </span>
+
+
+                <!-- 减分模板 -->
+
+                <span
+                  v-else-if="isDeduct(item)"
+                  class="template-deduct"
+                >
+                  -{{ item.score }}分
+                </span>
+
+
+                <!-- 未知 -->
+
+                <span
+                  v-else
+                  class="template-unknown"
+                >
+                  {{ item.score }}分
+                </span>
+
+              </div>
+
+            </el-option>
+
           </el-select>
+
 
           <div class="form-tip">
             这里只显示当前申报部门自己的加减分模板。
           </div>
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 模板详情 -->
+        <!-- ================================================== -->
+
         <el-form-item label="项目类型">
-          <el-tag
-            v-if="selectedTemplate"
-            :type="
-              Number(selectedTemplate.scoreType) === 1
-                ? 'success'
-                : 'danger'
-            "
-          >
-            {{
-              Number(selectedTemplate.scoreType) === 1
-                ? '加分'
-                : '减分'
-            }}
-          </el-tag>
+
+          <template v-if="selectedTemplate">
+
+            <!-- 加分 -->
+
+            <el-tag
+              v-if="isBonus(selectedTemplate)"
+              type="success"
+            >
+              加分
+            </el-tag>
+
+
+            <!-- 减分 -->
+
+            <el-tag
+              v-else-if="isDeduct(selectedTemplate)"
+              type="danger"
+            >
+              减分
+            </el-tag>
+
+
+            <!-- 未知 -->
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知类型
+            </el-tag>
+
+
+            <!-- 加分分值 -->
+
+            <span
+              v-if="isBonus(selectedTemplate)"
+              class="template-score bonus"
+            >
+              +{{ selectedTemplate.score }} 分
+            </span>
+
+
+            <!-- 减分分值 -->
+
+            <span
+              v-else-if="isDeduct(selectedTemplate)"
+              class="template-score deduct"
+            >
+              -{{ selectedTemplate.score }} 分
+            </span>
+
+
+            <!-- 未知分值 -->
+
+            <span
+              v-else
+              class="template-score"
+            >
+              {{ selectedTemplate.score }} 分
+            </span>
+
+          </template>
+
 
           <span
-            v-if="selectedTemplate"
-            class="template-score"
-          >
-            {{
-              Number(selectedTemplate.scoreType) === 1
-                ? '+'
-                : '-'
-            }}{{ selectedTemplate.score }} 分
-          </span>
-
-          <span
-            v-if="!selectedTemplate"
+            v-else
             class="empty-template"
           >
             请先选择加减分项目
           </span>
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 模板项目说明 -->
-        <el-form-item label="项目说明">
+        <!-- ================================================== -->
+
+        <el-form-item
+          label="项目说明"
+        >
+
           <el-input
-            :model-value="selectedTemplate?.description || ''"
+            :model-value="
+              selectedTemplate?.description || ''
+            "
             type="textarea"
             :rows="5"
             readonly
             placeholder="选择加减分项目后自动显示项目说明"
           />
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 证明材料 -->
-        <el-form-item label="活动凭证">
+        <!-- ================================================== -->
+
+        <el-form-item
+          label="活动凭证"
+        >
+
           <el-upload
             action=""
             :auto-upload="false"
@@ -378,20 +693,32 @@
             :on-change="handleDepartmentFile"
             :on-remove="removeDepartmentFile"
           >
+
             <el-button type="primary">
               选择凭证
             </el-button>
 
+
             <template #tip>
+
               <div class="upload-tip">
                 可上传活动证明、照片、文件等材料
               </div>
+
             </template>
+
           </el-upload>
+
         </el-form-item>
 
+
+
+        <!-- ================================================== -->
         <!-- 提交 -->
+        <!-- ================================================== -->
+
         <el-form-item>
+
           <el-button
             type="success"
             :loading="departmentSubmitting"
@@ -400,28 +727,44 @@
             提交部门加减分申报
           </el-button>
 
-          <el-button @click="resetDepartment">
+
+          <el-button
+            @click="resetDepartment"
+          >
             重置
           </el-button>
+
         </el-form-item>
+
       </el-form>
+
     </el-card>
 
+
+
     <!-- ====================================================== -->
-    <!-- 我的申请 -->
+    <!-- 我的申报 -->
     <!-- ====================================================== -->
 
     <el-card
       class="apply-card"
       shadow="never"
     >
+
       <div class="card-header">
+
         <div>
-          <h3>我的申报记录</h3>
+
+          <h3>
+            我的申报记录
+          </h3>
+
           <p>
             查看自己提交的部门学生加减分申报。
           </p>
+
         </div>
+
 
         <el-button
           size="small"
@@ -430,14 +773,24 @@
         >
           刷新
         </el-button>
+
       </div>
+
+
+      <!-- ================================================== -->
+      <!-- 我的申报表格 -->
+      <!-- ================================================== -->
 
       <el-table
         v-loading="listLoading"
-        :data="departmentApplyList"
+        :data="pagedDepartmentApplyList"
         border
         stripe
+        empty-text="暂无部门学生加减分申报"
       >
+
+        <!-- 序号 -->
+
         <el-table-column
           type="index"
           label="#"
@@ -445,71 +798,139 @@
           align="center"
         />
 
+
+        <!-- 项目 -->
+
         <el-table-column
           prop="title"
           label="加减分项目"
           min-width="200"
         />
 
+
+        <!-- 学生 -->
+
         <el-table-column
           label="被加减分学生"
           width="140"
           align="center"
         >
+
           <template #default="{ row }">
+
             {{ row.studentName || row.studentId }}
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 部门 -->
 
         <el-table-column
           label="所属部门"
           width="140"
           align="center"
         >
+
           <template #default="{ row }">
+
             {{ row.departmentName || row.departmentId }}
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 类型 -->
 
         <el-table-column
           label="类型"
           width="90"
           align="center"
         >
+
           <template #default="{ row }">
+
+            <!-- 加分 -->
+
             <el-tag
-              v-if="Number(row.scoreType) === 1"
+              v-if="isBonus(row)"
               type="success"
             >
               加分
             </el-tag>
 
+
+            <!-- 减分 -->
+
             <el-tag
-              v-else
+              v-else-if="isDeduct(row)"
               type="danger"
             >
               减分
             </el-tag>
+
+
+            <!-- 未知 -->
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知
+            </el-tag>
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 分值 -->
 
         <el-table-column
           label="分值"
           width="90"
           align="center"
         >
+
           <template #default="{ row }">
+
+            <!-- 加分 -->
+
             <span
-              :class="
-                Number(row.scoreType) === 1
-                  ? 'bonus'
-                  : 'deduct'
-              "
+              v-if="isBonus(row)"
+              class="bonus"
             >
-              {{ Number(row.scoreType) === 1 ? '+' : '-' }}{{ row.score }}
+              +{{ row.score }}
             </span>
+
+
+            <!-- 减分 -->
+
+            <span
+              v-else-if="isDeduct(row)"
+              class="deduct"
+            >
+              -{{ row.score }}
+            </span>
+
+
+            <!-- 未知 -->
+
+            <span
+              v-else
+              class="unknown-score"
+            >
+              {{ row.score }}
+            </span>
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 项目说明 -->
 
         <el-table-column
           prop="description"
@@ -518,18 +939,32 @@
           show-overflow-tooltip
         />
 
+
+        <!-- 时间 -->
+
         <el-table-column
           prop="createTime"
           label="申报时间"
-          width="170"
+          width="180"
         />
+
+
+        <!-- ================================================== -->
+        <!-- 审核状态 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="审核状态"
           width="150"
           align="center"
         >
+
           <template #default="{ row }">
+
+            <!-- ============================================== -->
+            <!-- 第一阶段：部门审核 -->
+            <!-- ============================================== -->
+
             <el-tag
               v-if="Number(row.status) === 0"
               type="warning"
@@ -537,12 +972,22 @@
               待部门审核
             </el-tag>
 
+
+            <!-- ============================================== -->
+            <!-- 部门审核驳回 -->
+            <!-- ============================================== -->
+
             <el-tag
               v-else-if="Number(row.status) === 2"
               type="danger"
             >
               部门已驳回
             </el-tag>
+
+
+            <!-- ============================================== -->
+            <!-- 第二阶段：辅导员审核 -->
+            <!-- ============================================== -->
 
             <el-tag
               v-else-if="
@@ -554,6 +999,11 @@
               待辅导员审核
             </el-tag>
 
+
+            <!-- ============================================== -->
+            <!-- 最终通过 -->
+            <!-- ============================================== -->
+
             <el-tag
               v-else-if="
                 Number(row.status) === 1 &&
@@ -564,6 +1014,11 @@
               审核通过
             </el-tag>
 
+
+            <!-- ============================================== -->
+            <!-- 辅导员驳回 -->
+            <!-- ============================================== -->
+
             <el-tag
               v-else-if="
                 Number(row.status) === 1 &&
@@ -573,8 +1028,25 @@
             >
               辅导员已驳回
             </el-tag>
+
+
+            <!-- ============================================== -->
+            <!-- 未知 -->
+            <!-- ============================================== -->
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知状态
+            </el-tag>
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 部门审核意见 -->
 
         <el-table-column
           prop="reviewRemark"
@@ -583,26 +1055,69 @@
           show-overflow-tooltip
         />
 
+
+        <!-- 辅导员审核意见 -->
+
         <el-table-column
           prop="finalReviewRemark"
           label="辅导员审核意见"
           min-width="180"
           show-overflow-tooltip
         />
+
       </el-table>
+
+
+      <!-- ================================================== -->
+      <!-- 我的申报分页 -->
+      <!-- ================================================== -->
+
+      <div
+        v-if="
+    !listLoading &&
+    departmentApplyList.length > 0
+  "
+        class="pagination-wrapper"
+      >
+
+        <div class="pagination-total">
+
+          共
+          {{ departmentApplyList.length }}
+          条申报记录
+
+        </div>
+
+
+        <el-pagination
+          v-model:current-page="myApplyPageNum"
+          v-model:page-size="myApplyPageSize"
+          :page-sizes="[10, 20, 30, 50]"
+          :total="departmentApplyList.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+        />
+
+      </div>
+
 
       <el-empty
         v-if="
-          !listLoading &&
-          departmentApplyList.length === 0
-        "
+    !listLoading &&
+    departmentApplyList.length === 0
+  "
         description="暂无部门学生加减分申报"
       />
+
     </el-card>
+
   </div>
 </template>
 
+
+
 <script setup>
+
 import {
   ref,
   reactive,
@@ -618,21 +1133,37 @@ import {
 
 import request from '@/utils/request'
 
-/* ========== 权限 ========== */
+
+
+/* ====================================================== */
+/* 权限 */
+/* ====================================================== */
 
 const loadingPermission = ref(false)
 
 const permission = reactive({
+
   canDepartmentApply: false,
+
   canDepartmentAudit: false,
+
   departments: [],
+
 })
 
-/* ========== 学生列表 ========== */
+
+
+/* ====================================================== */
+/* 学生列表 */
+/* ====================================================== */
 
 const studentList = ref([])
 
-/* ========== 部门加减分 ========== */
+
+
+/* ====================================================== */
+/* 部门加减分申报 */
+/* ====================================================== */
 
 const departmentFormRef = ref(null)
 
@@ -644,99 +1175,355 @@ const departmentTemplateList = ref([])
 
 const templateLoading = ref(false)
 
+
+
 const departmentForm = reactive({
+
   departmentId: null,
+
   templateId: null,
+
   studentId: null,
+
   evidenceUrl: '',
+
 })
+
+
+
+/* ====================================================== */
+/* 表单验证规则 */
+/* ====================================================== */
 
 const departmentRules = {
+
   departmentId: [
+
     {
       required: true,
+
       message: '请选择部门',
+
       trigger: 'change',
+
     },
+
   ],
+
 
   studentId: [
+
     {
       required: true,
+
       message: '请选择需要加减分的学生',
+
       trigger: 'change',
+
     },
+
   ],
+
 
   templateId: [
+
     {
       required: true,
+
       message: '请选择加减分项目',
+
       trigger: 'change',
+
     },
+
   ],
+
 }
 
+
+
+/* ====================================================== */
+/* scoreType 统一处理 */
+/* ====================================================== */
+
+/*
+ * 整个系统统一：
+ *
+ * scoreType = 1
+ * 加分
+ *
+ * scoreType = -1
+ * 减分
+ *
+ *
+ * 注意：
+ *
+ * scoreType 和审核 status 是完全不同的字段。
+ *
+ *
+ * scoreType：
+ *
+ * 1  = 加分
+ * -1 = 减分
+ *
+ *
+ * status：
+ *
+ * 0 = 待部门审核
+ * 1 = 部门审核通过
+ * 2 = 部门审核驳回
+ *
+ *
+ * finalStatus：
+ *
+ * 0 = 待辅导员审核
+ * 1 = 辅导员审核通过
+ * 2 = 辅导员审核驳回
+ */
+
+function getScoreType(item) {
+
+  if (!item) {
+
+    return 0
+
+  }
+
+  return Number(item.scoreType)
+
+}
+
+
+
+/* ====================================================== */
+/* 判断是否加分 */
+/* ====================================================== */
+
+function isBonus(item) {
+
+  return getScoreType(item) === 1
+
+}
+
+
+
+/* ====================================================== */
+/* 判断是否减分 */
+/* ====================================================== */
+
+function isDeduct(item) {
+
+  return getScoreType(item) === -1
+
+}
+
+
+
+/* ====================================================== */
+/* 获取模板下拉显示文字 */
+/* ====================================================== */
+
+function getTemplateLabel(item) {
+
+  if (!item) {
+
+    return ''
+
+  }
+
+
+  const scoreType =
+    getScoreType(item)
+
+
+  const score =
+    item.score ?? 0
+
+
+  /*
+   * 加分
+   */
+
+  if (scoreType === 1) {
+
+    return `${item.name}（+${score}分）`
+
+  }
+
+
+  /*
+   * 减分
+   */
+
+  if (scoreType === -1) {
+
+    return `${item.name}（-${score}分）`
+
+  }
+
+
+  /*
+   * 未知
+   */
+
+  return `${item.name}（${score}分）`
+
+}
+
+
+
+/* ====================================================== */
 /* 当前选择的模板 */
+/* ====================================================== */
 
 const selectedTemplate = computed(() => {
+
   return departmentTemplateList.value.find(
+
     (item) =>
-      item.id === departmentForm.templateId,
+
+      String(item.id) ===
+      String(departmentForm.templateId),
+
   )
+
 })
 
-/* ========== 我的申请 ========== */
+
 
 const listLoading = ref(false)
 
 const departmentApplyList = ref([])
 
-/* ========== 部门审核 ========== */
+/* ====================================================== */
+/* 我的申报分页 */
+/* ====================================================== */
+
+const myApplyPageNum = ref(1)
+
+const myApplyPageSize = ref(10)
+
+/* ====================================================== */
+/* 部门审核 */
+/* ====================================================== */
 
 const auditLoading = ref(false)
 
 const auditList = ref([])
 
 /* ====================================================== */
-/* 获取权限 */
+/* 当前页申报记录 */
+/* ====================================================== */
+
+const pagedDepartmentApplyList = computed(() => {
+
+  const start =
+    (myApplyPageNum.value - 1) *
+    myApplyPageSize.value
+
+  const end =
+    start +
+    myApplyPageSize.value
+
+  return departmentApplyList.value.slice(
+    start,
+    end
+  )
+
+})
+
+/* ====================================================== */
+/* 获取当前用户部门权限 */
 /* ====================================================== */
 
 async function loadPermission() {
+
   loadingPermission.value = true
 
-  try {
-    const res = await request.get(
-      '/departmentScoreApply/my-permissions',
-    )
 
-    const data = res.data?.data || {}
+  try {
+
+    const res =
+      await request.get(
+        '/departmentScoreApply/my-permissions',
+      )
+
+
+    const data =
+      res.data?.data || {}
+
+
+    /*
+     * 部门列表
+     */
 
     permission.departments =
-      data.departments || []
+      Array.isArray(data.departments)
+        ? data.departments
+        : []
+
+
+    /*
+     * 部门申报权限
+     */
 
     permission.canDepartmentApply =
       data.canDepartmentApply === true
 
+
+    /*
+     * 部门审核权限
+     */
+
     permission.canDepartmentAudit =
       data.canDepartmentAudit === true
+
+
+
+    /*
+     * 检查当前选择的部门是否仍然有效
+     */
 
     const validDepartmentIds =
       permission.departments.map(
         (item) => item.departmentId,
       )
 
+
     if (
+
       departmentForm.departmentId &&
-      !validDepartmentIds.includes(
-        departmentForm.departmentId,
+
+      !validDepartmentIds.some(
+
+        (id) =>
+
+          String(id) ===
+          String(
+            departmentForm.departmentId,
+          ),
+
       )
+
     ) {
+
       departmentForm.departmentId = null
+
       departmentForm.templateId = null
+
+      departmentTemplateList.value = []
+
     }
-  } catch (error) {
-    console.error(error)
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '获取部门权限失败：',
+      error,
+    )
+
 
     permission.departments = []
 
@@ -744,37 +1531,374 @@ async function loadPermission() {
 
     permission.canDepartmentAudit = false
 
+
     ElMessage.error(
+
       error?.response?.data?.message ||
       '获取部门权限失败',
+
     )
-  } finally {
-    loadingPermission.value = false
+
   }
+
+  finally {
+
+    loadingPermission.value = false
+
+  }
+
 }
+
 
 /* ====================================================== */
 /* 加载全部学生 */
 /* ====================================================== */
 
 async function loadStudentList() {
+
   try {
-    const res = await request.get(
-      '/user/student-list',
+
+    console.log(
+      '开始获取全部学生列表'
     )
 
+
+    const allStudents = []
+
+    let pageNum = 1
+
+    /*
+     * 不要一次传 10000。
+     *
+     * 后端一般会限制最大 pageSize。
+     *
+     * 这里每页取 100。
+     */
+
+    const pageSize = 100
+
+    let total = 0
+
+
+    /* ================================================== */
+    /* 循环获取所有分页 */
+    /* ================================================== */
+
+    while (true) {
+
+      console.log(
+        `正在获取学生第 ${pageNum} 页`
+      )
+
+
+      const res =
+        await request.get(
+          '/user/student/list',
+          {
+            params: {
+
+              pageNum,
+
+              pageSize,
+
+            },
+
+          },
+        )
+
+
+      console.log(
+        `第 ${pageNum} 页学生列表响应：`,
+        res
+      )
+
+
+      const responseData =
+        res?.data
+
+
+      const data =
+        responseData?.data ??
+        responseData ??
+        {}
+
+
+      /* ================================================== */
+      /* 兼容分页数据 */
+      /* ================================================== */
+
+      let records = []
+
+
+      if (
+        Array.isArray(data)
+      ) {
+
+        records = data
+
+      }
+
+      else if (
+        Array.isArray(
+          data?.records
+        )
+      ) {
+
+        records =
+          data.records
+
+        total =
+          Number(
+            data.total ?? 0
+          )
+
+      }
+
+
+      console.log(
+        `第 ${pageNum} 页学生数量：`,
+        records.length
+      )
+
+
+      /*
+       * 没有数据了
+       */
+
+      if (
+        records.length === 0
+      ) {
+
+        break
+
+      }
+
+
+      /*
+       * 加入总学生列表
+       */
+
+      allStudents.push(
+        ...records
+      )
+
+
+      /* ================================================== */
+      /* 判断是否已经获取完 */
+      /* ================================================== */
+
+      if (
+        total > 0 &&
+        allStudents.length >= total
+      ) {
+
+        break
+
+      }
+
+
+      /*
+       * 如果这一页数量小于 pageSize，
+       * 通常说明已经到最后一页。
+       */
+
+      if (
+        records.length < pageSize
+      ) {
+
+        break
+
+      }
+
+
+      pageNum++
+
+
+      /*
+       * 防止异常情况下死循环
+       */
+
+      if (
+        pageNum > 1000
+      ) {
+
+        console.warn(
+          '学生分页超过 1000 页，停止继续获取'
+        )
+
+        break
+
+      }
+
+    }
+
+
+    /* ================================================== */
+    /* 去重 */
+    /* ================================================== */
+
+    const studentMap =
+      new Map()
+
+
+    for (
+      const student
+      of allStudents
+      ) {
+
+      if (
+        !student ||
+        !student.id
+      ) {
+
+        continue
+
+      }
+
+
+      studentMap.set(
+        String(student.id),
+        student
+      )
+
+    }
+
+
+    const students =
+      Array.from(
+        studentMap.values()
+      )
+
+
+    /* ================================================== */
+    /* 过滤学生 */
+    /* ================================================== */
+
     studentList.value =
-      res.data?.data || []
-  } catch (error) {
-    console.error(error)
+
+      students.filter(
+        student => {
+
+          /*
+           * 必须有 ID
+           */
+
+          if (
+            !student ||
+            !student.id
+          ) {
+
+            return false
+
+          }
+
+
+          /*
+           * 如果后端明确返回 status，
+           * 那么只保留 status = 1。
+           */
+
+          if (
+            student.status !== undefined &&
+            student.status !== null &&
+            student.status !== ''
+          ) {
+
+            return Number(
+              student.status
+            ) === 1
+
+          }
+
+
+          /*
+           * 如果没有 status，
+           * 默认保留。
+           */
+
+          return true
+
+        }
+      )
+
+
+    /* ================================================== */
+    /* 输出最终结果 */
+    /* ================================================== */
+
+    console.log(
+      '================================'
+    )
+
+    console.log(
+      '学生总数：',
+      students.length
+    )
+
+    console.log(
+      '最终可申报学生数量：',
+      studentList.value.length
+    )
+
+    console.log(
+      '最终可申报学生：',
+      studentList.value
+    )
+
+    console.log(
+      '================================'
+    )
+
+
+    /* ================================================== */
+    /* 专门检查孙靖茹 */
+    /* ================================================== */
+
+    const target =
+      studentList.value.find(
+        student => {
+
+          const name =
+            student.realName ??
+            student.studentName ??
+            student.name ??
+            ''
+
+          return String(name)
+            .includes('孙靖茹')
+
+        }
+      )
+
+
+    console.log(
+      '检查孙靖茹：',
+      target
+    )
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '获取学生列表失败：',
+      error
+    )
+
 
     studentList.value = []
 
+
     ElMessage.error(
+
       error?.response?.data?.message ||
-      '获取学生列表失败',
+      error?.response?.data?.msg ||
+      '获取学生列表失败'
+
     )
+
   }
+
 }
 
 /* ====================================================== */
@@ -784,172 +1908,495 @@ async function loadStudentList() {
 async function loadDepartmentTemplates(
   departmentId,
 ) {
+
+  /*
+   * 清空旧模板
+   */
+
   departmentTemplateList.value = []
 
   departmentForm.templateId = null
 
+
+  /*
+   * 没有部门直接结束
+   */
+
   if (!departmentId) {
+
     return
+
   }
+
 
   templateLoading.value = true
 
+
   try {
-    const res = await request.get(
-      '/departmentScoreTemplate/list',
-      {
-        params: {
-          departmentId,
+
+    const res =
+      await request.get(
+
+        '/departmentScoreTemplate/list',
+
+        {
+
+          params: {
+
+            departmentId,
+
+          },
+
         },
-      },
-    )
+
+      )
+
+
+    const list =
+      Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+
+
+    /*
+     * 不过滤 scoreType。
+     *
+     * 后端返回：
+     *
+     * 1  = 加分
+     * -1 = 减分
+     *
+     * 两种模板全部显示。
+     */
 
     departmentTemplateList.value =
-      res.data?.data || []
-  } catch (error) {
-    console.error(error)
+
+      list.map(
+
+        (item) => ({
+
+          ...item,
+
+          scoreType:
+            Number(item.scoreType),
+
+        }),
+
+      )
+
+  }
+
+  catch (error) {
+
+    console.error(
+
+      '获取部门加减分项目失败：',
+
+      error,
+
+    )
+
 
     departmentTemplateList.value = []
 
+
     ElMessage.error(
+
       error?.response?.data?.message ||
       '获取部门加减分项目失败',
+
     )
-  } finally {
-    templateLoading.value = false
+
   }
+
+  finally {
+
+    templateLoading.value = false
+
+  }
+
 }
 
-/* 部门变化自动加载模板 */
+
+
+/* ====================================================== */
+/* 部门变化 */
+/* ====================================================== */
+
+/*
+ * 用户选择部门后：
+ *
+ * 自动加载这个部门自己的模板。
+ */
 
 watch(
+
   () => departmentForm.departmentId,
+
   async (val) => {
+
     await loadDepartmentTemplates(val)
+
   },
+
 )
+
+
 
 /* ====================================================== */
 /* 部门审核列表 */
 /* ====================================================== */
 
 async function loadAuditList() {
+
+  /*
+   * 没有权限不加载
+   */
+
   if (!permission.canDepartmentAudit) {
+
     auditList.value = []
+
     return
+
   }
+
 
   auditLoading.value = true
 
+
   try {
-    const res = await request.get(
-      '/departmentScoreApply/audit/list',
-    )
+
+    const res =
+      await request.get(
+
+        '/departmentScoreApply/audit/list',
+
+      )
+
+
+    /*
+     * 后端返回成功
+     */
 
     auditList.value =
-      res.data?.code === 200
-        ? res.data.data || []
+
+      res.data?.code === 200 &&
+      Array.isArray(res.data.data)
+
+        ? res.data.data.map(
+
+          (item) => ({
+
+            ...item,
+
+            scoreType:
+              Number(item.scoreType),
+
+          }),
+
+        )
+
         : []
-  } catch (error) {
-    console.error(error)
+
+  }
+
+  catch (error) {
+
+    console.error(
+
+      '获取待审核申请失败：',
+
+      error,
+
+    )
+
 
     auditList.value = []
 
+
     ElMessage.error(
+
       error?.response?.data?.message ||
       '获取待审核申请失败',
+
     )
-  } finally {
-    auditLoading.value = false
+
   }
+
+  finally {
+
+    auditLoading.value = false
+
+  }
+
 }
 
+
+
 /* ====================================================== */
-/* 审核操作 */
+/* 部门审核操作 */
 /* ====================================================== */
 
-async function auditApply(row, status) {
+async function auditApply(
+
+  row,
+
+  status,
+
+) {
+
+  /*
+   * status 是审核状态。
+   *
+   * 不是 scoreType。
+   *
+   *
+   * status：
+   *
+   * 1 = 部门审核通过
+   * 2 = 部门审核驳回
+   */
+
   const actionText =
-    status === 1 ? '通过' : '驳回'
+
+    status === 1
+
+      ? '通过'
+
+      : '驳回'
+
 
   try {
+
+    /*
+     * 输入审核意见
+     */
+
     const { value } =
+
       await ElMessageBox.prompt(
+
         `请输入${actionText}意见`,
+
         `部门申报${actionText}`,
+
         {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
+
+          confirmButtonText:
+            '确定',
+
+          cancelButtonText:
+            '取消',
+
           inputPlaceholder:
             '请输入审核意见（可选）',
-          inputType: 'textarea',
+
+          inputType:
+            'textarea',
+
         },
+
       )
 
+
+    /*
+     * 调用审核接口
+     */
+
     await request.put(
+
       `/departmentScoreApply/audit/${row.id}`,
+
       {
+
         status,
-        reviewRemark: value || '',
+
+        reviewRemark:
+          value || '',
+
       },
+
     )
 
+
     ElMessage.success(
+
       `部门申报已${actionText}`,
+
     )
+
+
+    /*
+     * 刷新审核列表
+     */
 
     await loadAuditList()
 
+
+    /*
+     * 刷新我的申报
+     */
+
     await loadMyApply()
-  } catch (error) {
+
+  }
+
+  catch (error) {
+
+    /*
+     * 用户取消
+     */
+
     if (
+
       error === 'cancel' ||
       error === 'close'
+
     ) {
+
       return
+
     }
 
-    console.error(error)
+
+    console.error(
+
+      '部门申报审核失败：',
+
+      error,
+
+    )
+
 
     ElMessage.error(
+
       error?.response?.data?.message ||
+
       `部门申报${actionText}失败`,
+
     )
+
   }
+
 }
 
+
+
 /* ====================================================== */
-/* 部门文件 */
+/* 部门文件选择 */
 /* ====================================================== */
 
 function handleDepartmentFile(file) {
-  departmentFile.value = file.raw
+
+  departmentFile.value =
+    file.raw || null
+
 }
 
-function removeDepartmentFile() {
-  departmentFile.value = null
-}
+
 
 /* ====================================================== */
-/* 提交部门加减分 */
+/* 删除部门文件 */
+/* ====================================================== */
+
+function removeDepartmentFile() {
+
+  departmentFile.value = null
+
+}
+
+
+
+/* ====================================================== */
+/* 提交部门加减分申报 */
 /* ====================================================== */
 
 async function submitDepartment() {
+
+  /*
+   * 表单不存在
+   */
+
   if (!departmentFormRef.value) {
+
     return
+
   }
+
+
+  /*
+   * 表单验证
+   */
 
   const valid =
     await departmentFormRef.value.validate()
 
+
   if (!valid) {
+
     return
+
   }
+
+
+  /*
+   * 确保模板存在
+   */
+
+  if (!selectedTemplate.value) {
+
+    ElMessage.warning(
+      '请选择有效的加减分项目'
+    )
+
+    return
+
+  }
+
+
+  /*
+   * 获取模板类型
+   */
+
+  const scoreType =
+    getScoreType(
+      selectedTemplate.value
+    )
+
+
+  /*
+   * 只允许：
+   *
+   * 1  = 加分
+   * -1 = 减分
+   */
+
+  if (
+    scoreType !== 1 &&
+    scoreType !== -1
+  ) {
+
+    ElMessage.error(
+      '当前加减分模板类型无效，请联系管理员检查模板配置'
+    )
+
+    return
+
+  }
+
 
   departmentSubmitting.value = true
 
+
   try {
+
+    /* ================================================== */
+    /* 提交数据 */
+    /* ================================================== */
+
     const data = {
+
       departmentId:
       departmentForm.departmentId,
 
@@ -960,40 +2407,197 @@ async function submitDepartment() {
       departmentForm.templateId,
 
       evidenceUrl:
+
         departmentFile.value
           ? departmentFile.value.name
           : null,
+
     }
 
-    await request.post(
-      '/departmentScoreApply/add',
-      data,
+
+    console.log(
+      '========== 提交部门申报 =========='
     )
 
-    ElMessage.success(
-      '部门加减分申报提交成功，等待本部门副部长或部长审核',
+    console.log(
+      '提交数据：',
+      data
     )
+
+    console.log(
+      '部门ID：',
+      data.departmentId
+    )
+
+    console.log(
+      '学生ID：',
+      data.studentId
+    )
+
+    console.log(
+      '模板ID：',
+      data.templateId
+    )
+
+    console.log(
+      '学生姓名：',
+      studentList.value.find(
+        item =>
+          String(item.id) ===
+          String(data.studentId)
+      )?.realName
+    )
+
+    console.log(
+      '================================'
+    )
+
+
+    /* ================================================== */
+    /* 调用后端 */
+    /* ================================================== */
+
+    const res =
+      await request.post(
+        '/departmentScoreApply/add',
+        data
+      )
+
+
+    console.log(
+      '部门申报接口响应：',
+      res
+    )
+
+
+    /* ================================================== */
+    /* 重点：检查后端业务状态 */
+    /* ================================================== */
+
+    const responseData =
+      res?.data
+
+
+    const code =
+      Number(
+        responseData?.code
+      )
+
+
+    /*
+     * 后端 Result.success
+     *
+     * code = 200
+     */
+
+    if (
+      code !== 200
+    ) {
+
+      console.error(
+        '部门申报后端返回失败：',
+        responseData
+      )
+
+
+      ElMessage.error(
+
+        responseData?.message ||
+        responseData?.msg ||
+        '部门加减分申报提交失败'
+
+      )
+
+
+      return
+
+    }
+
+
+    /* ================================================== */
+    /* 真正成功 */
+    /* ================================================== */
+
+    ElMessage.success(
+      '部门加减分申报提交成功，等待本部门副部长或部长审核'
+    )
+
+
+    /*
+     * 重置表单
+     */
 
     resetDepartment()
 
+
+    /*
+     * 刷新我的申报记录
+     */
+
     await loadMyApply()
-  } catch (error) {
-    console.error(error)
+
+    /*
+     * 如果当前用户本身有部门审核权限，
+     * 同时刷新部门审核列表。
+     */
+
+    if (
+      permission.canDepartmentAudit
+    ) {
+
+      await loadAuditList()
+
+    }
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '提交部门加减分申报失败：',
+      error
+    )
+
+
+    /*
+     * HTTP 层错误
+     */
+
+    const message =
+
+      error?.response?.data?.message ||
+
+      error?.response?.data?.msg ||
+
+      error?.message ||
+
+      '提交失败，请检查后端服务'
+
 
     ElMessage.error(
-      error?.response?.data?.message ||
-      '提交失败',
+      message
     )
-  } finally {
-    departmentSubmitting.value = false
+
   }
+
+  finally {
+
+    departmentSubmitting.value = false
+
+  }
+
 }
 
 /* ====================================================== */
-/* 重置部门表单 */
+/* 重置部门申报表单 */
 /* ====================================================== */
 
 function resetDepartment() {
+
+  /*
+   * 清空数据
+   */
+
   departmentForm.departmentId = null
 
   departmentForm.studentId = null
@@ -1002,181 +2606,746 @@ function resetDepartment() {
 
   departmentForm.evidenceUrl = ''
 
+
+  /*
+   * 清空模板
+   */
+
   departmentTemplateList.value = []
+
+
+  /*
+   * 清空文件
+   */
 
   departmentFile.value = null
 
+
+  /*
+   * 重置 Element Plus 表单状态
+   */
+
   departmentFormRef.value?.resetFields()
+
 }
 
+
+
 /* ====================================================== */
-/* 我的申报记录 */
+/* 加载我的申报记录 */
 /* ====================================================== */
 
 async function loadMyApply() {
+
   listLoading.value = true
 
+
   try {
+
     const res =
       await request.get(
+
         '/departmentScoreApply/my',
+
       )
 
+
     departmentApplyList.value =
-      (res.data?.data || []).map(
-        (item) => ({
-          ...item,
-          title:
-            item.title ||
-            '部门加减分',
-        }),
-      )
-  } catch (error) {
-    console.error(error)
+
+      Array.isArray(res.data?.data)
+
+        ? res.data.data.map(
+
+          (item) => ({
+
+            ...item,
+
+            title:
+              item.title ||
+              '部门加减分',
+
+            scoreType:
+              Number(item.scoreType),
+
+          }),
+
+        )
+
+        : []
+
+
+    /*
+     * 每次重新加载申报记录，
+     * 默认回到第一页。
+     */
+
+    myApplyPageNum.value = 1
+
+  }
+
+  catch (error) {
+
+    console.error(
+
+      '获取申报记录失败：',
+
+      error,
+
+    )
+
 
     departmentApplyList.value = []
 
+
     ElMessage.error(
+
       error?.response?.data?.message ||
       '获取申报记录失败',
+
     )
-  } finally {
-    listLoading.value = false
+
   }
+
+  finally {
+
+    listLoading.value = false
+
+  }
+
 }
+
+
 
 /* ====================================================== */
 /* 页面初始化 */
 /* ====================================================== */
 
 onMounted(async () => {
+
+  /*
+   * 1. 获取部门权限
+   */
+
   await loadPermission()
+
+
+  /*
+   * 2. 获取学生列表
+   */
 
   await loadStudentList()
 
+
+  /*
+   * 3. 获取我的申报
+   */
+
   await loadMyApply()
+
+
+  /*
+   * 4. 如果有部门审核权限
+   *    获取待审核数据
+   */
 
   if (
     permission.canDepartmentAudit
   ) {
+
     await loadAuditList()
+
   }
+
 })
+
 </script>
 
+
+
 <style scoped>
+
+/* ====================================================== */
+/* 页面 */
+/* ====================================================== */
+
 .score-apply-page {
+
   padding: 24px;
-  min-height: calc(100vh - 60px);
-  background: #f5f7fa;
+
+  min-height:
+    calc(100vh - 60px);
+
+  background:
+    #f5f7fa;
+
 }
+
+
+
+/* ====================================================== */
+/* 页面标题 */
+/* ====================================================== */
 
 .page-header {
+
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    center;
+
+  margin-bottom:
+    20px;
+
 }
+
+
 
 .page-header h2 {
-  margin: 0 0 6px;
-  font-size: 24px;
-  color: #303133;
+
+  margin:
+    0 0 6px;
+
+  font-size:
+    24px;
+
+  color:
+    #303133;
+
 }
+
+
 
 .page-header p {
-  margin: 0;
-  color: #909399;
+
+  margin:
+    0;
+
+  color:
+    #909399;
+
+  font-size:
+    14px;
+
 }
+
+
+
+/* ====================================================== */
+/* 卡片 */
+/* ====================================================== */
 
 .apply-card {
-  margin-bottom: 20px;
+
+  margin-bottom:
+    20px;
+
 }
+
+
+
+/* ====================================================== */
+/* 卡片标题 */
+/* ====================================================== */
 
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 25px;
+
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    flex-start;
+
+  margin-bottom:
+    25px;
+
 }
+
+
 
 .card-header h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  color: #303133;
+
+  margin:
+    0 0 8px;
+
+  font-size:
+    18px;
+
+  color:
+    #303133;
+
 }
+
+
 
 .card-header p {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
+
+  margin:
+    0;
+
+  color:
+    #909399;
+
+  font-size:
+    14px;
+
 }
+
+
+
+/* ====================================================== */
+/* 表单 */
+/* ====================================================== */
 
 .apply-form {
-  max-width: 800px;
+
+  max-width:
+    800px;
+
 }
+
+
+
+/* ====================================================== */
+/* 上传 */
+/* ====================================================== */
 
 .upload-tip {
-  color: #909399;
-  font-size: 12px;
+
+  color:
+    #909399;
+
+  font-size:
+    12px;
+
 }
+
+
+
+/* ====================================================== */
+/* 表单提示 */
+/* ====================================================== */
 
 .form-tip {
-  margin-top: 6px;
-  color: #909399;
-  font-size: 12px;
-  line-height: 1.5;
+
+  margin-top:
+    6px;
+
+  color:
+    #909399;
+
+  font-size:
+    12px;
+
+  line-height:
+    1.5;
+
 }
+
+
+
+/* ====================================================== */
+/* 模板分值 */
+/* ====================================================== */
 
 .template-score {
-  margin-left: 12px;
-  font-weight: 700;
-  color: #606266;
+
+  margin-left:
+    12px;
+
+  font-weight:
+    700;
+
 }
+
+
+
+.template-score.bonus {
+
+  color:
+    #67c23a;
+
+}
+
+
+
+.template-score.deduct {
+
+  color:
+    #f56c6c;
+
+}
+
+
 
 .empty-template {
-  color: #c0c4cc;
+
+  color:
+    #c0c4cc;
+
 }
+
+
+
+/* ====================================================== */
+/* 加分 */
+/* ====================================================== */
 
 .bonus {
-  color: #67c23a;
-  font-weight: 700;
+
+  color:
+    #67c23a;
+
+  font-weight:
+    700;
+
 }
+
+
+
+/* ====================================================== */
+/* 减分 */
+/* ====================================================== */
 
 .deduct {
-  color: #f56c6c;
-  font-weight: 700;
+
+  color:
+    #f56c6c;
+
+  font-weight:
+    700;
+
 }
+
+
+
+/* ====================================================== */
+/* 未知分值 */
+/* ====================================================== */
+
+.unknown-score {
+
+  color:
+    #909399;
+
+  font-weight:
+    700;
+
+}
+
+
+
+/* ====================================================== */
+/* 部门列表 */
+/* ====================================================== */
 
 .department-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    12px;
+
 }
+
+
+
+/* ====================================================== */
+/* 部门项目 */
+/* ====================================================== */
 
 .department-item {
-  padding: 16px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  background: #fafafa;
+
+  padding:
+    16px;
+
+  border:
+    1px solid #ebeef5;
+
+  border-radius:
+    8px;
+
+  background:
+    #fafafa;
+
 }
+
+
+
+/* ====================================================== */
+/* 部门信息 */
+/* ====================================================== */
 
 .department-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    12px;
+
 }
+
+
 
 .department-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+
+  font-size:
+    16px;
+
+  font-weight:
+    600;
+
+  color:
+    #303133;
+
 }
 
+
+
+/* ====================================================== */
+/* 部门提示 */
+/* ====================================================== */
+
 .department-tip {
-  margin-top: 8px;
-  font-size: 13px;
+
+  margin-top:
+    8px;
+
+  font-size:
+    13px;
+
+  color:
+    #909399;
+
+}
+
+
+
+/* ====================================================== */
+/* 模板下拉选项 */
+/* ====================================================== */
+
+.template-option {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  width:
+    100%;
+
+}
+
+
+
+.template-name {
+
+  color:
+    #303133;
+
+}
+
+
+
+/* ====================================================== */
+/* 模板加分 */
+/* ====================================================== */
+
+.template-bonus {
+
+  color:
+    #67c23a;
+
+  font-weight:
+    700;
+
+}
+
+
+
+/* ====================================================== */
+/* 模板减分 */
+/* ====================================================== */
+
+.template-deduct {
+
+  color:
+    #f56c6c;
+
+  font-weight:
+    700;
+
+}
+
+
+
+/* ====================================================== */
+/* 模板未知 */
+/* ====================================================== */
+
+.template-unknown {
+
+  color:
+    #909399;
+
+}
+
+
+
+/* ====================================================== */
+/* 表格优化 */
+/* ====================================================== */
+
+:deep(.el-table) {
+
+  width:
+    100%;
+
+}
+
+
+
+:deep(.el-table th) {
+
+  background:
+    #f5f7fa;
+
+}
+
+
+
+:deep(.el-table td) {
+
+  vertical-align:
+    middle;
+
+}
+
+
+
+/* ====================================================== */
+/* 移动端 */
+/* ====================================================== */
+
+@media (max-width: 768px) {
+
+  .score-apply-page {
+
+    padding:
+      12px;
+
+  }
+
+
+  .page-header {
+
+    align-items:
+      flex-start;
+
+  }
+
+
+  .page-header h2 {
+
+    font-size:
+      20px;
+
+  }
+
+
+  .card-header {
+
+    flex-direction:
+      column;
+
+    gap:
+      12px;
+
+  }
+
+
+  .apply-form {
+
+    max-width:
+      100%;
+
+  }
+
+
+  .department-info {
+
+    align-items:
+      flex-start;
+
+  }
+
+}
+/* ====================================================== */
+/* 我的申报分页 */
+/* ====================================================== */
+
+.pagination-wrapper {
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-top: 20px;
+
+  padding-top: 16px;
+
+  border-top: 1px solid #ebeef5;
+
+}
+
+
+.pagination-total {
+
   color: #909399;
+
+  font-size: 13px;
+
+}
+
+
+/* ====================================================== */
+/* 移动端分页 */
+/* ====================================================== */
+
+@media (max-width: 768px) {
+
+  .pagination-wrapper {
+
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 12px;
+
+  }
+
 }
 </style>

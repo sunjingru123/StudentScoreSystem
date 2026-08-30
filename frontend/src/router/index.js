@@ -47,35 +47,58 @@ const router = createRouter({
       name: 'Student',
       component: MainLayout,
       children: [
-        { path: '', name: 'StudentHome', component: Home },
-        { path: 'score', name: 'StudentScore', component: Score },
-        { path: 'apply', name: 'StudentApply', component: Apply },
-        { path: 'record', name: 'StudentRecord', component: Record },
-        { path: 'message', name: 'StudentMessage', component: StudentMessage },
+
+        {
+          path: '',
+          name: 'StudentHome',
+          component: Home,
+        },
+
+        {
+          path: 'score',
+          name: 'StudentScore',
+          component: Score,
+        },
+
+        {
+          path: 'apply',
+          name: 'StudentApply',
+          component: Apply,
+        },
+
+        {
+          path: 'record',
+          name: 'StudentRecord',
+          component: Record,
+        },
+
+        {
+          path: 'message',
+          name: 'StudentMessage',
+          component: StudentMessage,
+        },
+
         {
           path: 'student/:id',
           name: 'StudentDetail',
-          component: () => import('@/views/admin/StudentDetail.vue'),
+          component: () =>
+            import('@/views/admin/StudentDetail.vue'),
         },
-        {
-          path: '/student/score-apply',
-          name: 'StudentScoreApply',
-          component: () => import('@/views/student/ScoreApply.vue'),
-        },
+
         {
           path: 'department-apply',
           name: 'StudentDepartmentApply',
-          component: () => import('@/views/student/DepartmentApply.vue'),
+          component: () =>
+            import('@/views/student/DepartmentApply.vue'),
         },
+
         {
           path: 'department-final-audit',
           name: 'TeacherDepartmentFinalAudit',
-          component: () => import('@/views/home/DepartmentFinalAudit.vue'),
+          component: () =>
+            import('@/views/home/DepartmentFinalAudit.vue'),
         },
-        {
-          path: 'department-final-audit',
-          component: () => import('@/views/home/DepartmentFinalAudit.vue'),
-        },
+
       ],
     },
 

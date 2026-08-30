@@ -1,148 +1,1476 @@
 <template>
   <div class="apply-page">
-    <el-card>
+
+    <el-card class="apply-card">
+
       <template #header>
+
         <div class="card-title">
-          <span>加分申请</span>
+
+          <span>
+            个人证书申报
+          </span>
+
         </div>
+
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <!-- 申请项目 -->
-        <el-form-item label="申请项目" prop="ruleName">
-          <el-select v-model="form.ruleName" placeholder="请选择申请项目" style="width: 300px">
-            <el-option label="竞赛获奖" value="竞赛获奖" />
-            <el-option label="社会实践" value="社会实践" />
-            <el-option label="志愿服务" value="志愿服务" />
-            <el-option label="其他加分" value="其他加分" />
+
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="120px"
+      >
+
+        <!-- =====================================================
+             获奖类别
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖类别"
+          prop="awardCategory"
+        >
+
+          <el-select
+            v-model="form.awardCategory"
+            placeholder="请选择获奖类别"
+            style="width: 300px"
+          >
+
+            <el-option
+              label="A类"
+              value="A"
+            />
+
+            <el-option
+              label="B类"
+              value="B"
+            />
+
+            <el-option
+              label="C类"
+              value="C"
+            />
+
+            <el-option
+              label="其他"
+              value="OTHER"
+            />
+
           </el-select>
+
         </el-form-item>
 
-        <!-- 申请分数 -->
-        <el-form-item label="申请分数" prop="score">
-          <el-input-number v-model="form.score" :min="1" :max="20" />
-          <span class="unit"> 分 </span>
+
+        <!-- =====================================================
+             获奖名称
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖名称"
+          prop="awardName"
+        >
+
+          <el-input
+            v-model="form.awardName"
+            placeholder="请输入获奖名称"
+            maxlength="100"
+            show-word-limit
+            style="width: 500px"
+          />
+
         </el-form-item>
 
-        <!-- 申请说明 -->
-        <el-form-item label="申请说明" prop="description">
+
+        <!-- =====================================================
+             获奖级别
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖级别"
+          prop="awardLevel"
+        >
+
+          <el-select
+            v-model="form.awardLevel"
+            placeholder="请选择获奖级别"
+            style="width: 300px"
+          >
+
+            <el-option
+              label="国家级"
+              value="国家级"
+            />
+
+            <el-option
+              label="省级"
+              value="省级"
+            />
+
+            <el-option
+              label="校级"
+              value="校级"
+            />
+
+            <el-option
+              label="院级"
+              value="院级"
+            />
+
+          </el-select>
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             获奖等级
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖等级"
+          prop="awardGrade"
+        >
+
+          <el-select
+            v-model="form.awardGrade"
+            placeholder="请选择获奖等级"
+            style="width: 300px"
+          >
+
+            <el-option
+              label="一等奖"
+              value="一等奖"
+            />
+
+            <el-option
+              label="二等奖"
+              value="二等奖"
+            />
+
+            <el-option
+              label="三等奖"
+              value="三等奖"
+            />
+
+            <el-option
+              label="优秀奖"
+              value="优秀奖"
+            />
+
+            <el-option
+              label="其他"
+              value="OTHER"
+            />
+
+          </el-select>
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             其他获奖等级
+             ===================================================== -->
+
+        <el-form-item
+          v-if="form.awardGrade === 'OTHER'"
+          label="其他等级"
+          prop="awardGradeOther"
+        >
+
+          <el-input
+            v-model="form.awardGradeOther"
+            placeholder="请输入其他获奖等级"
+            maxlength="50"
+            style="width: 300px"
+          />
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             获奖时间
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖时间"
+          prop="awardTime"
+        >
+
+          <el-date-picker
+            v-model="form.awardTime"
+            type="date"
+            placeholder="请选择获奖时间"
+            value-format="YYYY-MM-DD"
+            style="width: 300px"
+          />
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             奖项类型
+             ===================================================== -->
+
+        <el-form-item
+          label="奖项类型"
+          prop="awardType"
+        >
+
+          <el-radio-group
+            v-model="form.awardType"
+          >
+
+            <el-radio value="个人奖">
+              个人奖
+            </el-radio>
+
+            <el-radio value="团体奖">
+              团体奖
+            </el-radio>
+
+          </el-radio-group>
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             是否有获奖凭证
+             ===================================================== -->
+
+        <el-form-item
+          label="获奖凭证"
+          prop="hasCertificate"
+        >
+
+          <el-radio-group
+            v-model="form.hasCertificate"
+          >
+
+            <el-radio value="YES">
+              有
+            </el-radio>
+
+            <el-radio value="NO">
+              无
+            </el-radio>
+
+          </el-radio-group>
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             有凭证 → 上传材料
+             ===================================================== -->
+
+        <el-form-item
+          v-if="form.hasCertificate === 'YES'"
+          label="证书材料"
+          prop="materialFile"
+        >
+
+          <el-upload
+            class="certificate-upload"
+            action="/api/file/upload"
+            :headers="uploadHeaders"
+            :limit="1"
+            :on-success="handleUploadSuccess"
+            :on-error="handleUploadError"
+            :on-remove="handleRemove"
+            :before-upload="beforeUpload"
+          >
+
+            <el-button
+              type="primary"
+            >
+
+              上传获奖凭证
+
+            </el-button>
+
+
+            <template #tip>
+
+              <div
+                class="el-upload__tip"
+              >
+
+                请上传获奖证书或相关证明材料
+
+                <br />
+
+                支持 PDF、JPG、PNG，文件大小不超过 10MB
+
+              </div>
+
+            </template>
+
+          </el-upload>
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             无凭证 → 填写原因
+             ===================================================== -->
+
+        <el-form-item
+          v-if="form.hasCertificate === 'NO'"
+          label="无凭证原因"
+          prop="certificateReason"
+        >
+
+          <el-input
+            v-model="form.certificateReason"
+            type="textarea"
+            :rows="4"
+            placeholder="请说明没有获奖凭证的原因"
+            maxlength="300"
+            show-word-limit
+            style="width: 600px"
+          />
+
+        </el-form-item>
+
+
+        <!-- =====================================================
+             申请说明
+             ===================================================== -->
+
+        <el-form-item
+          label="申请说明"
+          prop="description"
+        >
+
           <el-input
             v-model="form.description"
             type="textarea"
             :rows="5"
-            placeholder="请详细说明你的加分事由"
+            placeholder="可补充说明获奖情况"
             maxlength="500"
             show-word-limit
+            style="width: 600px"
           />
+
         </el-form-item>
 
-        <!-- 提交按钮 -->
-        <el-form-item>
-          <el-button type="primary" @click="submitApply"> 提交申请 </el-button>
-          <el-button @click="resetForm"> 重置 </el-button>
+
+        <!-- =====================================================
+             最终加分
+             ===================================================== -->
+
+        <el-form-item
+          label="申请分值"
+        >
+
+          <div
+            class="score-tip"
+          >
+
+            <el-tag
+              type="info"
+            >
+
+              学生无需填写，
+              由档案部审核后确定最终加分
+
+            </el-tag>
+
+          </div>
+
         </el-form-item>
+
+
+        <!-- =====================================================
+             提交
+             ===================================================== -->
+
+        <el-form-item>
+
+          <el-button
+            type="primary"
+            :loading="submitting"
+            @click="submitApply"
+          >
+
+            提交申报
+
+          </el-button>
+
+
+          <el-button
+            @click="resetForm"
+          >
+
+            重置
+
+          </el-button>
+
+        </el-form-item>
+
       </el-form>
+
     </el-card>
+
   </div>
 </template>
 
+
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { addApply } from '@/api/apply'
 
-const formRef = ref()
+import {
+  reactive,
+  ref,
+  watch
+} from 'vue'
 
-// 只定义一次form
-const form = reactive({
-  ruleName: '',
-  score: 5,
-  description: '',
-})
+import {
+  ElMessage
+} from 'element-plus'
 
-// 名称映射ruleId
-const ruleMap = {
-  竞赛获奖: 1,
-  社会实践: 2,
-  志愿服务: 3,
-  其他加分: 4,
-}
+import {
+  addApply
+} from '@/api/apply'
 
-const rules = {
-  ruleName: [
-    {
-      required: true,
-      message: '请选择申请项目',
-      trigger: 'change',
-    },
-  ],
-  score: [
-    {
-      required: true,
-      message: '请输入申请分数',
-      trigger: 'change',
-    },
-  ],
-  description: [
-    {
-      required: true,
-      message: '请输入申请说明',
-      trigger: 'blur',
-    },
-    {
-      min: 5,
-      message: '申请说明至少填写5个字',
-      trigger: 'blur',
-    },
-  ],
-}
 
-function submitApply() {
-  formRef.value.validate((valid) => {
-    if (!valid) {
-      return
-    }
-    const user = JSON.parse(localStorage.getItem('user'))
+/*
+ * =========================================================
+ * 表单引用
+ * =========================================================
+ */
 
-    const data = {
-      studentId: user.id,
-      activityId: 1,
-      ruleId: 1,
-      applyScore: form.score,
-      materialFile: '',
-      description: form.description,
-    }
-    addApply(data)
-      .then((res) => {
-        console.log('接口返回：', res)
-        ElMessage.success('申请提交成功！')
-        resetForm()
-      })
-      .catch((err) => {
-        console.log(err)
-        ElMessage.error('提交失败')
-      })
+const formRef =
+  ref()
+
+const submitting =
+  ref(false)
+
+
+/*
+ * =========================================================
+ * 个人证书申报表单
+ * =========================================================
+ *
+ * 这个页面只负责：
+ *
+ * 「个人证书加分申报」
+ *
+ * =========================================================
+ *
+ * 明确不包含：
+ *
+ * ❌ 部门
+ * ❌ 部门ID
+ * ❌ 部门名称
+ * ❌ 活动
+ * ❌ 活动ID
+ * ❌ 活动名称
+ * ❌ 部门加分
+ * ❌ 部门减分
+ * ❌ 活动加分
+ * ❌ 活动减分
+ * ❌ 规则选择
+ * ❌ 学生填写最终分值
+ *
+ * =========================================================
+ */
+
+const form =
+  reactive({
+
+    /*
+     * 获奖类别
+     */
+
+    awardCategory:
+      '',
+
+
+    /*
+     * 获奖名称
+     */
+
+    awardName:
+      '',
+
+
+    /*
+     * 获奖级别
+     */
+
+    awardLevel:
+      '',
+
+
+    /*
+     * 获奖等级
+     */
+
+    awardGrade:
+      '',
+
+
+    /*
+     * 其他获奖等级
+     */
+
+    awardGradeOther:
+      '',
+
+
+    /*
+     * 获奖时间
+     */
+
+    awardTime:
+      '',
+
+
+    /*
+     * 奖项类型
+     */
+
+    awardType:
+      '',
+
+
+    /*
+     * 是否有凭证
+     */
+
+    hasCertificate:
+      '',
+
+
+    /*
+     * 获奖材料
+     */
+
+    materialFile:
+      '',
+
+
+    /*
+     * 无凭证原因
+     */
+
+    certificateReason:
+      '',
+
+
+    /*
+     * 申请说明
+     */
+
+    description:
+      '',
+
   })
+
+
+/*
+ * =========================================================
+ * 表单校验
+ * =========================================================
+ */
+
+const rules =
+  {
+
+    awardCategory: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择获奖类别',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    awardName: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请输入获奖名称',
+
+        trigger:
+          'blur',
+
+      },
+
+    ],
+
+
+    awardLevel: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择获奖级别',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    awardGrade: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择获奖等级',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    awardGradeOther: [
+
+      {
+
+        validator:
+          (rule, value, callback) => {
+
+            if (
+
+              form.awardGrade ===
+              'OTHER' &&
+
+              (
+                !value ||
+                !value.trim()
+              )
+
+            ) {
+
+              callback(
+                new Error(
+                  '请输入其他获奖等级'
+                )
+              )
+
+              return
+
+            }
+
+            callback()
+
+          },
+
+        trigger:
+          'blur',
+
+      },
+
+    ],
+
+
+    awardTime: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择获奖时间',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    awardType: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择奖项类型',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    hasCertificate: [
+
+      {
+
+        required:
+          true,
+
+        message:
+          '请选择是否有获奖凭证',
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    materialFile: [
+
+      {
+
+        validator:
+          (rule, value, callback) => {
+
+            if (
+
+              form.hasCertificate ===
+              'YES' &&
+
+              !value
+
+            ) {
+
+              callback(
+                new Error(
+                  '请上传获奖凭证'
+                )
+              )
+
+              return
+
+            }
+
+            callback()
+
+          },
+
+        trigger:
+          'change',
+
+      },
+
+    ],
+
+
+    certificateReason: [
+
+      {
+
+        validator:
+          (rule, value, callback) => {
+
+            if (
+
+              form.hasCertificate ===
+              'NO' &&
+
+              (
+                !value ||
+                !value.trim()
+              )
+
+            ) {
+
+              callback(
+                new Error(
+                  '请填写没有获奖凭证的原因'
+                )
+              )
+
+              return
+
+            }
+
+            callback()
+
+          },
+
+        trigger:
+          'blur',
+
+      },
+
+    ],
+
+  }
+
+
+/*
+ * =========================================================
+ * 获奖等级变化
+ * =========================================================
+ */
+
+watch(
+
+  () =>
+    form.awardGrade,
+
+  (value) => {
+
+    if (
+      value !==
+      'OTHER'
+    ) {
+
+      form.awardGradeOther =
+        ''
+
+    }
+
+  }
+
+)
+
+
+/*
+ * =========================================================
+ * 获奖凭证变化
+ * =========================================================
+ */
+
+watch(
+
+  () =>
+    form.hasCertificate,
+
+  (value) => {
+
+    /*
+     * 有凭证
+     */
+
+    if (
+      value ===
+      'YES'
+    ) {
+
+      form.certificateReason =
+        ''
+
+    }
+
+
+    /*
+     * 无凭证
+     */
+
+    if (
+      value ===
+      'NO'
+    ) {
+
+      form.materialFile =
+        ''
+
+    }
+
+  }
+
+)
+
+
+/*
+ * =========================================================
+ * 上传请求头
+ * =========================================================
+ */
+
+const uploadHeaders =
+  {
+
+    Authorization:
+      localStorage.getItem(
+        'token'
+      ) || '',
+
+  }
+
+
+/*
+ * =========================================================
+ * 上传前检查
+ * =========================================================
+ */
+
+function beforeUpload(
+  file
+) {
+
+  const allowedTypes =
+    [
+
+      'application/pdf',
+
+      'image/jpeg',
+
+      'image/png',
+
+    ]
+
+
+  if (
+    !allowedTypes.includes(
+      file.type
+    )
+  ) {
+
+    ElMessage.error(
+      '获奖凭证只能上传 PDF、JPG、PNG 文件'
+    )
+
+    return false
+
+  }
+
+
+  const maxSize =
+    10 * 1024 * 1024
+
+
+  if (
+    file.size >
+    maxSize
+  ) {
+
+    ElMessage.error(
+      '获奖凭证不能超过 10MB'
+    )
+
+    return false
+
+  }
+
+
+  return true
+
 }
+
+
+/*
+ * =========================================================
+ * 上传成功
+ * =========================================================
+ */
+
+function handleUploadSuccess(
+  response
+) {
+
+  console.log(
+    '获奖凭证上传返回：',
+    response
+  )
+
+
+  if (
+
+    response &&
+
+    response.data &&
+
+    response.data.url
+
+  ) {
+
+    form.materialFile =
+      response.data.url
+
+  }
+
+
+  else if (
+
+    response &&
+
+    response.url
+
+  ) {
+
+    form.materialFile =
+      response.url
+
+  }
+
+
+  else {
+
+    ElMessage.error(
+      '文件上传成功，但没有获取到文件地址'
+    )
+
+    return
+
+  }
+
+
+  if (
+    formRef.value
+  ) {
+
+    formRef.value.validateField(
+      'materialFile'
+    )
+
+  }
+
+
+  ElMessage.success(
+    '获奖凭证上传成功'
+  )
+
+}
+
+
+/*
+ * =========================================================
+ * 上传失败
+ * =========================================================
+ */
+
+function handleUploadError(
+  error
+) {
+
+  console.log(
+    '获奖凭证上传失败：',
+    error
+  )
+
+
+  ElMessage.error(
+    '获奖凭证上传失败'
+  )
+
+}
+
+
+/*
+ * =========================================================
+ * 删除文件
+ * =========================================================
+ */
+
+function handleRemove() {
+
+  form.materialFile =
+    ''
+
+
+  if (
+    formRef.value
+  ) {
+
+    formRef.value.validateField(
+      'materialFile'
+    )
+
+  }
+
+}
+
+
+/*
+ * =========================================================
+ * 提交个人证书申报
+ * =========================================================
+ */
+
+async function submitApply() {
+
+  try {
+
+    /*
+     * =====================================================
+     * 表单校验
+     * =====================================================
+     */
+
+    const valid =
+      await formRef.value.validate()
+
+
+    if (
+      !valid
+    ) {
+
+      return
+
+    }
+
+
+    submitting.value =
+      true
+
+
+    /*
+     * =====================================================
+     * 只提交个人证书数据
+     * =====================================================
+     *
+     * 这里故意不提交：
+     *
+     * ❌ studentId
+     * ❌ applyType
+     * ❌ departmentId
+     * ❌ departmentName
+     * ❌ activityId
+     * ❌ activityName
+     * ❌ ruleId
+     * ❌ ruleName
+     * ❌ scoreType
+     * ❌ score
+     * ❌ applyScore
+     *
+     * studentId：
+     * 后端从登录信息获取。
+     *
+     * applyType：
+     * 后端固定为 CERTIFICATE。
+     *
+     * 最终加分：
+     * 档案部审核时填写。
+     */
+
+    const data =
+      {
+
+        /*
+         * 获奖类别
+         */
+
+        awardCategory:
+        form.awardCategory,
+
+
+        /*
+         * 获奖名称
+         */
+
+        awardName:
+        form.awardName,
+
+
+        /*
+         * 获奖级别
+         */
+
+        awardLevel:
+        form.awardLevel,
+
+
+        /*
+         * 获奖等级
+         */
+
+        awardGrade:
+        form.awardGrade,
+
+
+        /*
+         * 其他获奖等级
+         */
+
+        awardGradeOther:
+
+          form.awardGrade ===
+          'OTHER'
+
+            ? form.awardGradeOther
+
+            : '',
+
+
+        /*
+         * 获奖时间
+         */
+
+        awardTime:
+        form.awardTime,
+
+
+        /*
+         * 奖项类型
+         */
+
+        awardType:
+        form.awardType,
+
+
+        /*
+         * 是否有凭证
+         */
+
+        hasCertificate:
+        form.hasCertificate,
+
+
+        /*
+         * 凭证文件
+         */
+
+        materialFile:
+
+          form.hasCertificate ===
+          'YES'
+
+            ? form.materialFile
+
+            : '',
+
+
+        /*
+         * 无凭证原因
+         */
+
+        certificateReason:
+
+          form.hasCertificate ===
+          'NO'
+
+            ? form.certificateReason
+
+            : '',
+
+
+        /*
+         * 申请说明
+         */
+
+        description:
+        form.description,
+
+      }
+
+
+    console.log(
+      '个人证书申报数据：',
+      data
+    )
+
+
+    /*
+     * =====================================================
+     * 调用接口
+     * =====================================================
+     */
+
+    const res =
+      await addApply(
+        data
+      )
+
+
+    console.log(
+      '个人证书申报接口返回：',
+      res
+    )
+
+
+    /*
+     * =====================================================
+     * 判断接口结果
+     * =====================================================
+     */
+
+    if (
+
+      res &&
+
+      (
+        res.code ===
+        200 ||
+
+        res.code ===
+        0
+      )
+
+    ) {
+
+      ElMessage.success(
+        '个人证书申报提交成功，已进入档案部审核'
+      )
+
+
+      resetForm()
+
+    }
+
+    else {
+
+      ElMessage.error(
+
+        res?.message ||
+
+        res?.msg ||
+
+        '申报提交失败'
+
+      )
+
+    }
+
+  }
+
+  catch (
+    error
+    ) {
+
+    console.error(
+      '个人证书申报失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      '申报提交失败，请稍后重试'
+    )
+
+  }
+
+  finally {
+
+    submitting.value =
+      false
+
+  }
+
+}
+
+
+/*
+ * =========================================================
+ * 重置表单
+ * =========================================================
+ */
 
 function resetForm() {
-  formRef.value.resetFields()
+
+  if (
+    formRef.value
+  ) {
+
+    formRef.value.resetFields()
+
+  }
+
+
+  form.awardCategory =
+    ''
+
+  form.awardName =
+    ''
+
+  form.awardLevel =
+    ''
+
+  form.awardGrade =
+    ''
+
+  form.awardGradeOther =
+    ''
+
+  form.awardTime =
+    ''
+
+  form.awardType =
+    ''
+
+  form.hasCertificate =
+    ''
+
+  form.materialFile =
+    ''
+
+  form.certificateReason =
+    ''
+
+  form.description =
+    ''
+
 }
+
 </script>
 
+
 <style scoped>
+
 .apply-page {
+
   padding: 30px;
+
 }
+
+
+.apply-card {
+
+  max-width: 1000px;
+
+  margin: 0 auto;
+
+}
+
+
 .card-title {
+
   font-size: 20px;
+
   font-weight: bold;
+
 }
+
+
 .el-form {
-  max-width: 700px;
+
+  max-width: 850px;
+
 }
-.unit {
-  margin-left: 10px;
+
+
+.score-tip {
+
+  display: flex;
+
+  align-items: center;
+
 }
+
+
+.certificate-upload {
+
+  width: 600px;
+
+}
+
 </style>

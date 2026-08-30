@@ -9,11 +9,15 @@
       <div class="title-box">
 
         <div>
-          <h2>部门加减分最终审核</h2>
+
+          <h2>
+            部门加减分最终审核
+          </h2>
 
           <p>
             审核部长 / 副部长初审通过的部门加减分申请
           </p>
+
         </div>
 
         <el-button
@@ -35,7 +39,6 @@
     ====================================================== -->
     <div class="statistics">
 
-      <!-- 待最终审核 -->
       <el-card class="stat-card">
 
         <div class="stat-icon pending">
@@ -61,7 +64,6 @@
       </el-card>
 
 
-      <!-- 已选择 -->
       <el-card class="stat-card">
 
         <div class="stat-icon selected">
@@ -98,7 +100,6 @@
 
         <div class="toolbar">
 
-          <!-- 搜索 -->
           <el-input
             v-model="keyword"
             placeholder="搜索学生姓名 / 部门 / 项目"
@@ -117,18 +118,19 @@
           </el-input>
 
 
-          <!-- 右侧 -->
           <div class="toolbar-right">
 
             <span class="selected-text">
               已选择 {{ selectedRows.length }} 条
             </span>
 
-
-            <!-- 一键最终通过 -->
             <el-button
               type="success"
-              :disabled="selectedRows.length === 0"
+              :disabled="
+                selectedRows.length === 0 ||
+                batchLoading ||
+                processingId !== null
+              "
               :loading="batchLoading"
               @click="batchPass"
             >
@@ -150,7 +152,7 @@
 
       <!-- =====================================================
            表格
-      ====================================================== -->
+    ====================================================== -->
       <el-table
         ref="tableRef"
         v-loading="loading"
@@ -162,15 +164,14 @@
         @selection-change="handleSelectionChange"
       >
 
-        <!-- 选择 -->
         <el-table-column
           type="selection"
           width="55"
           align="center"
+          :selectable="isSelectable"
         />
 
 
-        <!-- 序号 -->
         <el-table-column
           type="index"
           label="#"
@@ -394,9 +395,7 @@
         />
 
 
-        <!-- =================================================
-             状态
-        ================================================== -->
+        <!-- 状态 -->
         <el-table-column
           label="状态"
           width="130"
@@ -406,9 +405,7 @@
           <template #default>
 
             <el-tag type="warning">
-
               待最终审核
-
             </el-tag>
 
           </template>
@@ -416,9 +413,7 @@
         </el-table-column>
 
 
-        <!-- =================================================
-             操作
-        ================================================== -->
+        <!-- 操作 -->
         <el-table-column
           label="操作"
           width="190"
@@ -428,14 +423,13 @@
 
           <template #default="{ row }">
 
-            <!-- 最终通过 -->
             <el-button
               type="success"
               link
               :loading="processingId === row.id"
               :disabled="
-                processingId !== null &&
-                processingId !== row.id
+                processingId !== null ||
+                batchLoading
               "
               @click="pass(row)"
             >
@@ -449,12 +443,13 @@
             </el-button>
 
 
-            <!-- 最终驳回 -->
             <el-button
               type="danger"
               link
+              :loading="processingId === row.id && rejectLoading"
               :disabled="
-                processingId !== null
+                processingId !== null ||
+                batchLoading
               "
               @click="reject(row)"
             >
@@ -532,6 +527,8 @@ const batchLoading = ref(false)
 
 const processingId = ref(null)
 
+const rejectLoading = ref(false)
+
 const tableRef = ref(null)
 
 
@@ -551,17 +548,6 @@ async function loadList() {
 
   try {
 
-    /*
-     * =====================================================
-     * 这里已经改成【最终审核接口】
-     *
-     * 不再使用：
-     *
-     * /departmentScoreApply/audit/list
-     *
-     * =====================================================
-     */
-
     const res =
       await request.get(
         '/departmentScoreApply/final-audit/list'
@@ -573,23 +559,43 @@ async function loadList() {
       res
     )
 
-    console.log(
-      'res.data：',
-      res.data
-    )
 
     console.log(
-      'res.data.data：',
-      res.data?.data
+      '最终审核接口业务数据：',
+      res?.data
     )
 
 
-    const data =
-      res.data?.data
+    const result =
+      res?.data
 
 
     /*
-     * 后端返回数组
+     * =====================================================
+     * 统一处理后端 Result
+     * =====================================================
+     */
+
+    if (
+      !result ||
+      result.code !== 200
+    ) {
+
+      throw new Error(
+        result?.message ||
+        result?.msg ||
+        '最终审核接口返回失败'
+      )
+
+    }
+
+
+    const data =
+      result.data
+
+
+    /*
+     * 普通数组
      */
 
     if (Array.isArray(data)) {
@@ -599,8 +605,9 @@ async function loadList() {
 
     }
 
+
     /*
-     * 兼容分页
+     * 分页数据
      */
 
     else if (
@@ -613,8 +620,9 @@ async function loadList() {
 
     }
 
+
     /*
-     * 数据异常
+     * 其他情况
      */
 
     else {
@@ -630,7 +638,9 @@ async function loadList() {
 
 
     /*
-     * 清除旧选择
+     * =====================================================
+     * 清除选择
+     * =====================================================
      */
 
     selectedRows.value = []
@@ -666,9 +676,12 @@ async function loadList() {
 
     list.value = []
 
+    selectedRows.value = []
+
     ElMessage.error(
       error?.response?.data?.message ||
       error?.response?.data?.msg ||
+      error?.message ||
       '获取最终审核列表失败，请检查后端服务'
     )
 
@@ -757,6 +770,20 @@ const filteredList =
 
 
 /* =========================================================
+   是否允许选择
+========================================================= */
+
+function isSelectable(row) {
+
+  return (
+    row &&
+    row.id != null
+  )
+
+}
+
+
+/* =========================================================
    多选
 ========================================================= */
 
@@ -800,16 +827,118 @@ function openEvidence(url) {
 
 
 /* =========================================================
+   最终审核请求
+========================================================= */
+
+async function finalAuditRequest(
+  row,
+  status
+) {
+
+  if (
+    !row ||
+    row.id == null
+  ) {
+
+    throw new Error(
+      '申请记录不存在'
+    )
+
+  }
+
+
+  console.log(
+    '===================================='
+  )
+
+  console.log(
+    '开始最终审核：',
+    {
+      id: row.id,
+      studentName: row.studentName,
+      departmentName: row.departmentName,
+      status
+    }
+  )
+
+
+  const res =
+    await request.put(
+
+      `/departmentScoreApply/final-audit/${row.id}`,
+
+      {
+        status: status,
+        reviewRemark: ''
+      }
+
+    )
+
+
+  console.log(
+    `申请 ${row.id} 最终审核响应：`,
+    res
+  )
+
+
+  const result =
+    res?.data
+
+
+  /*
+   * =====================================================
+   * 这里必须严格判断业务 code
+   * =====================================================
+   */
+
+  if (
+    !result ||
+    result.code !== 200
+  ) {
+
+    const message =
+      result?.message ||
+      result?.msg ||
+      `申请 ${row.id} 审核失败`
+
+    throw new Error(message)
+
+  }
+
+
+  return result
+
+}
+
+
+/* =========================================================
    单条最终通过
 ========================================================= */
 
 async function pass(row) {
 
-  if (!row || !row.id) {
+  if (
+    !row ||
+    row.id == null
+  ) {
 
     ElMessage.error(
       '申请记录不存在'
     )
+
+    return
+
+  }
+
+
+  /*
+   * 防止重复点击
+   */
+
+  if (
+    processingId.value !== null ||
+    batchLoading.value
+  ) {
 
     return
 
@@ -859,67 +988,25 @@ async function pass(row) {
 
   try {
 
-    console.log(
-      '准备最终通过：',
-      row
+    await finalAuditRequest(
+      row,
+      1
+    )
+
+
+    ElMessage.success(
+      '最终审核通过'
     )
 
 
     /*
-     * =====================================================
-     * 最关键：
+     * 重新加载
      *
-     * 初审：
-     * /departmentScoreApply/audit/{id}
-     *
-     * 现在改成：
-     *
-     * /departmentScoreApply/final-audit/{id}
-     * =====================================================
+     * 后端 finalStatus=1 后，
+     * 该记录会自动从待审核列表消失。
      */
 
-    const res =
-      await request.put(
-
-        `/departmentScoreApply/final-audit/${row.id}`,
-
-        {
-          status: 1,
-          reviewRemark: ''
-        }
-
-      )
-
-
-    console.log(
-      '最终通过响应：',
-      res
-    )
-
-
-    if (
-      res.data?.code === 200
-    ) {
-
-      ElMessage.success(
-        '最终审核通过'
-      )
-
-      await loadList()
-
-    }
-
-    else {
-
-      ElMessage.error(
-
-        res.data?.message ||
-        res.data?.msg ||
-        '最终审核失败'
-
-      )
-
-    }
+    await loadList()
 
   }
 
@@ -930,12 +1017,12 @@ async function pass(row) {
       error
     )
 
-    ElMessage.error(
 
+    ElMessage.error(
       error?.response?.data?.message ||
       error?.response?.data?.msg ||
-      '最终审核失败，请检查后端接口'
-
+      error?.message ||
+      '最终审核失败'
     )
 
   }
@@ -956,11 +1043,24 @@ async function pass(row) {
 
 async function reject(row) {
 
-  if (!row || !row.id) {
+  if (
+    !row ||
+    row.id == null
+  ) {
 
     ElMessage.error(
       '申请记录不存在'
     )
+
+    return
+
+  }
+
+
+  if (
+    processingId.value !== null ||
+    batchLoading.value
+  ) {
 
     return
 
@@ -1007,61 +1107,24 @@ async function reject(row) {
   processingId.value =
     row.id
 
+  rejectLoading.value =
+    true
+
 
   try {
 
-    console.log(
-      '准备最终驳回：',
-      row
+    await finalAuditRequest(
+      row,
+      2
     )
 
 
-    /*
-     * 最终审核接口
-     */
-
-    const res =
-      await request.put(
-
-        `/departmentScoreApply/final-audit/${row.id}`,
-
-        {
-          status: 2,
-          reviewRemark: ''
-        }
-
-      )
-
-
-    console.log(
-      '最终驳回响应：',
-      res
+    ElMessage.success(
+      '申请已驳回'
     )
 
 
-    if (
-      res.data?.code === 200
-    ) {
-
-      ElMessage.success(
-        '申请已驳回'
-      )
-
-      await loadList()
-
-    }
-
-    else {
-
-      ElMessage.error(
-
-        res.data?.message ||
-        res.data?.msg ||
-        '驳回失败'
-
-      )
-
-    }
+    await loadList()
 
   }
 
@@ -1072,12 +1135,12 @@ async function reject(row) {
       error
     )
 
-    ElMessage.error(
 
+    ElMessage.error(
       error?.response?.data?.message ||
       error?.response?.data?.msg ||
-      '驳回失败，请检查后端接口'
-
+      error?.message ||
+      '驳回失败'
     )
 
   }
@@ -1086,6 +1149,9 @@ async function reject(row) {
 
     processingId.value =
       null
+
+    rejectLoading.value =
+      false
 
   }
 
@@ -1098,11 +1164,21 @@ async function reject(row) {
 
 async function batchPass() {
 
+  /*
+   * =====================================================
+   * 先从当前选中的行中获取 ID
+   * =====================================================
+   */
+
   const rows =
     tableRef.value?.getSelectionRows?.() ||
     selectedRows.value ||
     []
 
+
+  console.log(
+    '===================================='
+  )
 
   console.log(
     '开始一键最终审核'
@@ -1140,6 +1216,36 @@ async function batchPass() {
   }
 
 
+  if (processingId.value !== null) {
+
+    return
+
+  }
+
+
+  /*
+   * 过滤掉没有 ID 的数据
+   */
+
+  const validRows =
+    rows.filter(
+      row =>
+        row &&
+        row.id != null
+    )
+
+
+  if (!validRows.length) {
+
+    ElMessage.error(
+      '选中的申请没有有效记录 ID'
+    )
+
+    return
+
+  }
+
+
   /*
    * 二次确认
    */
@@ -1148,7 +1254,7 @@ async function batchPass() {
 
     await ElMessageBox.confirm(
 
-      `确定通过选中的 ${rows.length} 条部门加减分申请吗？`,
+      `确定通过选中的 ${validRows.length} 条部门加减分申请吗？`,
 
       '一键最终审核',
 
@@ -1175,7 +1281,9 @@ async function batchPass() {
 
 
   /*
+   * =====================================================
    * 开始批量处理
+   * =====================================================
    */
 
   batchLoading.value =
@@ -1189,75 +1297,61 @@ async function batchPass() {
     0
 
 
+  const failedRows = []
+
+
   try {
 
     /*
-     * 后端没有批量接口，
-     * 所以逐条调用最终审核接口。
+     * 这里依然逐条请求，
+     * 但每一条失败都会记录真正原因。
      */
 
     for (
       const row
-      of rows
+      of validRows
       ) {
-
-      if (
-        !row ||
-        !row.id
-      ) {
-
-        failCount++
-
-        continue
-
-      }
-
 
       try {
 
-        const res =
-          await request.put(
-
-            `/departmentScoreApply/final-audit/${row.id}`,
-
-            {
-              status: 1,
-              reviewRemark: ''
-            }
-
-          )
-
-
-        console.log(
-          `申请 ${row.id} 最终审核响应：`,
-          res
+        await finalAuditRequest(
+          row,
+          1
         )
 
 
-        if (
-          res.data?.code === 200
-        ) {
+        successCount++
 
-          successCount++
-
-        }
-
-        else {
-
-          failCount++
-
-        }
 
       }
 
       catch (error) {
 
+        failCount++
+
+
+        failedRows.push({
+
+          id:
+          row.id,
+
+          studentName:
+            row.studentName ||
+            '未知学生',
+
+          reason:
+            error?.response?.data?.message ||
+            error?.response?.data?.msg ||
+            error?.message ||
+            '未知错误'
+
+        })
+
+
         console.error(
           `申请 ${row.id} 最终审核失败：`,
           error
         )
-
-        failCount++
 
       }
 
@@ -1265,8 +1359,20 @@ async function batchPass() {
 
 
     /*
-     * 结果提示
+     * =====================================================
+     * 批量结果
+     * =====================================================
      */
+
+    console.log(
+      '批量审核完成',
+      {
+        successCount,
+        failCount,
+        failedRows
+      }
+    )
+
 
     if (
       successCount > 0 &&
@@ -1274,9 +1380,7 @@ async function batchPass() {
     ) {
 
       ElMessage.success(
-
         `成功通过 ${successCount} 条申请`
-
       )
 
     }
@@ -1287,27 +1391,66 @@ async function batchPass() {
     ) {
 
       ElMessage.warning(
-
         `成功通过 ${successCount} 条，失败 ${failCount} 条`
+      )
 
+
+      /*
+       * 把失败原因打印出来
+       */
+
+      console.table(
+        failedRows
       )
 
     }
 
     else {
 
+      console.table(
+        failedRows
+      )
+
+
+      /*
+       * 不再只显示“批量审核失败”
+       * 而是显示第一条真实失败原因
+       */
+
+      const firstError =
+        failedRows[0]?.reason ||
+        '未知错误'
+
+
       ElMessage.error(
-        `批量审核失败，共 ${failCount} 条`
+        `批量审核失败：${firstError}`
       )
 
     }
 
 
     /*
-     * 重新加载
+     * =====================================================
+     * 无论成功还是部分成功，都重新加载
+     * =====================================================
      */
 
     await loadList()
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '批量最终审核异常：',
+      error
+    )
+
+
+    ElMessage.error(
+      error?.message ||
+      '批量审核过程中发生异常'
+    )
 
   }
 
