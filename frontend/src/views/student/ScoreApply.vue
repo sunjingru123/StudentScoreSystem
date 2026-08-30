@@ -1,220 +1,648 @@
 <template>
   <div class="score-apply-page">
+
+    <!-- 页面头部 -->
     <div class="page-header">
+
       <div>
-        <h2>综合测评申报</h2>
-        <p>个人证书和部门活动加减分申报</p>
+
+        <h2>
+          部门加减分申报
+        </h2>
+
+        <p>
+          申报本部门活动、部门工作等加减分
+        </p>
+
       </div>
 
-      <el-button :loading="loadingPermission" @click="loadPermission"> 刷新 </el-button>
-    </div>
-    <!-- ========================= -->
-    <!-- 我的部门身份 -->
-    <!-- ========================= -->
 
-    <el-card class="apply-card" shadow="never">
+      <el-button
+        :loading="loadingPermission"
+        @click="refreshAll"
+      >
+
+        <el-icon>
+          <Refresh />
+        </el-icon>
+
+        刷新
+
+      </el-button>
+
+    </div>
+
+
+    <!-- =====================================================
+         我的部门身份
+    ====================================================== -->
+
+    <el-card
+      class="apply-card"
+      shadow="never"
+    >
+
       <div class="card-header">
+
         <div>
-          <h3>我的部门身份</h3>
-          <p>显示你当前加入的部门以及担任的职务。</p>
+
+          <h3>
+            我的部门身份
+          </h3>
+
+          <p>
+            显示你当前加入的部门以及担任的职务。
+          </p>
+
         </div>
 
-        <el-button size="small" :loading="loadingPermission" @click="loadPermission">
+
+        <el-button
+          size="small"
+          :loading="loadingPermission"
+          @click="refreshPermission"
+        >
+
+          <el-icon>
+            <Refresh />
+          </el-icon>
+
           刷新
+
         </el-button>
+
       </div>
 
-      <div v-if="permission.departments.length > 0" class="department-list">
+
+      <div
+        v-if="permission.departments.length > 0"
+        class="department-list"
+      >
+
         <div
           v-for="item in permission.departments"
           :key="item.departmentId"
           class="department-item"
         >
+
           <div class="department-info">
+
             <div class="department-name">
-              {{ item.departmentName }}
+
+              {{ item.departmentName || '未命名部门' }}
+
             </div>
 
+
             <el-tag
-              :type="
-                item.position === '部长'
-                  ? 'danger'
-                  : item.position === '副部长'
-                    ? 'warning'
-                    : 'primary'
-              "
+              :type="getPositionTagType(item.position)"
             >
-              {{ item.position }}
+
+              {{ getPositionName(item.position) }}
+
             </el-tag>
+
           </div>
+
 
           <div class="department-tip">
-            <span v-if="item.position === '干事'"> 你可以提交本部门加减分申报 </span>
 
-            <span v-else> 你可以提交部门申报，并审核本部门其他成员的申报 </span>
-          </div>
-        </div>
-      </div>
+            <span
+              v-if="isDepartmentLeader(item.position)"
+            >
 
-      <el-empty v-else description="当前没有部门干部身份" />
-    </el-card>
-    <!-- ========================= -->
-    <!-- 部门申报审核 -->
-    <!-- ========================= -->
+              你可以提交本部门加减分申报，
+              并审核本部门其他成员提交的申报。
 
-    <el-card v-if="permission.canDepartmentAudit" class="apply-card" shadow="never">
-      <div class="card-header">
-        <div>
-          <h3>部门申报审核</h3>
-          <p>你是副部长或部长，可以审核本部门其他成员提交的加减分申请。</p>
-        </div>
-
-        <el-button size="small" :loading="auditLoading" @click="loadAuditList"> 刷新 </el-button>
-      </div>
-
-      <el-table v-loading="auditLoading" :data="auditList" border stripe>
-        <el-table-column type="index" label="#" width="60" align="center" />
-
-        <el-table-column prop="title" label="申报项目" min-width="180" />
-
-        <el-table-column label="申报学生" width="120" align="center">
-          <template #default="{ row }">
-            {{ row.studentName || row.studentId }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="部门" width="140" align="center">
-          <template #default="{ row }">
-            {{ row.departmentName || row.departmentId }}
-          </template>
-        </el-table-column>
-
-        <el-table-column label="类型" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="Number(row.scoreType) === 1" type="success"> 加分 </el-tag>
-
-            <el-tag v-else type="danger"> 减分 </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="分值" width="90" align="center">
-          <template #default="{ row }">
-            <span :class="Number(row.scoreType) === 1 ? 'bonus' : 'deduct'">
-              {{ Number(row.scoreType) === 1 ? '+' : '-' }}{{ row.score }}
             </span>
+
+
+            <span v-else>
+
+              你可以提交本部门加减分申报。
+
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <el-empty
+        v-else
+        description="当前没有部门身份"
+      />
+
+    </el-card>
+
+
+    <!-- =====================================================
+         部门申报审核
+    ====================================================== -->
+
+    <el-card
+      v-if="permission.canDepartmentAudit"
+      class="apply-card"
+      shadow="never"
+    >
+
+      <div class="card-header">
+
+        <div>
+
+          <h3>
+            部门申报审核
+          </h3>
+
+          <p>
+            审核本部门其他成员提交的学生加减分申报。
+          </p>
+
+        </div>
+
+
+        <div class="audit-header-actions">
+
+          <span class="selected-text">
+
+            当前页已选择
+
+            <strong>
+              {{ selectedAuditRows.length }}
+            </strong>
+
+            条
+
+          </span>
+
+
+          <!-- 一键通过选中 -->
+
+          <el-button
+            type="success"
+            :disabled="
+              selectedAuditRows.length === 0 ||
+              batchAuditing
+            "
+            :loading="batchAuditing"
+            @click="batchAuditPass"
+          >
+
+            <el-icon>
+              <CircleCheck />
+            </el-icon>
+
+            一键通过选中
+
+          </el-button>
+
+
+          <!-- 一键全部通过 -->
+
+          <el-button
+            type="primary"
+            :disabled="
+              auditList.length === 0 ||
+              batchAuditing
+            "
+            :loading="batchAuditing"
+            @click="batchAuditAllPass"
+          >
+
+            <el-icon>
+              <CircleCheck />
+            </el-icon>
+
+            一键全部通过
+
+          </el-button>
+
+
+          <!-- 刷新 -->
+
+          <el-button
+            size="small"
+            :loading="auditLoading"
+            @click="loadAuditList"
+          >
+
+            <el-icon>
+              <Refresh />
+            </el-icon>
+
+            刷新
+
+          </el-button>
+
+        </div>
+
+      </div>
+
+
+      <!-- 审核分页提示 -->
+
+      <div
+        v-if="auditList.length > 0"
+        class="audit-page-tip"
+      >
+
+        <span>
+
+          当前显示第
+
+          <strong>
+            {{ auditCurrentPage }}
+          </strong>
+
+          页，每页
+
+          <strong>
+            {{ auditPageSize }}
+          </strong>
+
+          条
+
+        </span>
+
+
+        <span>
+
+          共
+
+          <strong>
+            {{ auditList.length }}
+          </strong>
+
+          条待审核申请
+
+        </span>
+
+
+        <span class="tip-divider">
+          |
+        </span>
+
+
+        <span>
+
+          共
+
+          <strong>
+            {{ auditTotalPages }}
+          </strong>
+
+          页
+
+        </span>
+
+      </div>
+
+
+      <!-- 审核表格 -->
+
+      <el-table
+        ref="auditTableRef"
+        v-loading="auditLoading"
+        :data="pagedAuditList"
+        border
+        stripe
+        row-key="id"
+        style="width: 100%"
+        @selection-change="handleAuditSelectionChange"
+      >
+
+        <!-- 选择 -->
+
+        <el-table-column
+          type="selection"
+          width="55"
+          align="center"
+        />
+
+
+        <!-- 序号 -->
+
+        <el-table-column
+          label="#"
+          width="60"
+          align="center"
+        >
+
+          <template #default="{ $index }">
+
+            {{
+              (auditCurrentPage - 1) *
+              auditPageSize +
+              $index +
+              1
+            }}
+
           </template>
+
         </el-table-column>
+
+
+        <!-- 项目名称 -->
+
+        <el-table-column
+          prop="title"
+          label="加减分项目"
+          min-width="180"
+        >
+
+          <template #default="{ row }">
+
+            {{ row.title || '—' }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 被加减分学生 -->
+
+        <el-table-column
+          label="被加减分学生"
+          width="150"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            {{
+              row.studentName ||
+              row.studentId ||
+              '—'
+            }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 申报人 -->
+
+        <el-table-column
+          label="申报人"
+          width="130"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            {{
+              row.applicantName ||
+              row.applicantUsername ||
+              '—'
+            }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 部门 -->
+
+        <el-table-column
+          label="部门"
+          width="130"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            {{
+              row.departmentName ||
+              row.departmentId ||
+              '—'
+            }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 类型 -->
+
+        <el-table-column
+          label="类型"
+          width="90"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-tag
+              v-if="Number(row.scoreType) === 1"
+              type="success"
+            >
+
+              加分
+
+            </el-tag>
+
+
+            <el-tag
+              v-else
+              type="danger"
+            >
+
+              减分
+
+            </el-tag>
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 分值 -->
+
+        <el-table-column
+          label="分值"
+          width="110"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <span
+              :class="
+                Number(row.scoreType) === 1
+                  ? 'bonus'
+                  : 'deduct'
+              "
+            >
+
+              {{
+                Number(row.scoreType) === 1
+                  ? '+'
+                  : '-'
+              }}{{ row.score }}
+
+            </span>
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 项目说明 -->
 
         <el-table-column
           prop="description"
-          label="申报说明"
-          min-width="220"
+          label="项目说明"
+          min-width="240"
           show-overflow-tooltip
+        >
+
+          <template #default="{ row }">
+
+            {{ row.description || '—' }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- 申报时间 -->
+
+        <el-table-column
+          prop="createTime"
+          label="申报时间"
+          width="180"
+          align="center"
         />
 
-        <el-table-column prop="createTime" label="申报时间" width="170" />
 
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <!-- 操作 -->
+
+        <el-table-column
+          label="操作"
+          width="180"
+          fixed="right"
+          align="center"
+        >
+
           <template #default="{ row }">
-            <el-button type="success" size="small" @click="auditApply(row, 1)"> 通过 </el-button>
 
-            <el-button type="danger" size="small" @click="auditApply(row, 2)"> 驳回 </el-button>
+            <el-button
+              type="success"
+              size="small"
+              :disabled="
+                batchAuditing ||
+                auditingId !== null
+              "
+              :loading="auditingId === row.id"
+              @click="auditApply(row, 1)"
+            >
+
+              <el-icon>
+                <CircleCheck />
+              </el-icon>
+
+              通过
+
+            </el-button>
+
+
+            <el-button
+              type="danger"
+              size="small"
+              :disabled="
+                batchAuditing ||
+                auditingId !== null
+              "
+              :loading="auditingId === row.id"
+              @click="auditApply(row, 2)"
+            >
+
+              <el-icon>
+                <CircleClose />
+              </el-icon>
+
+              驳回
+
+            </el-button>
+
           </template>
+
         </el-table-column>
+
       </el-table>
 
-      <el-empty v-if="!auditLoading && auditList.length === 0" description="暂无待审核部门申报" />
-    </el-card>
-    <!-- 个人证书 -->
-    <el-card class="apply-card" shadow="never">
-      <div class="card-header">
-        <div>
-          <h3>个人证书申报</h3>
-          <p>上传个人获奖证书、竞赛证书等材料， 提交后由档案部审核。</p>
-        </div>
 
-        <el-tag type="primary"> 档案部审核 </el-tag>
-      </div>
+      <!-- 没有数据 -->
 
-      <el-form
-        ref="certificateFormRef"
-        :model="certificateForm"
-        :rules="certificateRules"
-        label-width="110px"
-        class="apply-form"
+      <el-empty
+        v-if="
+          !auditLoading &&
+          auditList.length === 0
+        "
+        description="暂无待审核部门申报"
+      />
+
+
+      <!-- 分页 -->
+
+      <div
+        v-if="
+          !auditLoading &&
+          auditList.length > 0
+        "
+        class="audit-pagination"
       >
-        <el-form-item label="加分项目" prop="ruleId">
-          <el-select
-            v-model="certificateForm.ruleId"
-            placeholder="请选择加分项目"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="item in scoreRules"
-              :key="item.id"
-              :label="`${item.name}（${item.score}分）`"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
 
-        <el-form-item label="申请分值" prop="applyScore">
-          <el-input-number
-            v-model="certificateForm.applyScore"
-            :min="0.01"
-            :max="40"
-            :precision="2"
-            :step="0.5"
-          />
-        </el-form-item>
+        <el-pagination
+          v-model:current-page="auditCurrentPage"
+          :page-size="auditPageSize"
+          :total="auditList.length"
+          layout="prev, pager, next"
+          background
+          @current-change="handleAuditPageChange"
+        />
 
-        <el-form-item label="申报说明" prop="description">
-          <el-input
-            v-model="certificateForm.description"
-            type="textarea"
-            :rows="4"
-            maxlength="1000"
-            show-word-limit
-            placeholder="请输入证书、获奖情况等说明"
-          />
-        </el-form-item>
+      </div>
 
-        <el-form-item label="获奖凭证">
-          <el-upload
-            action=""
-            :auto-upload="false"
-            :limit="1"
-            :on-change="handleCertificateFile"
-            :on-remove="removeCertificateFile"
-          >
-            <el-button type="primary"> 选择凭证 </el-button>
-
-            <template #tip>
-              <div class="upload-tip">请上传获奖证书、证明材料等</div>
-            </template>
-          </el-upload>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" :loading="certificateSubmitting" @click="submitCertificate">
-            提交个人证书
-          </el-button>
-
-          <el-button @click="resetCertificate"> 重置 </el-button>
-        </el-form-item>
-      </el-form>
     </el-card>
 
-    <!-- 部门活动 -->
-    <el-card v-if="permission.canDepartmentApply" class="apply-card" shadow="never">
+
+    <!-- =====================================================
+         部门活动申报
+    ====================================================== -->
+
+    <el-card
+      v-if="permission.canDepartmentApply"
+      class="apply-card"
+      shadow="never"
+    >
+
       <div class="card-header">
+
         <div>
-          <h3>部门活动加减分申报</h3>
-          <p>申报本部门活动、部门工作等加减分， 由本部门副部长或部长审核。</p>
+
+          <h3>
+            部门活动加减分申报
+          </h3>
+
+          <p>
+            申报本部门活动、部门工作等加减分，
+            由本部门副部长或部长审核。
+          </p>
+
         </div>
 
-        <el-tag type="success"> 部门审核 → 辅导员审核 </el-tag>
+
+        <el-tag type="success">
+
+          部门审核 → 辅导员审核
+
+        </el-tag>
+
       </div>
+
 
       <el-form
         ref="departmentFormRef"
@@ -223,33 +651,66 @@
         label-width="110px"
         class="apply-form"
       >
-        <!-- 部门 -->
-        <el-form-item label="所属部门" prop="departmentId">
+
+        <!-- 所属部门 -->
+
+        <el-form-item
+          label="所属部门"
+          prop="departmentId"
+        >
+
           <el-select
             v-model="departmentForm.departmentId"
             placeholder="请选择申报部门"
             style="width: 100%"
           >
+
             <el-option
               v-for="item in permission.departments"
               :key="item.departmentId"
-              :label="`${item.departmentName}（${item.position}）`"
+              :label="
+                `${item.departmentName || '未命名部门'}（${getPositionName(item.position)}）`
+              "
               :value="item.departmentId"
             />
+
           </el-select>
+
         </el-form-item>
 
-        <!-- 类型 -->
-        <el-form-item label="申报类型" prop="scoreType">
-          <el-radio-group v-model="departmentForm.scoreType">
-            <el-radio :value="1"> 加分 </el-radio>
 
-            <el-radio :value="-1"> 减分 </el-radio>
+        <!-- 申报类型 -->
+
+        <el-form-item
+          label="申报类型"
+          prop="scoreType"
+        >
+
+          <el-radio-group
+            v-model="departmentForm.scoreType"
+          >
+
+            <el-radio :value="1">
+              加分
+            </el-radio>
+
+
+            <el-radio :value="-1">
+              减分
+            </el-radio>
+
           </el-radio-group>
+
         </el-form-item>
+
 
         <!-- 分值 -->
-        <el-form-item label="分值" prop="score">
+
+        <el-form-item
+          label="分值"
+          prop="score"
+        >
+
           <el-input-number
             v-model="departmentForm.score"
             :min="0.01"
@@ -257,20 +718,34 @@
             :precision="2"
             :step="0.5"
           />
+
         </el-form-item>
 
-        <!-- 项目 -->
-        <el-form-item label="项目名称" prop="title">
+
+        <!-- 项目名称 -->
+
+        <el-form-item
+          label="项目名称"
+          prop="title"
+        >
+
           <el-input
             v-model="departmentForm.title"
             maxlength="200"
             show-word-limit
             placeholder="例如：迎新活动、志愿服务、部门工作等"
           />
+
         </el-form-item>
 
-        <!-- 说明 -->
-        <el-form-item label="申报说明" prop="description">
+
+        <!-- 申报说明 -->
+
+        <el-form-item
+          label="申报说明"
+          prop="description"
+        >
+
           <el-input
             v-model="departmentForm.description"
             type="textarea"
@@ -279,47 +754,116 @@
             show-word-limit
             placeholder="请详细说明活动内容、本人负责工作等"
           />
+
         </el-form-item>
 
-        <!-- 凭证 -->
-        <el-form-item label="活动凭证">
+
+        <!-- 活动凭证 -->
+
+        <el-form-item
+          label="活动凭证"
+        >
+
           <el-upload
-            action=""
+            action="#"
             :auto-upload="false"
             :limit="1"
             :on-change="handleDepartmentFile"
             :on-remove="removeDepartmentFile"
           >
-            <el-button type="primary"> 选择凭证 </el-button>
+
+            <el-button type="primary">
+
+              选择凭证
+
+            </el-button>
+
 
             <template #tip>
-              <div class="upload-tip">可上传活动证明、照片、文件等材料</div>
+
+              <div class="upload-tip">
+
+                可上传活动证明、照片、文件等材料
+
+              </div>
+
             </template>
+
           </el-upload>
+
         </el-form-item>
+
+
+        <!-- 提交 -->
 
         <el-form-item>
-          <el-button type="success" :loading="departmentSubmitting" @click="submitDepartment">
+
+          <el-button
+            type="success"
+            :loading="departmentSubmitting"
+            @click="submitDepartment"
+          >
+
             提交部门申报
+
           </el-button>
 
-          <el-button @click="resetDepartment"> 重置 </el-button>
+
+          <el-button
+            @click="resetDepartment"
+          >
+
+            重置
+
+          </el-button>
+
         </el-form-item>
+
       </el-form>
+
     </el-card>
 
-    <!-- 我的申请 -->
-    <el-card class="apply-card" shadow="never">
+
+    <!-- =====================================================
+         我的部门申报记录
+    ====================================================== -->
+
+    <el-card
+      class="apply-card"
+      shadow="never"
+    >
+
       <div class="card-header">
+
         <div>
-          <h3>我的申报记录</h3>
-          <p>查看个人证书和部门加减分申报的审核进度。</p>
+
+          <h3>
+            我的部门申报记录
+          </h3>
+
+          <p>
+            查看自己提交的部门加减分申报及审核进度。
+          </p>
+
         </div>
 
-        <el-button size="small" :loading="listLoading" @click="loadMyApply">
+
+        <el-button
+          size="small"
+          :loading="listLoading"
+          @click="loadMyApply"
+        >
+
+          <el-icon>
+            <Refresh />
+          </el-icon>
+
           刷新
+
         </el-button>
+
       </div>
+
 
       <el-table
         v-loading="listLoading"
@@ -327,6 +871,9 @@
         border
         stripe
       >
+
+        <!-- 序号 -->
+
         <el-table-column
           type="index"
           label="#"
@@ -334,241 +881,279 @@
           align="center"
         />
 
-        <!-- 申报项目 -->
+
+        <!-- 项目 -->
+
         <el-table-column
           label="申报项目"
           min-width="180"
         >
-          <template #default="{ row }">
-            {{ row.title }}
-          </template>
-        </el-table-column>
 
-        <!-- 申报类型 -->
-        <el-table-column
-          label="申报类型"
-          width="120"
-          align="center"
-        >
           <template #default="{ row }">
 
-            <el-tag
-              v-if="row.applyType === 'CERTIFICATE'"
-              type="primary"
-            >
-              个人证书
-            </el-tag>
-
-            <el-tag
-              v-else
-              type="success"
-            >
-              部门加减分
-            </el-tag>
+            {{ row.title || '—' }}
 
           </template>
+
         </el-table-column>
+
 
         <!-- 部门 -->
+
         <el-table-column
           label="部门"
           min-width="130"
           align="center"
         >
-          <template #default="{ row }">
-        <span v-if="row.applyType === 'DEPARTMENT'">
-          {{ row.departmentName || '-' }}
-        </span>
 
-            <span v-else>
-          -
-        </span>
+          <template #default="{ row }">
+
+            {{ row.departmentName || '-' }}
+
           </template>
+
         </el-table-column>
 
-        <!-- 加减分 -->
+
+        <!-- 类型 -->
+
         <el-table-column
           label="类型"
           width="90"
           align="center"
         >
+
           <template #default="{ row }">
 
             <el-tag
-              v-if="row.applyType === 'CERTIFICATE'"
+              v-if="Number(row.scoreType) === 1"
               type="success"
             >
+
               加分
+
             </el-tag>
 
-            <el-tag
-              v-else-if="Number(row.scoreType) === 1"
-              type="success"
-            >
-              加分
-            </el-tag>
 
             <el-tag
               v-else
               type="danger"
             >
+
               减分
+
             </el-tag>
 
           </template>
+
         </el-table-column>
+
 
         <!-- 分值 -->
+
         <el-table-column
           label="分值"
-          width="90"
+          width="110"
           align="center"
         >
-          <template #default="{ row }">
 
-        <span
-          v-if="row.applyType === 'CERTIFICATE'"
-          class="bonus"
-        >
-          +{{ row.score }}
-        </span>
+          <template #default="{ row }">
 
             <span
-              v-else
-              :class="Number(row.scoreType) === 1 ? 'bonus' : 'deduct'"
+              :class="
+                Number(row.scoreType) === 1
+                  ? 'bonus'
+                  : 'deduct'
+              "
             >
-          {{ Number(row.scoreType) === 1 ? '+' : '-' }}{{ row.score }}
-        </span>
+
+              {{
+                Number(row.scoreType) === 1
+                  ? '+'
+                  : '-'
+              }}{{ row.score }}
+
+            </span>
 
           </template>
+
         </el-table-column>
+
 
         <!-- 审核状态 -->
+
         <el-table-column
           label="审核状态"
-          min-width="150"
+          min-width="180"
           align="center"
         >
+
           <template #default="{ row }">
 
-            <!-- 个人证书 -->
-            <template v-if="row.applyType === 'CERTIFICATE'">
+            <!-- 待部门审核 -->
 
-              <el-tag
-                v-if="Number(row.status) === 0"
-                type="warning"
-              >
-                待档案部审核
-              </el-tag>
+            <el-tag
+              v-if="Number(row.status) === 0"
+              type="warning"
+            >
 
-              <el-tag
-                v-else-if="Number(row.status) === 1"
-                type="success"
-              >
-                审核通过
-              </el-tag>
+              待部门审核
 
-              <el-tag
-                v-else
-                type="danger"
-              >
-                已驳回
-              </el-tag>
+            </el-tag>
 
-            </template>
 
-            <!-- 部门申报 -->
-            <template v-else>
+            <!-- 部门驳回 -->
 
-              <!-- 初审待审核 -->
-              <el-tag
-                v-if="Number(row.status) === 0"
-                type="warning"
-              >
-                待部门审核
-              </el-tag>
+            <el-tag
+              v-else-if="Number(row.status) === 2"
+              type="danger"
+            >
 
-              <!-- 初审驳回 -->
-              <el-tag
-                v-else-if="Number(row.status) === 2"
-                type="danger"
-              >
-                部门审核驳回
-              </el-tag>
+              部门审核驳回
 
-              <!-- 初审通过，看终审 -->
-              <template v-else>
+            </el-tag>
 
-                <el-tag
-                  v-if="Number(row.finalStatus) === 0"
-                  type="warning"
-                >
-                  待辅导员终审
-                </el-tag>
 
-                <el-tag
-                  v-else-if="Number(row.finalStatus) === 1"
-                  type="success"
-                >
-                  终审通过
-                </el-tag>
+            <!-- 部门通过，等待辅导员 -->
 
-                <el-tag
-                  v-else
-                  type="danger"
-                >
-                  终审驳回
-                </el-tag>
+            <el-tag
+              v-else-if="
+                Number(row.status) === 1 &&
+                Number(row.finalStatus) === 0
+              "
+              type="warning"
+            >
 
-              </template>
+              待辅导员终审
 
-            </template>
+            </el-tag>
+
+
+            <!-- 终审通过 -->
+
+            <el-tag
+              v-else-if="
+                Number(row.status) === 1 &&
+                Number(row.finalStatus) === 1
+              "
+              type="success"
+            >
+
+              终审通过
+
+            </el-tag>
+
+
+            <!-- 终审驳回 -->
+
+            <el-tag
+              v-else-if="
+                Number(row.status) === 1 &&
+                Number(row.finalStatus) === 2
+              "
+              type="danger"
+            >
+
+              终审驳回
+
+            </el-tag>
+
+
+            <!-- 其他 -->
+
+            <el-tag
+              v-else
+              type="warning"
+            >
+
+              审核处理中
+
+            </el-tag>
 
           </template>
+
         </el-table-column>
 
+
         <!-- 审核意见 -->
+
         <el-table-column
           label="审核意见"
           min-width="200"
           show-overflow-tooltip
         >
+
           <template #default="{ row }">
 
-            <!-- 个人证书 -->
-            <span v-if="row.applyType === 'CERTIFICATE'">
-          {{ row.description || '-' }}
-        </span>
+            <!-- 终审驳回 -->
 
-            <!-- 部门申报 -->
-            <span v-else>
+            <template
+              v-if="Number(row.finalStatus) === 2"
+            >
 
-          <template v-if="row.finalStatus === 2">
-            {{ row.finalReviewRemark || '-' }}
+              {{
+                row.finalReviewRemark ||
+                '终审驳回'
+              }}
+
+            </template>
+
+
+            <!-- 部门驳回 -->
+
+            <template
+              v-else-if="Number(row.status) === 2"
+            >
+
+              {{
+                row.reviewRemark ||
+                '部门审核驳回'
+              }}
+
+            </template>
+
+
+            <!-- 终审通过 -->
+
+            <template
+              v-else-if="Number(row.finalStatus) === 1"
+            >
+
+              {{
+                row.finalReviewRemark ||
+                '审核通过'
+              }}
+
+            </template>
+
+
+            <!-- 部门初审通过 -->
+
+            <template
+              v-else-if="Number(row.status) === 1"
+            >
+
+              {{
+                row.reviewRemark ||
+                '部门初审通过'
+              }}
+
+            </template>
+
+
+            <template v-else>
+
+              -
+
+            </template>
+
           </template>
 
-          <template v-else-if="row.status === 2">
-            {{ row.reviewRemark || '-' }}
-          </template>
-
-          <template v-else-if="row.finalStatus === 1">
-            {{ row.finalReviewRemark || '审核通过' }}
-          </template>
-
-          <template v-else-if="row.status === 1">
-            {{ row.reviewRemark || '部门初审通过' }}
-          </template>
-
-          <template v-else>
-            -
-          </template>
-
-        </span>
-
-          </template>
         </el-table-column>
 
-        <!-- 时间 -->
+
+        <!-- 申报时间 -->
+
         <el-table-column
           prop="createTime"
           label="申报时间"
@@ -578,674 +1163,1940 @@
 
       </el-table>
 
+
       <el-empty
-        v-if="!listLoading && myApplyList.length === 0"
-        description="暂无申报记录"
+        v-if="
+          !listLoading &&
+          myApplyList.length === 0
+        "
+        description="暂无部门申报记录"
       />
+
     </el-card>
+
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted } from 'vue'
 
-import { ElMessage, ElMessageBox } from 'element-plus'
+<script setup>
+
+import {
+  ref,
+  reactive,
+  computed,
+  onMounted
+} from 'vue'
+
+import {
+  ElMessage,
+  ElMessageBox
+} from 'element-plus'
+
+import {
+  CircleCheck,
+  CircleClose,
+  Refresh
+} from '@element-plus/icons-vue'
 
 import request from '@/utils/request'
 
-/*
- * ============================
- * 权限
- * ============================
- */
 
-const loadingPermission = ref(false)
+/* =========================================================
+   权限
+========================================================= */
 
-const permission = reactive({
-  canDepartmentApply: false,
+const loadingPermission =
+  ref(false)
 
-  // 副部长 / 部长才能审核
-  canDepartmentAudit: false,
+const permission =
+  reactive({
 
-  departments: [],
-})
-/*
- * ============================
- * 个人证书
- * ============================
- */
+    canDepartmentApply:
+      false,
 
-const certificateFormRef = ref(null)
+    canDepartmentAudit:
+      false,
 
-const certificateSubmitting = ref(false)
+    departments:
+      []
 
-const certificateFile = ref(null)
+  })
 
-const certificateForm = reactive({
-  ruleId: null,
-  applyScore: null,
-  description: '',
-})
 
-const certificateRules = {
-  ruleId: [
-    {
-      required: true,
-      message: '请选择加分项目',
-      trigger: 'change',
-    },
-  ],
+/* =========================================================
+   权限辅助函数
+========================================================= */
 
-  applyScore: [
-    {
-      required: true,
-      message: '请输入申请分值',
-      trigger: 'blur',
-    },
-  ],
+function isDepartmentLeader(position) {
 
-  description: [
-    {
-      required: true,
-      message: '请输入申报说明',
-      trigger: 'blur',
-    },
-  ],
+  const value =
+    String(position ?? '')
+      .trim()
+
+  return (
+    value === '部长' ||
+    value === '副部长' ||
+    value === '1' ||
+    value === '2'
+  )
+
 }
 
-const scoreRules = ref([])
 
-/*
- * ============================
- * 部门申报
- * ============================
- */
+function getPositionName(position) {
 
-const departmentFormRef = ref(null)
+  const value =
+    String(position ?? '')
+      .trim()
 
-const departmentSubmitting = ref(false)
+  if (
+    value === '部长'
+  ) {
 
-const departmentFile = ref(null)
+    return '部长'
 
-const departmentForm = reactive({
-  departmentId: null,
-  scoreType: 1,
-  score: null,
-  title: '',
-  description: '',
-})
+  }
+
+
+  if (
+    value === '副部长'
+  ) {
+
+    return '副部长'
+
+  }
+
+
+  return value || '成员'
+
+}
+
+
+function getPositionTagType(position) {
+
+  const name =
+    getPositionName(position)
+
+  if (
+    name === '部长'
+  ) {
+
+    return 'danger'
+
+  }
+
+
+  if (
+    name === '副部长'
+  ) {
+
+    return 'warning'
+
+  }
+
+
+  return 'primary'
+
+}
+
+
+/* =========================================================
+   部门申报
+========================================================= */
+
+const departmentFormRef =
+  ref(null)
+
+const departmentSubmitting =
+  ref(false)
+
+const departmentFile =
+  ref(null)
+
+const departmentForm =
+  reactive({
+
+    departmentId:
+      null,
+
+    scoreType:
+      1,
+
+    score:
+      null,
+
+    title:
+      '',
+
+    description:
+      ''
+
+  })
+
 
 const departmentRules = {
+
   departmentId: [
+
     {
       required: true,
       message: '请选择部门',
-      trigger: 'change',
-    },
+      trigger: 'change'
+    }
+
   ],
 
   scoreType: [
+
     {
       required: true,
       message: '请选择加减分',
-      trigger: 'change',
-    },
+      trigger: 'change'
+    }
+
   ],
 
   score: [
+
     {
       required: true,
       message: '请输入分值',
-      trigger: 'blur',
-    },
+      trigger: 'blur'
+    }
+
   ],
 
   title: [
+
     {
       required: true,
       message: '请输入项目名称',
-      trigger: 'blur',
-    },
+      trigger: 'blur'
+    }
+
   ],
 
   description: [
+
     {
       required: true,
       message: '请输入申报说明',
-      trigger: 'blur',
-    },
-  ],
+      trigger: 'blur'
+    }
+
+  ]
+
 }
 
-/*
- * ============================
- * 我的申请
- * ============================
- */
 
-const listLoading = ref(false)
+/* =========================================================
+   部门审核
+========================================================= */
 
-const myApplyList = ref([])
-/*
- * ============================
- * 部门审核
- * ============================
- */
+const auditLoading =
+  ref(false)
 
-const auditLoading = ref(false)
+const auditList =
+  ref([])
 
-const auditList = ref([])
-/*
- * ============================
- * 加载权限
- * ============================
- */
+const auditTableRef =
+  ref(null)
+
+const selectedAuditRows =
+  ref([])
+
+const batchAuditing =
+  ref(false)
+
+const auditingId =
+  ref(null)
+
+
+/* =========================================================
+   审核分页
+========================================================= */
+
+const auditPageSize =
+  ref(5)
+
+const auditCurrentPage =
+  ref(1)
+
+
+const auditTotalPages =
+  computed(() => {
+
+    if (
+      auditList.value.length === 0
+    ) {
+
+      return 0
+
+    }
+
+
+    return Math.ceil(
+      auditList.value.length /
+      auditPageSize.value
+    )
+
+  })
+
+
+const pagedAuditList =
+  computed(() => {
+
+    const start =
+      (
+        auditCurrentPage.value -
+        1
+      ) *
+      auditPageSize.value
+
+    const end =
+      start +
+      auditPageSize.value
+
+    return auditList.value.slice(
+      start,
+      end
+    )
+
+  })
+
+
+/* =========================================================
+   我的部门申报
+========================================================= */
+
+const listLoading =
+  ref(false)
+
+const myApplyList =
+  ref([])
+
+
+/* =========================================================
+   获取权限
+========================================================= */
 
 async function loadPermission() {
-  loadingPermission.value = true
+
+  loadingPermission.value =
+    true
 
   try {
-    const res = await request.get('/departmentScoreApply/my-permissions')
 
-    const data = res.data?.data || {}
+    const res =
+      await request.get(
+        '/departmentScoreApply/my-permissions'
+      )
 
-    permission.departments = data.departments || []
 
-    permission.canDepartmentApply = data.canDepartmentApply === true
+    const data =
+      res.data?.data || {}
 
-    /*
-     * 副部长 / 部长拥有审核权限
-     */
-    permission.canDepartmentAudit = permission.departments.some(
-      (item) => item.position === '副部长' || item.position === '部长',
-    )
+
+    permission.departments =
+      Array.isArray(data.departments)
+        ? data.departments
+        : []
+
+
+    permission.canDepartmentApply =
+      Boolean(
+        data.canDepartmentApply === true ||
+        Number(data.canDepartmentApply) === 1 ||
+        permission.departments.length > 0
+      )
+
+
+    permission.canDepartmentAudit =
+      Boolean(
+        data.canDepartmentAudit === true ||
+        Number(data.canDepartmentAudit) === 1 ||
+        permission.departments.some(
+          item =>
+            isDepartmentLeader(
+              item.position
+            )
+        )
+      )
+
   } catch (error) {
-    console.error(error)
 
-    permission.canDepartmentApply = false
-
-    permission.canDepartmentAudit = false
-
-    permission.departments = []
-
-    ElMessage.error('获取部门权限失败')
-  } finally {
-    loadingPermission.value = false
-  }
-}
-/*
- * ============================
- * 加载部门待审核申请
- * ============================
- */
-
-async function loadAuditList() {
-  if (!permission.canDepartmentAudit) {
-    auditList.value = []
-    return
-  }
-
-  auditLoading.value = true
-
-  try {
-    const res = await request.get('/departmentScoreApply/audit/list')
-
-    if (res.data?.code === 200) {
-      auditList.value = res.data.data || []
-    } else {
-      auditList.value = []
-    }
-  } catch (error) {
-    console.error(error)
-
-    auditList.value = []
-
-    ElMessage.error(error?.response?.data?.message || '获取待审核申请失败')
-  } finally {
-    auditLoading.value = false
-  }
-}
-/*
- * ============================
- * 审核部门申报
- * ============================
- */
-
-async function auditApply(row, status) {
-  const actionText = status === 1 ? '通过' : '驳回'
-
-  try {
-    const { value } = await ElMessageBox.prompt(
-      `请输入${actionText}意见`,
-      `部门申报${actionText}`,
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        inputPlaceholder: '请输入审核意见（可选）',
-        inputType: 'textarea',
-      },
+    console.error(
+      '获取部门权限失败：',
+      error
     )
 
-    await request.put(`/departmentScoreApply/audit/${row.id}`, {
-      status,
-      reviewRemark: value || '',
-    })
 
-    ElMessage.success(`部门申报已${actionText}`)
+    permission.departments =
+      []
+
+    permission.canDepartmentApply =
+      false
+
+    permission.canDepartmentAudit =
+      false
+
+    auditList.value =
+      []
+
+    ElMessage.error(
+      getErrorMessage(
+        error,
+        '获取部门权限失败'
+      )
+    )
+
+  } finally {
+
+    loadingPermission.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
+   刷新权限
+========================================================= */
+
+async function refreshPermission() {
+
+  await loadPermission()
+
+
+  if (
+    permission.canDepartmentAudit
+  ) {
 
     await loadAuditList()
-  } catch (error) {
-    /*
-     * 用户点取消不提示错误
-     */
-    if (error === 'cancel' || error === 'close') {
-      return
+
+  } else {
+
+    auditList.value =
+      []
+
+    clearAuditSelection()
+
+  }
+
+}
+
+
+/* =========================================================
+   刷新全部
+========================================================= */
+
+async function refreshAll() {
+
+  await refreshPermission()
+
+  await loadMyApply()
+
+}
+
+
+/* =========================================================
+   获取部门审核列表
+========================================================= */
+
+async function loadAuditList() {
+
+  if (
+    !permission.canDepartmentAudit
+  ) {
+
+    auditList.value =
+      []
+
+    clearAuditSelection()
+
+    return
+
+  }
+
+
+  auditLoading.value =
+    true
+
+  try {
+
+    const res =
+      await request.get(
+        '/departmentScoreApply/audit/list'
+      )
+
+
+    if (
+      Number(res.data?.code) !== 200
+    ) {
+
+      throw new Error(
+        res.data?.message ||
+        res.data?.msg ||
+        '获取待审核申请失败'
+      )
+
     }
 
-    console.error(error)
 
-    ElMessage.error(error?.response?.data?.message || `部门申报${actionText}失败`)
-  }
-}
-/*
- * ============================
- * 加载加分规则
- * ============================
- */
+    const data =
+      res.data?.data
 
-async function loadScoreRules() {
-  try {
-    const res = await request.get('/scoreRule/list')
 
-    scoreRules.value = res.data?.data || []
+    let list =
+      []
+
+
+    if (
+      Array.isArray(data)
+    ) {
+
+      list =
+        data
+
+    } else if (
+      data &&
+      Array.isArray(data.records)
+    ) {
+
+      list =
+        data.records
+
+    } else if (
+      data &&
+      Array.isArray(data.list)
+    ) {
+
+      list =
+        data.list
+
+    }
+
+
+    auditList.value =
+      list.filter(
+        item =>
+          Number(item.status) === 0
+      )
+
+
+    const totalPages =
+      auditTotalPages.value
+
+
+    if (
+      totalPages === 0
+    ) {
+
+      auditCurrentPage.value =
+        1
+
+    } else if (
+      auditCurrentPage.value >
+      totalPages
+    ) {
+
+      auditCurrentPage.value =
+        totalPages
+
+    }
+
+
+    clearAuditSelection()
+
   } catch (error) {
-    console.error(error)
+
+    console.error(
+      '获取部门待审核申请失败：',
+      error
+    )
+
+
+    auditList.value =
+      []
+
+    clearAuditSelection()
+
+
+    ElMessage.error(
+      getErrorMessage(
+        error,
+        '获取待审核申请失败'
+      )
+    )
+
+  } finally {
+
+    auditLoading.value =
+      false
+
   }
+
 }
 
-/*
- * ============================
- * 个人证书文件
- * ============================
- */
 
-function handleCertificateFile(file) {
-  certificateFile.value = file.raw
+/* =========================================================
+   审核分页
+========================================================= */
+
+function handleAuditPageChange(page) {
+
+  auditCurrentPage.value =
+    page
+
+  clearAuditSelection()
+
 }
 
-function removeCertificateFile() {
-  certificateFile.value = null
+
+/* =========================================================
+   选择审核记录
+========================================================= */
+
+function handleAuditSelectionChange(rows) {
+
+  selectedAuditRows.value =
+    Array.isArray(rows)
+      ? rows
+      : []
+
 }
 
-/*
- * ============================
- * 部门文件
- * ============================
- */
+
+/* =========================================================
+   清空审核选择
+========================================================= */
+
+function clearAuditSelection() {
+
+  selectedAuditRows.value =
+    []
+
+
+  auditTableRef.value
+    ?.clearSelection()
+
+}
+
+
+/* =========================================================
+   单条审核
+========================================================= */
+
+async function auditApply(
+  row,
+  status
+) {
+
+  if (
+    !row ||
+    row.id === null ||
+    row.id === undefined
+  ) {
+
+    ElMessage.error(
+      '申请数据异常，缺少申请 ID'
+    )
+
+    return
+
+  }
+
+
+  if (
+    batchAuditing.value ||
+    auditingId.value !== null
+  ) {
+
+    return
+
+  }
+
+
+  const actionText =
+    Number(status) === 1
+      ? '通过'
+      : '驳回'
+
+
+  let reviewRemark =
+    ''
+
+
+  /* -------------------------------------------------------
+     输入审核意见
+  ------------------------------------------------------- */
+
+  try {
+
+    const result =
+      await ElMessageBox.prompt(
+
+        Number(status) === 1
+          ? '请输入审核意见（可不填）'
+          : '请输入驳回原因（必填）',
+
+        `部门申报${actionText}`,
+
+        {
+
+          confirmButtonText:
+            '确定',
+
+          cancelButtonText:
+            '取消',
+
+          inputType:
+            'textarea',
+
+          inputPlaceholder:
+            Number(status) === 1
+              ? '请输入审核意见（可不填）'
+              : '请输入驳回原因',
+
+          inputValidator:
+            Number(status) === 2
+              ? value => {
+
+                return String(
+                  value || ''
+                ).trim()
+                  ? true
+                  : '驳回时必须填写原因'
+
+              }
+              : undefined
+
+        }
+
+      )
+
+
+    reviewRemark =
+      String(
+        result.value || ''
+      ).trim()
+
+  } catch {
+
+    return
+
+  }
+
+
+  /* -------------------------------------------------------
+     二次确认
+  ------------------------------------------------------- */
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      Number(status) === 1
+        ? '确定通过这条部门加减分申报吗？通过后将进入辅导员终审。'
+        : '确定驳回这条部门加减分申报吗？',
+
+      '确认审核',
+
+      {
+
+        confirmButtonText:
+          Number(status) === 1
+            ? '确定通过'
+            : '确定驳回',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          Number(status) === 1
+            ? 'success'
+            : 'warning'
+
+      }
+
+    )
+
+  } catch {
+
+    return
+
+  }
+
+
+  auditingId.value =
+    row.id
+
+
+  try {
+
+    const res =
+      await request.put(
+
+        `/departmentScoreApply/audit/${row.id}`,
+
+        {
+
+          status:
+            Number(status),
+
+          reviewRemark:
+          reviewRemark
+
+        }
+
+      )
+
+
+    if (
+      Number(res.data?.code) !== 200
+    ) {
+
+      throw new Error(
+        res.data?.message ||
+        res.data?.msg ||
+        `部门申报${actionText}失败`
+      )
+
+    }
+
+
+    ElMessage.success(
+
+      Number(status) === 1
+        ? '部门审核通过，已进入辅导员终审'
+        : '部门申报已驳回'
+
+    )
+
+
+    await loadAuditList()
+
+    await loadMyApply()
+
+  } catch (error) {
+
+    console.error(
+      '部门审核失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      getErrorMessage(
+        error,
+        `部门申报${actionText}失败`
+      )
+    )
+
+  } finally {
+
+    auditingId.value =
+      null
+
+  }
+
+}
+
+
+/* =========================================================
+   批量通过选中
+========================================================= */
+
+async function batchAuditPass() {
+
+  const rows =
+    auditTableRef.value
+      ?.getSelectionRows?.() ||
+    []
+
+
+  if (
+    rows.length === 0
+  ) {
+
+    ElMessage.warning(
+      '请先勾选要审核通过的申请'
+    )
+
+    return
+
+  }
+
+
+  if (
+    batchAuditing.value ||
+    auditingId.value !== null
+  ) {
+
+    return
+
+  }
+
+
+  const validRows =
+    rows.filter(
+      row =>
+        row &&
+        row.id !== null &&
+        row.id !== undefined
+    )
+
+
+  if (
+    validRows.length === 0
+  ) {
+
+    ElMessage.error(
+      '选中的申请数据无效'
+    )
+
+    return
+
+  }
+
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      `确定审核通过当前页选中的 ${validRows.length} 条部门申报吗？通过后将进入辅导员终审。`,
+
+      '一键通过选中',
+
+      {
+
+        confirmButtonText:
+          '全部通过',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'success'
+
+      }
+
+    )
+
+  } catch {
+
+    return
+
+  }
+
+
+  batchAuditing.value =
+    true
+
+
+  let successCount =
+    0
+
+  let failCount =
+    0
+
+
+  try {
+
+    for (
+      const row of validRows
+      ) {
+
+      try {
+
+        const res =
+          await request.put(
+
+            `/departmentScoreApply/audit/${row.id}`,
+
+            {
+
+              status:
+                1,
+
+              reviewRemark:
+                ''
+
+            }
+
+          )
+
+
+        if (
+          Number(res.data?.code) === 200
+        ) {
+
+          successCount++
+
+        } else {
+
+          failCount++
+
+        }
+
+      } catch (error) {
+
+        failCount++
+
+        console.error(
+          `申请 ${row.id} 审核失败：`,
+          error
+        )
+
+      }
+
+    }
+
+
+    if (
+      successCount > 0 &&
+      failCount === 0
+    ) {
+
+      ElMessage.success(
+        `成功审核通过 ${successCount} 条申请`
+      )
+
+    } else if (
+      successCount > 0
+    ) {
+
+      ElMessage.warning(
+        `成功通过 ${successCount} 条，失败 ${failCount} 条`
+      )
+
+    } else {
+
+      ElMessage.error(
+        `一键审核失败，共 ${failCount} 条`
+      )
+
+    }
+
+
+    await loadAuditList()
+
+    await loadMyApply()
+
+  } finally {
+
+    batchAuditing.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
+   一键全部通过
+========================================================= */
+
+async function batchAuditAllPass() {
+
+  const rows =
+    auditList.value.filter(
+      row =>
+        row &&
+        row.id !== null &&
+        row.id !== undefined &&
+        Number(row.status) === 0
+    )
+
+
+  if (
+    rows.length === 0
+  ) {
+
+    ElMessage.warning(
+      '当前没有待审核的部门申报'
+    )
+
+    return
+
+  }
+
+
+  if (
+    batchAuditing.value ||
+    auditingId.value !== null
+  ) {
+
+    return
+
+  }
+
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      `当前共有 ${rows.length} 条待审核部门申报，确定全部审核通过吗？通过后所有申请都将进入辅导员终审。`,
+
+      '一键全部通过',
+
+      {
+
+        confirmButtonText:
+          '全部通过',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'warning'
+
+      }
+
+    )
+
+  } catch {
+
+    return
+
+  }
+
+
+  batchAuditing.value =
+    true
+
+
+  let successCount =
+    0
+
+  let failCount =
+    0
+
+
+  try {
+
+    for (
+      const row of rows
+      ) {
+
+      try {
+
+        const res =
+          await request.put(
+
+            `/departmentScoreApply/audit/${row.id}`,
+
+            {
+
+              status:
+                1,
+
+              reviewRemark:
+                ''
+
+            }
+
+          )
+
+
+        if (
+          Number(res.data?.code) === 200
+        ) {
+
+          successCount++
+
+        } else {
+
+          failCount++
+
+        }
+
+      } catch (error) {
+
+        failCount++
+
+        console.error(
+          `申请 ${row.id} 请求失败：`,
+          error
+        )
+
+      }
+
+    }
+
+
+    if (
+      successCount > 0 &&
+      failCount === 0
+    ) {
+
+      ElMessage.success(
+        `已全部通过，共 ${successCount} 条申请`
+      )
+
+    } else if (
+      successCount > 0
+    ) {
+
+      ElMessage.warning(
+        `成功通过 ${successCount} 条，失败 ${failCount} 条`
+      )
+
+    } else {
+
+      ElMessage.error(
+        `一键全部通过失败，共 ${failCount} 条`
+      )
+
+    }
+
+
+    auditCurrentPage.value =
+      1
+
+
+    await loadAuditList()
+
+    await loadMyApply()
+
+  } finally {
+
+    batchAuditing.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
+   部门凭证
+========================================================= */
 
 function handleDepartmentFile(file) {
-  departmentFile.value = file.raw
+
+  departmentFile.value =
+    file?.raw || null
+
 }
+
 
 function removeDepartmentFile() {
-  departmentFile.value = null
+
+  departmentFile.value =
+    null
+
 }
 
-/*
- * ============================
- * 提交个人证书
- * ============================
- */
 
-async function submitCertificate() {
-  console.log("开始提交，当前表单数据:", certificateForm);
-
-  // 检查关键数据
-  if (!certificateForm.ruleId) {
-    ElMessage.warning("必须选择加分项目！");
-    return;
-  }
-
-  certificateSubmitting.value = true;
-
-  try {
-    const data = {
-      ruleId: certificateForm.ruleId,
-      applyScore: certificateForm.applyScore || 0,
-      description: certificateForm.description || "无说明",
-      materialFile: certificateFile.value ? certificateFile.value.name : null,
-    };
-
-    console.log("正在向后端发送 POST 请求...");
-    // 强制发送请求，不再依赖 certificateFormRef.value.validate()
-    const res = await request.post('/scoreApply/add', data);
-
-    console.log("后端返回结果:", res.data);
-    ElMessage.success('提交成功');
-    resetCertificate();
-    loadMyApply();
-  } catch (error) {
-    console.error("请求过程发生错误:", error);
-    ElMessage.error('提交失败，请看控制台错误');
-  } finally {
-    certificateSubmitting.value = false;
-  }
-}
-
-/*
- * ============================
- * 提交部门申报
- * ============================
- */
+/* =========================================================
+   提交部门申报
+========================================================= */
 
 async function submitDepartment() {
-  if (!departmentFormRef.value) {
+
+  if (
+    !departmentFormRef.value
+  ) {
+
     return
+
   }
 
-  const valid = await departmentFormRef.value.validate()
+
+  const valid =
+    await departmentFormRef.value
+      .validate()
+      .catch(
+        () => false
+      )
+
 
   if (!valid) {
+
     return
+
   }
 
-  departmentSubmitting.value = true
+
+  departmentSubmitting.value =
+    true
+
 
   try {
+
     const data = {
-      departmentId: departmentForm.departmentId,
 
-      scoreType: departmentForm.scoreType,
+      departmentId:
+      departmentForm.departmentId,
 
-      score: departmentForm.score,
+      scoreType:
+      departmentForm.scoreType,
 
-      title: departmentForm.title,
+      score:
+      departmentForm.score,
 
-      description: departmentForm.description,
+      title:
+      departmentForm.title,
 
-      evidenceUrl: departmentFile.value ? departmentFile.value.name : null,
+      description:
+      departmentForm.description,
+
+      evidenceUrl:
+        departmentFile.value
+          ? departmentFile.value.name
+          : null
+
     }
 
-    await request.post('/departmentScoreApply/add', data)
 
-    ElMessage.success('部门申报提交成功，等待本部门副部或部长审核')
+    const res =
+      await request.post(
+        '/departmentScoreApply/add',
+        data
+      )
+
+
+    if (
+      Number(res.data?.code) !== 200
+    ) {
+
+      throw new Error(
+        res.data?.message ||
+        res.data?.msg ||
+        '部门申报提交失败'
+      )
+
+    }
+
+
+    ElMessage.success(
+      '部门申报提交成功，等待本部门副部或部长审核'
+    )
+
 
     resetDepartment()
 
     await loadMyApply()
+
+
+    if (
+      permission.canDepartmentAudit
+    ) {
+
+      await loadAuditList()
+
+    }
+
   } catch (error) {
-    console.error(error)
 
-    ElMessage.error(error?.response?.data?.message || '提交失败')
+    console.error(
+      '部门申报提交失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      getErrorMessage(
+        error,
+        '部门申报提交失败'
+      )
+    )
+
   } finally {
-    departmentSubmitting.value = false
+
+    departmentSubmitting.value =
+      false
+
   }
+
 }
 
-/*
- * ============================
- * 重置
- * ============================
- */
 
-function resetCertificate() {
-  certificateForm.ruleId = null
-
-  certificateForm.applyScore = null
-
-  certificateForm.description = ''
-
-  certificateFile.value = null
-
-  certificateFormRef.value?.resetFields()
-}
+/* =========================================================
+   重置部门申报
+========================================================= */
 
 function resetDepartment() {
-  departmentForm.departmentId = null
 
-  departmentForm.scoreType = 1
+  departmentForm.departmentId =
+    null
 
-  departmentForm.score = null
+  departmentForm.scoreType =
+    1
 
-  departmentForm.title = ''
+  departmentForm.score =
+    null
 
-  departmentForm.description = ''
+  departmentForm.title =
+    ''
 
-  departmentFile.value = null
+  departmentForm.description =
+    ''
 
-  departmentFormRef.value?.resetFields()
+  departmentFile.value =
+    null
+
+
+  departmentFormRef.value
+    ?.clearValidate()
+
 }
 
-/*
- * ============================
- * 我的申请
- * ============================
- */
+
+/* =========================================================
+   我的部门申报记录
+========================================================= */
 
 async function loadMyApply() {
-  listLoading.value = true
+
+  listLoading.value =
+    true
+
 
   try {
-    const [certificateRes, departmentRes] = await Promise.all([
-      request
-        .get('/scoreApply/my')
-        .catch(() => ({ data: { data: [] } })),
 
-      request
-        .get('/departmentScoreApply/my')
-        .catch(() => ({ data: { data: [] } })),
-    ])
+    const res =
+      await request.get(
+        '/departmentScoreApply/my'
+      )
 
-    // ============================
-    // 个人证书申报
-    // ============================
 
-    const certificateList = (
-      certificateRes.data?.data || []
-    ).map((item) => ({
-      ...item,
+    if (
+      Number(res.data?.code) !== 200
+    ) {
 
-      applyType: 'CERTIFICATE',
+      throw new Error(
+        res.data?.message ||
+        res.data?.msg ||
+        '获取部门申报记录失败'
+      )
 
-      title:
-        item.ruleName ||
-        item.description ||
-        '个人证书申报',
+    }
 
-      scoreType: 1,
 
-      score: item.applyScore,
+    const data =
+      res.data?.data
 
-      departmentName: null,
 
-      finalStatus: null,
+    let list =
+      []
 
-      reviewRemark: null,
 
-      finalReviewRemark: null,
-    }))
+    if (
+      Array.isArray(data)
+    ) {
 
-    // ============================
-    // 部门申报
-    // ============================
+      list =
+        data
 
-    const departmentList = (
-      departmentRes.data?.data || []
-    ).map((item) => ({
-      ...item,
+    } else if (
+      data &&
+      Array.isArray(data.records)
+    ) {
 
-      applyType: 'DEPARTMENT',
+      list =
+        data.records
 
-      title:
-        item.title ||
-        '部门加减分申报',
+    } else if (
+      data &&
+      Array.isArray(data.list)
+    ) {
 
-      scoreType: item.scoreType,
+      list =
+        data.list
 
-      score: item.score,
+    }
 
-      departmentName:
-        item.departmentName || null,
 
-      reviewRemark:
-        item.reviewRemark || null,
+    myApplyList.value =
+      list
+        .map(
+          item => ({
 
-      finalReviewRemark:
-        item.finalReviewRemark || null,
+            ...item,
 
-      finalStatus:
-        item.finalStatus ?? 0,
-    }))
+            title:
+              item.title ||
+              '部门加减分申报',
 
-    // ============================
-    // 合并
-    // ============================
+            departmentName:
+              item.departmentName ||
+              null,
 
-    myApplyList.value = [
-      ...certificateList,
-      ...departmentList,
-    ].sort((a, b) => {
-      const timeA = new Date(
-        a.createTime || 0
-      ).getTime()
+            reviewRemark:
+              item.reviewRemark ||
+              null,
 
-      const timeB = new Date(
-        b.createTime || 0
-      ).getTime()
+            finalReviewRemark:
+              item.finalReviewRemark ||
+              null,
 
-      return timeB - timeA
-    })
+            finalStatus:
+              item.finalStatus ?? 0
+
+          })
+        )
+        .sort(
+          (a, b) => {
+
+            const timeA =
+              new Date(
+                a.createTime || 0
+              ).getTime()
+
+            const timeB =
+              new Date(
+                b.createTime || 0
+              ).getTime()
+
+            return (
+              timeB -
+              timeA
+            )
+
+          }
+        )
 
   } catch (error) {
-    console.error(error)
 
-    myApplyList.value = []
+    console.error(
+      '获取部门申报记录失败：',
+      error
+    )
 
-    ElMessage.error('获取申报记录失败')
+
+    myApplyList.value =
+      []
+
+
+    ElMessage.error(
+      getErrorMessage(
+        error,
+        '获取部门申报记录失败'
+      )
+    )
+
   } finally {
-    listLoading.value = false
+
+    listLoading.value =
+      false
+
   }
+
 }
 
-/*
- * ============================
- * 初始化 (修改为不使用 await 阻塞)
- * ============================
- */
-onMounted(() => {
-  // 1. 发起权限检查 (就算这个失败了，也不影响后面)
-  loadPermission().catch(e => console.error("权限接口报错:", e))
 
-  // 2. 加载加分规则
-  loadScoreRules().catch(e => console.error("规则接口报错:", e))
+/* =========================================================
+   错误信息
+========================================================= */
 
-  // 3. 【核心】发起我的申报记录请求
-  loadMyApply().catch(e => console.error("列表接口报错:", e))
+function getErrorMessage(
+  error,
+  defaultMessage
+) {
 
-  /*
-   * 只有副部长 / 部长才加载审核列表
-   */
-  if (permission.canDepartmentAudit) {
-    loadAuditList()
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.msg ||
+    error?.message ||
+    defaultMessage
+  )
+
+}
+
+
+/* =========================================================
+   初始化
+========================================================= */
+
+onMounted(
+  async () => {
+
+    await refreshAll()
+
   }
-})
+)
+
 </script>
 
+
 <style scoped>
+
 .score-apply-page {
-  padding: 24px;
-  min-height: calc(100vh - 60px);
-  background: #f5f7fa;
+
+  padding:
+    24px;
+
+  min-height:
+    calc(100vh - 60px);
+
+  background:
+    #f5f7fa;
+
 }
+
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    center;
+
+  margin-bottom:
+    20px;
+
 }
+
 
 .page-header h2 {
-  margin: 0 0 6px;
-  font-size: 24px;
-  color: #303133;
+
+  margin:
+    0 0 6px;
+
+  font-size:
+    24px;
+
+  color:
+    #303133;
+
 }
+
 
 .page-header p {
-  margin: 0;
-  color: #909399;
+
+  margin:
+    0;
+
+  color:
+    #909399;
+
 }
+
 
 .apply-card {
-  margin-bottom: 20px;
+
+  margin-bottom:
+    20px;
+
 }
+
 
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 25px;
+
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    flex-start;
+
+  margin-bottom:
+    20px;
+
 }
+
 
 .card-header h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
-  color: #303133;
+
+  margin:
+    0 0 8px;
+
+  font-size:
+    18px;
+
+  color:
+    #303133;
+
 }
+
 
 .card-header p {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
+
+  margin:
+    0;
+
+  color:
+    #909399;
+
+  font-size:
+    14px;
+
 }
+
+
+.audit-header-actions {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  flex-wrap:
+    wrap;
+
+}
+
+
+.selected-text {
+
+  color:
+    #909399;
+
+  font-size:
+    14px;
+
+  white-space:
+    nowrap;
+
+}
+
+
+.selected-text strong {
+
+  color:
+    #409eff;
+
+  font-size:
+    16px;
+
+}
+
+
+.audit-page-tip {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    18px;
+
+  margin-bottom:
+    15px;
+
+  padding:
+    10px 14px;
+
+  border-radius:
+    6px;
+
+  background:
+    #f5f7fa;
+
+  color:
+    #606266;
+
+  font-size:
+    13px;
+
+}
+
+
+.audit-page-tip strong {
+
+  color:
+    #409eff;
+
+}
+
+
+.tip-divider {
+
+  color:
+    #dcdfe6;
+
+}
+
+
+.audit-pagination {
+
+  display:
+    flex;
+
+  justify-content:
+    flex-end;
+
+  margin-top:
+    20px;
+
+}
+
 
 .apply-form {
-  max-width: 800px;
+
+  max-width:
+    800px;
+
 }
+
 
 .upload-tip {
-  color: #909399;
-  font-size: 12px;
+
+  color:
+    #909399;
+
+  font-size:
+    12px;
+
 }
+
 
 .bonus {
-  color: #67c23a;
-  font-weight: 700;
+
+  color:
+    #67c23a;
+
+  font-weight:
+    700;
+
 }
+
 
 .deduct {
-  color: #f56c6c;
-  font-weight: 700;
+
+  color:
+    #f56c6c;
+
+  font-weight:
+    700;
+
 }
+
+
 .department-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    12px;
+
 }
+
 
 .department-item {
-  padding: 16px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  background: #fafafa;
+
+  padding:
+    16px;
+
+  border:
+    1px solid #ebeef5;
+
+  border-radius:
+    8px;
+
+  background:
+    #fafafa;
+
 }
+
 
 .department-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    12px;
+
 }
+
 
 .department-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+
+  font-size:
+    16px;
+
+  font-weight:
+    600;
+
+  color:
+    #303133;
+
 }
 
+
 .department-tip {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #909399;
+
+  margin-top:
+    8px;
+
+  font-size:
+    13px;
+
+  color:
+    #909399;
+
 }
+
+
+@media (max-width: 1100px) {
+
+  .card-header {
+
+    flex-direction:
+      column;
+
+    gap:
+      15px;
+
+  }
+
+
+  .audit-header-actions {
+
+    width:
+      100%;
+
+    justify-content:
+      flex-start;
+
+  }
+
+}
+
+
+@media (max-width: 700px) {
+
+  .score-apply-page {
+
+    padding:
+      12px;
+
+  }
+
+
+  .audit-page-tip {
+
+    flex-wrap:
+      wrap;
+
+  }
+
+}
+
 </style>

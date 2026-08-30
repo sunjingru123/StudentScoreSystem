@@ -792,41 +792,140 @@ function loadAuditedCount() {
 
 /* ============================================================
    获取学生人数
+   与“成绩查看”保持一致
 ============================================================ */
 
 async function loadStudentCount() {
 
   try {
 
+    /*
+     * 与成绩查看使用同一个接口
+     *
+     * pageSize = 1 就够了，
+     * 我们真正需要的是后端返回的 total。
+     */
+
     const res =
       await request.get(
-        '/user/student/list'
+        '/user/student/list',
+        {
+          params: {
+            pageNum: 1,
+            pageSize: 1
+          }
+        }
       )
 
 
-    const data =
-      res?.data?.data
+    console.log(
+      '首页学生人数响应：',
+      res
+    )
 
+
+    const responseData =
+      res?.data
+
+
+    /*
+     * 与成绩查看页面保持同样的数据结构处理方式
+     *
+     * 常见情况：
+     *
+     * res.data = {
+     *   code: 200,
+     *   data: {
+     *     records: [...],
+     *     total: 123
+     *   }
+     * }
+     */
+
+    const pageData =
+      responseData?.data ??
+      responseData
+
+
+    /*
+     * 直接读取 total
+     *
+     * 这就是成绩查看页面顶部：
+     *
+     * 共 {{ total }} 名学生
+     *
+     * 使用的数量。
+     */
 
     if (
-      Array.isArray(data)
+      pageData &&
+      pageData.total !== undefined
     ) {
 
       studentCount.value =
-        data.length
+        Number(pageData.total) || 0
 
-    } else {
+      console.log(
+        '首页当前管理学生人数：',
+        studentCount.value
+      )
 
-      studentCount.value =
-        0
+      return
 
     }
 
 
-  } catch (error) {
+    /*
+     * 如果后端没有返回 total，
+     * 再尝试兼容 records。
+     */
+
+    if (
+      Array.isArray(
+        pageData?.records
+      )
+    ) {
+
+      studentCount.value =
+        pageData.records.length
+
+      return
+
+    }
+
+
+    /*
+     * 最后兼容原来的数组格式
+     */
+
+    if (
+      Array.isArray(
+        pageData
+      )
+    ) {
+
+      studentCount.value =
+        pageData.length
+
+      return
+
+    }
+
 
     console.warn(
-      '学生数量接口暂不可用：',
+      '学生人数接口没有找到有效数据：',
+      pageData
+    )
+
+
+    studentCount.value = 0
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '获取学生人数失败：',
       error
     )
 
@@ -836,7 +935,6 @@ async function loadStudentCount() {
   }
 
 }
-
 
 /* ============================================================
    页面加载

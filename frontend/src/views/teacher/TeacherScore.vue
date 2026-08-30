@@ -67,11 +67,15 @@
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           >
+
             <template #prefix>
+
               <el-icon>
                 <Search />
               </el-icon>
+
             </template>
+
           </el-input>
 
 
@@ -250,6 +254,213 @@
 
     </el-card>
 
+
+    <!-- =====================================================
+         学生流水详情弹窗
+    ====================================================== -->
+
+    <el-dialog
+      v-model="detailVisible"
+      :title="`${detailStudent.studentName || '学生'} 的加减分流水`"
+      width="800px"
+      destroy-on-close
+    >
+
+      <!-- =========================
+           学生基本信息
+      ========================== -->
+
+      <div class="detail-student">
+
+        <el-avatar :size="48">
+
+          {{
+            (
+              detailStudent.studentName ||
+              '学'
+            ).substring(0, 1)
+          }}
+
+        </el-avatar>
+
+
+        <div class="detail-student-info">
+
+          <div class="detail-name">
+            {{ detailStudent.studentName || '未知学生' }}
+          </div>
+
+          <div class="detail-meta">
+
+            学号：
+            {{ detailStudent.studentNo || '-' }}
+
+            <span class="divider">
+              |
+            </span>
+
+            班级：
+            {{ detailStudent.className || '-' }}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- =========================
+           流水加载
+      ========================== -->
+
+      <div
+        v-loading="detailLoading"
+        class="detail-content"
+      >
+
+        <!-- 有流水 -->
+
+        <el-table
+          v-if="detailRecords.length > 0"
+          :data="detailRecords"
+          border
+          stripe
+          style="width: 100%"
+        >
+
+          <!-- =====================
+               计分项
+          ====================== -->
+
+          <el-table-column
+            label="计分项"
+            min-width="180"
+          >
+
+            <template #default="scope">
+
+              <span>
+                {{ formatRuleName(scope.row.ruleName) }}
+              </span>
+
+            </template>
+
+          </el-table-column>
+
+
+          <!-- =====================
+               分数
+          ====================== -->
+
+          <el-table-column
+            label="分数"
+            width="100"
+            align="center"
+          >
+
+            <template #default="scope">
+
+              <span
+                :class="
+                  Number(scope.row.score) > 0
+                    ? 'bonus-score'
+                    : 'deduct-score'
+                "
+              >
+
+                {{
+                  formatScore(
+                    scope.row.score
+                  )
+                }}
+
+              </span>
+
+            </template>
+
+          </el-table-column>
+
+
+          <!-- =====================
+               来源
+          ====================== -->
+
+          <el-table-column
+            label="来源"
+            width="120"
+            align="center"
+          >
+
+            <template #default="scope">
+
+              <el-tag
+                size="small"
+                type="info"
+              >
+
+                {{
+                  formatSourceType(
+                    scope.row.sourceType
+                  )
+                }}
+
+              </el-tag>
+
+            </template>
+
+          </el-table-column>
+
+
+          <!-- =====================
+               时间
+          ====================== -->
+
+          <el-table-column
+            label="时间"
+            min-width="180"
+          >
+
+            <template #default="scope">
+
+              {{
+                formatTime(
+                  scope.row.createTime
+                )
+              }}
+
+            </template>
+
+          </el-table-column>
+
+        </el-table>
+
+
+        <!-- 没有流水 -->
+
+        <el-empty
+          v-else-if="!detailLoading"
+          description="暂无公开加减分流水"
+        />
+
+      </div>
+
+
+      <!-- =========================
+           弹窗底部
+      ========================== -->
+
+      <template #footer>
+
+        <el-button
+          @click="detailVisible = false"
+        >
+          关闭
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -281,7 +492,6 @@ import request from '@/utils/request'
 
 const list = ref([])
 
-
 const loading = ref(false)
 
 
@@ -291,9 +501,7 @@ const loading = ref(false)
 
 const pageNum = ref(1)
 
-
 const pageSize = ref(10)
-
 
 const total = ref(0)
 
@@ -306,6 +514,19 @@ const searchKeyword = ref('')
 
 
 /* =========================================================
+   学生详情
+========================================================= */
+
+const detailVisible = ref(false)
+
+const detailLoading = ref(false)
+
+const detailRecords = ref([])
+
+const detailStudent = ref({})
+
+
+/* =========================================================
    获取学生列表
 ========================================================= */
 
@@ -313,37 +534,7 @@ async function load() {
 
   loading.value = true
 
-
   try {
-
-    console.log(
-      '===================================='
-    )
-
-    console.log(
-      '开始获取学生成绩'
-    )
-
-    console.log(
-      '当前页：',
-      pageNum.value
-    )
-
-    console.log(
-      '每页：',
-      pageSize.value
-    )
-
-    console.log(
-      '搜索关键词：',
-      searchKeyword.value
-    )
-
-
-    /* =====================================================
-       第一步
-       获取分页学生
-    ===================================================== */
 
     const params = {
 
@@ -354,21 +545,9 @@ async function load() {
     }
 
 
-    /*
-     * 关键：
-     *
-     * 搜索框输入的内容，
-     * 同时去匹配：
-     *
-     * 学号
-     * 姓名
-     * 账号
-     * 班级
-     *
-     * 后端目前 student/list
-     * 是分字段接收参数的，
-     * 所以这里需要把关键词分别传给四个字段。
-     */
+    /* =========================
+       搜索
+    ========================== */
 
     if (
       searchKeyword.value &&
@@ -377,6 +556,7 @@ async function load() {
 
       params.keyword =
         searchKeyword.value.trim()
+
     }
 
 
@@ -385,6 +565,10 @@ async function load() {
       params
     )
 
+
+    /* =========================
+       获取学生
+    ========================== */
 
     const studentRes =
       await request.get(
@@ -401,11 +585,6 @@ async function load() {
     )
 
 
-    /* =====================================================
-       第二步
-       解析后端分页
-    ===================================================== */
-
     const responseData =
       studentRes?.data
 
@@ -415,12 +594,6 @@ async function load() {
       responseData
 
 
-    console.log(
-      '分页数据：',
-      pageData
-    )
-
-
     if (
       !pageData ||
       !Array.isArray(
@@ -428,16 +601,9 @@ async function load() {
       )
     ) {
 
-      console.error(
-        '后端没有返回正确分页结构：',
-        studentRes
-      )
-
-
       list.value = []
 
       total.value = 0
-
 
       ElMessage.error(
         '学生分页数据格式异常'
@@ -458,42 +624,12 @@ async function load() {
       )
 
 
-    console.log(
-      '当前页学生：',
-      students
-    )
-
-
-    console.log(
-      '学生总数：',
-      total.value
-    )
-
-
-    /* =====================================================
-       第三步
-       获取当前页学生成绩
-    ===================================================== */
+    /* =========================
+       获取当前页成绩
+    ========================== */
 
     const rows = []
 
-
-    /*
-     * 注意：
-     *
-     * 这里现在只查询当前页的学生成绩。
-     *
-     * 比如：
-     *
-     * 第1页 10人
-     *
-     * 就只请求这10人的成绩。
-     *
-     * 翻到第2页，
-     * 再请求第2页10人的成绩。
-     *
-     * 不会一次请求全部几百个学生。
-     */
 
     for (
       const student
@@ -509,10 +645,6 @@ async function load() {
 
       }
 
-
-      /* =================================================
-         学生基本信息
-      ================================================== */
 
       const row = {
 
@@ -543,9 +675,9 @@ async function load() {
       }
 
 
-      /* =================================================
+      /* =========================
          查询综合成绩
-      ================================================== */
+      ========================== */
 
       try {
 
@@ -553,12 +685,6 @@ async function load() {
           await request.get(
             `/scoreStatistics/${student.id}`
           )
-
-
-        console.log(
-          `学生 ${student.id} 成绩：`,
-          scoreRes
-        )
 
 
         const scoreData =
@@ -588,11 +714,6 @@ async function load() {
           error
         )
 
-
-        /*
-         * 没成绩也不能影响学生显示
-         */
-
         row.totalScore = 0
 
       }
@@ -603,22 +724,7 @@ async function load() {
     }
 
 
-    /* =====================================================
-       最终数据
-    ===================================================== */
-
     list.value = rows
-
-
-    console.log(
-      '最终成绩列表：',
-      list.value
-    )
-
-
-    console.log(
-      '===================================='
-    )
 
   }
 
@@ -658,12 +764,7 @@ async function load() {
 
 function handleSearch() {
 
-  /*
-   * 搜索必须从第一页开始。
-   */
-
   pageNum.value = 1
-
 
   load()
 
@@ -678,9 +779,7 @@ function resetSearch() {
 
   searchKeyword.value = ''
 
-
   pageNum.value = 1
-
 
   load()
 
@@ -695,7 +794,6 @@ function handlePageChange(page) {
 
   pageNum.value = page
 
-
   load()
 
 }
@@ -709,14 +807,7 @@ function handleSizeChange(size) {
 
   pageSize.value = size
 
-
-  /*
-   * 改变每页数量以后，
-   * 从第一页开始。
-   */
-
   pageNum.value = 1
-
 
   load()
 
@@ -727,24 +818,312 @@ function handleSizeChange(size) {
    查看详情
 ========================================================= */
 
-function viewDetail(row) {
+async function viewDetail(row) {
 
   console.log(
-    '查看学生详情：',
+    '查看学生公开流水：',
     row
   )
 
 
+  /* =========================
+     打开弹窗
+  ========================== */
+
+  detailVisible.value = true
+
+
+  /* =========================
+     保存学生信息
+  ========================== */
+
+  detailStudent.value = {
+
+    id: row.id,
+
+    studentName:
+    row.studentName,
+
+    studentNo:
+    row.studentNo,
+
+    className:
+    row.className,
+
+    username:
+    row.username
+
+  }
+
+
+  /* =========================
+     清空旧数据
+  ========================== */
+
+  detailRecords.value = []
+
+  detailLoading.value = true
+
+
+  try {
+
+    /* =====================================================
+       使用普通公开接口
+
+       /score/student/{studentId}/records
+
+       这里不会返回 adminHidden = 1 的记录。
+    ===================================================== */
+
+    const res =
+      await request.get(
+        `/score/student/${row.id}/records`
+      )
+
+
+    console.log(
+      '学生公开流水：',
+      res
+    )
+
+
+    const data =
+      res?.data?.data ??
+      res?.data ??
+      []
+
+
+    if (
+      Array.isArray(data)
+    ) {
+
+      detailRecords.value =
+        data
+
+    }
+
+    else {
+
+      detailRecords.value =
+        []
+
+    }
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '获取学生流水失败：',
+      error
+    )
+
+
+    detailRecords.value = []
+
+
+    ElMessage.error(
+      error?.response?.data?.message ||
+      error?.response?.data?.msg ||
+      '获取学生流水失败'
+    )
+
+  }
+
+  finally {
+
+    detailLoading.value = false
+
+  }
+
+}
+
+
+/* =========================================================
+   来源类型中文转换
+========================================================= */
+
+/*
+ * 以后你要增加、删除、修改名称，
+ * 主要就在这里改。
+ *
+ * 例如：
+ *
+ * CERTIFICATE: '证书'
+ *
+ * 如果以后数据库新增：
+ *
+ * INTERNSHIP: '实习'
+ *
+ * 就在这里继续增加。
+ */
+
+function formatSourceType(type) {
+
+  if (!type) {
+
+    return '-'
+
+  }
+
+
+  const typeMap = {
+
+    CERTIFICATE: '证书',
+
+    ACTIVITY: '活动',
+
+    COURSE: '课程',
+
+    COMPETITION: '竞赛',
+
+    VOLUNTEER: '志愿服务',
+
+    AWARD: '获奖',
+
+    OTHER: '其他'
+
+  }
+
+
+  return typeMap[type] || type
+
+}
+
+
+/* =========================================================
+   计分项中文转换
+========================================================= */
+
+/*
+ * 后端目前返回的 ruleName 可能是：
+ *
+ * 计分项: CERTIFICATE
+ *
+ * 所以这里专门处理 ruleName。
+ *
+ * 注意：
+ *
+ * 不直接使用 formatSourceType，
+ * 避免以后“来源”和“计分项”需要不同中文名称时互相影响。
+ */
+
+function formatRuleName(ruleName) {
+
+  if (!ruleName) {
+
+    return '-'
+
+  }
+
+
+  let name =
+    String(ruleName)
+
+
   /*
-   * 这里暂时不跳转学生端。
+   * 去掉后端暂时拼接的：
    *
-   * 后面可以直接弹出
-   * 该学生的完整成绩。
+   * 计分项:
    */
 
-  ElMessage.info(
-    `${row.studentName} 的综合评分为 ${row.totalScore} 分`
-  )
+  name =
+    name.replace(
+      /^计分项[:：]\s*/,
+      ''
+    )
+
+
+  /*
+   * 如果后端返回的是：
+   *
+   * CERTIFICATE
+   *
+   * 就转换成：
+   *
+   * 证书
+   */
+
+  const ruleMap = {
+
+    CERTIFICATE: '证书',
+
+    ACTIVITY: '活动',
+
+    COURSE: '课程',
+
+    COMPETITION: '竞赛',
+
+    VOLUNTEER: '志愿服务',
+
+    AWARD: '获奖',
+
+    OTHER: '其他'
+
+  }
+
+
+  return ruleMap[name] || name
+
+}
+
+
+/* =========================================================
+   格式化分数
+========================================================= */
+
+function formatScore(score) {
+
+  if (
+    score === null ||
+    score === undefined
+  ) {
+
+    return '0'
+
+  }
+
+
+  const number =
+    Number(score)
+
+
+  if (
+    Number.isNaN(number)
+  ) {
+
+    return score
+
+  }
+
+
+  if (number > 0) {
+
+    return `+${number}`
+
+  }
+
+
+  return `${number}`
+
+}
+
+
+/* =========================================================
+   格式化时间
+========================================================= */
+
+function formatTime(time) {
+
+  if (!time) {
+
+    return '-'
+
+  }
+
+
+  return String(time)
+    .replace('T', ' ')
 
 }
 
@@ -928,12 +1307,115 @@ onMounted(() => {
 
 
 /* =========================================================
+   详情学生
+========================================================= */
+
+.detail-student {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 15px;
+
+  padding: 10px 5px 20px;
+
+  border-bottom: 1px solid #ebeef5;
+
+  margin-bottom: 20px;
+
+}
+
+
+.detail-student-info {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 6px;
+
+}
+
+
+.detail-name {
+
+  font-size: 18px;
+
+  font-weight: bold;
+
+  color: #303133;
+
+}
+
+
+.detail-meta {
+
+  font-size: 13px;
+
+  color: #909399;
+
+}
+
+
+.divider {
+
+  margin: 0 8px;
+
+  color: #dcdfe6;
+
+}
+
+
+/* =========================================================
+   详情内容
+========================================================= */
+
+.detail-content {
+
+  min-height: 180px;
+
+}
+
+
+/* =========================================================
+   加分
+========================================================= */
+
+.bonus-score {
+
+  color: #67c23a;
+
+  font-weight: bold;
+
+  font-size: 16px;
+
+}
+
+
+/* =========================================================
+   扣分
+========================================================= */
+
+.deduct-score {
+
+  color: #f56c6c;
+
+  font-weight: bold;
+
+  font-size: 16px;
+
+}
+
+
+/* =========================================================
    响应式
 ========================================================= */
 
 @media (max-width: 700px) {
 
   .header {
+
     align-items: flex-start;
 
     gap: 15px;
@@ -942,12 +1424,16 @@ onMounted(() => {
 
 
   .search-bar {
+
     flex-wrap: wrap;
+
   }
 
 
   .pagination {
+
     justify-content: center;
+
   }
 
 }

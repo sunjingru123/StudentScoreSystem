@@ -167,61 +167,59 @@
         <!-- 类型 -->
         <el-table-column
           label="类型"
-          width="90"
+          width="100"
           align="center"
         >
-
           <template #default="{ row }">
-
             <el-tag
-              :type="
-                Number(row.scoreType) === 1
-                  ? 'success'
-                  : 'danger'
-              "
+              v-if="Number(row.scoreType) === 1"
+              type="success"
             >
-
-              {{
-                Number(row.scoreType) === 1
-                  ? '加分'
-                  : '减分'
-              }}
-
+              加分
             </el-tag>
 
-          </template>
+            <el-tag
+              v-else-if="Number(row.scoreType) === -1"
+              type="danger"
+            >
+              减分
+            </el-tag>
 
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知
+            </el-tag>
+          </template>
         </el-table-column>
 
 
         <!-- 分值 -->
         <el-table-column
-          prop="score"
           label="分值"
-          width="100"
+          width="90"
           align="center"
         >
-
           <template #default="{ row }">
+    <span
+      v-if="Number(row.scoreType) === 1"
+      class="score-plus"
+    >
+      +{{ row.score }}
+    </span>
 
             <span
-              :class="
-                Number(row.scoreType) === 1
-                  ? 'score-plus'
-                  : 'score-minus'
-              "
+              v-else-if="Number(row.scoreType) === -1"
+              class="score-minus"
             >
+      -{{ row.score }}
+    </span>
 
-              {{
-                Number(row.scoreType) === 1
-                  ? '+'
-                  : '-'
-              }}{{ row.score ?? 0 }}
-
-            </span>
-
+            <span v-else>
+      {{ row.score }}
+    </span>
           </template>
-
         </el-table-column>
 
 
