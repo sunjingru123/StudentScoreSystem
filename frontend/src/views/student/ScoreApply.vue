@@ -1227,6 +1227,14 @@ const permission =
    权限辅助函数
 ========================================================= */
 
+/*
+ * 只有部长、副部长拥有部门审核身份。
+ *
+ * 注意：
+ * 这里不再使用 1 / 2 作为部长、副部长的判断，
+ * 防止数据库 position 数字含义发生变化时，
+ * 把干事错误识别成审核人。
+ */
 function isDepartmentLeader(position) {
 
   const value =
@@ -1235,9 +1243,7 @@ function isDepartmentLeader(position) {
 
   return (
     value === '部长' ||
-    value === '副部长' ||
-    value === '1' ||
-    value === '2'
+    value === '副部长'
   )
 
 }
@@ -1503,25 +1509,35 @@ async function loadPermission() {
         : []
 
 
+    /*
+     * 部门申报权限：
+     *
+     * 后端明确返回 true / 1 时允许。
+     *
+     * departments.length > 0 仍然保留，
+     * 因为普通部门成员也应该能够提交本部门申报。
+     */
     permission.canDepartmentApply =
-      Boolean(
-        data.canDepartmentApply === true ||
-        Number(data.canDepartmentApply) === 1 ||
-        permission.departments.length > 0
-      )
+      data.canDepartmentApply === true ||
+      Number(data.canDepartmentApply) === 1 ||
+      permission.departments.length > 0
 
 
+    /*
+     * 部门审核权限：
+     *
+     * 这里只相信后端返回的 canDepartmentAudit。
+     *
+     * 不再根据 departments.some(position)
+     * 自己猜测用户是不是部长/副部长。
+     *
+     * 这样可以避免干事因为 position 数值映射问题
+     * 被错误显示审核界面。
+     */
     permission.canDepartmentAudit =
-      Boolean(
-        data.canDepartmentAudit === true ||
-        Number(data.canDepartmentAudit) === 1 ||
-        permission.departments.some(
-          item =>
-            isDepartmentLeader(
-              item.position
-            )
-        )
-      )
+      data.canDepartmentAudit === true ||
+      Number(data.canDepartmentAudit) === 1
+
 
   } catch (error) {
 
@@ -1577,6 +1593,10 @@ async function refreshPermission() {
 
   } else {
 
+    /*
+     * 普通干事等没有审核权限，
+     * 直接清空审核数据。
+     */
     auditList.value =
       []
 
@@ -1606,6 +1626,12 @@ async function refreshAll() {
 
 async function loadAuditList() {
 
+  /*
+   * 双重保护：
+   *
+   * 即使其他地方误调用 loadAuditList，
+   * 没有审核权限也不会请求审核接口。
+   */
   if (
     !permission.canDepartmentAudit
   ) {
@@ -2657,6 +2683,7 @@ async function loadMyApply() {
             )
 
           }
+
         )
 
   } catch (error) {

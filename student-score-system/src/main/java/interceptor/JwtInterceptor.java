@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.interceptor;
 
 import com.student.studentscoresystem.utils.JwtUtil;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -23,36 +24,45 @@ public class JwtInterceptor implements HandlerInterceptor {
         // 1. 放行浏览器的跨域预检请求
         // ==============================
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-
             return true;
-
         }
 
 
         // ==============================
-        // 2. 获取 Authorization
+        // 2. 获取 Token：优先 Header，降级 Cookie
         // ==============================
-        String token =
-                request.getHeader("Authorization");
+        String token = null;
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+
+        // Header取不到，去读Cookie兼容旧逻辑
+        if(token == null){
+            Cookie[] cookies = request.getCookies();
+            if(cookies != null){
+                for (Cookie cookie : cookies) {
+                    if("token".equals(cookie.getName())){
+                        token = cookie.getValue();
+                        break;
+                    }
+                }
+            }
+        }
 
 
         // ==============================
         // 3. 没有 Token
         // ==============================
-        if (token == null ||
-                !token.startsWith("Bearer ")) {
-
-
+        if (token == null) {
             response.setStatus(401);
-
             response.setContentType(
                     "application/json;charset=UTF-8"
             );
-
             response.getWriter().write(
                     "{\"message\":\"请先登录\"}"
             );
-
             return false;
         }
 
@@ -61,30 +71,16 @@ public class JwtInterceptor implements HandlerInterceptor {
         // 4. 验证 Token
         // ==============================
         try {
-
-
-            String jwt =
-                    token.substring(7);
-
-
-            JwtUtil.parseToken(jwt);
-
-
+            JwtUtil.parseToken(token);
         } catch (Exception e) {
-
-
             response.setStatus(401);
-
             response.setContentType(
                     "application/json;charset=UTF-8"
             );
-
             response.getWriter().write(
                     "{\"message\":\"token无效\"}"
             );
-
             return false;
-
         }
 
 

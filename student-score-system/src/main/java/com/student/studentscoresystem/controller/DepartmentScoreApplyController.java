@@ -9,11 +9,13 @@ import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.DepartmentScoreApply;
 import com.student.studentscoresystem.entity.DepartmentScoreTemplate;
 import com.student.studentscoresystem.entity.ScoreRecord;
+import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
+import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
@@ -46,6 +48,8 @@ public class DepartmentScoreApplyController {
 
     private final ScoreRecordMapper scoreRecordMapper;
 
+    private final ScoreRuleMapper scoreRuleMapper;
+
     private final DepartmentMapper departmentMapper;
 
     private final SysUserMapper sysUserMapper;
@@ -58,6 +62,7 @@ public class DepartmentScoreApplyController {
             IDepartmentScoreTemplateService templateService,
             SysUserDepartmentMapper userDepartmentMapper,
             ScoreRecordMapper scoreRecordMapper,
+            ScoreRuleMapper scoreRuleMapper,
             DepartmentMapper departmentMapper,
             SysUserMapper sysUserMapper,
             SysSemesterMapper sysSemesterMapper) {
@@ -66,28 +71,36 @@ public class DepartmentScoreApplyController {
 
         this.templateService = templateService;
 
-        this.userDepartmentMapper = userDepartmentMapper;
+        this.userDepartmentMapper =
+                userDepartmentMapper;
 
-        this.scoreRecordMapper = scoreRecordMapper;
+        this.scoreRecordMapper =
+                scoreRecordMapper;
 
-        this.departmentMapper = departmentMapper;
+        this.scoreRuleMapper =
+                scoreRuleMapper;
 
-        this.sysUserMapper = sysUserMapper;
+        this.departmentMapper =
+                departmentMapper;
 
-        this.sysSemesterMapper = sysSemesterMapper;
+        this.sysUserMapper =
+                sysUserMapper;
+
+        this.sysSemesterMapper =
+                sysSemesterMapper;
     }
 
 
-    /* =========================================================
-       获取当前登录用户 ID
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 获取当前登录用户 ID
+     * =========================================================
+     */
     private Long getCurrentUserId(
             HttpServletRequest request) {
 
         Object userIdAttr =
                 request.getAttribute("userId");
-
 
         if (userIdAttr != null) {
 
@@ -139,6 +152,7 @@ public class DepartmentScoreApplyController {
                     userId.toString()
             );
 
+
         } catch (Exception e) {
 
             throw new IllegalArgumentException(
@@ -148,14 +162,17 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       部门申报权限
-
-       干事 / 副部长 / 部长
-       都可以提交部门加减分申报。
-       ========================================================= */
-
-    private boolean canApply(String position) {
+    /*
+     * =========================================================
+     * 部门申报权限
+     *
+     * 干事 / 副部长 / 部长
+     *
+     * 都可以提交部门加减分申报。
+     * =========================================================
+     */
+    private boolean canApply(
+            String position) {
 
         return "干事".equals(position)
                 || "副部长".equals(position)
@@ -163,24 +180,28 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       部门审核权限
-
-       副部长 / 部长
-       可以进行部门初审。
-       ========================================================= */
-
-    private boolean canAudit(String position) {
+    /*
+     * =========================================================
+     * 部门审核权限
+     *
+     * 副部长 / 部长
+     *
+     * 可以进行部门初审。
+     * =========================================================
+     */
+    private boolean canAudit(
+            String position) {
 
         return "副部长".equals(position)
                 || "部长".equals(position);
     }
 
 
-    /* =========================================================
-       查询当前正在进行的学期
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 查询当前正在进行的学期
+     * =========================================================
+     */
     private SysSemester getCurrentSemester() {
 
         LocalDate today =
@@ -217,22 +238,23 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       提交部门加减分申报
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 提交部门加减分申报
+     * =========================================================
+     */
     @PostMapping("/add")
     public Result<Void> add(
             @RequestBody DepartmentScoreApplyAddDTO dto,
             HttpServletRequest request) {
 
+
         Long applicantId;
 
 
-        /* =====================================================
-           获取当前登录用户
-           ===================================================== */
-
+        /*
+         * 获取当前登录用户
+         */
         try {
 
             applicantId =
@@ -246,10 +268,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           参数检查
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 参数检查
+         * =====================================================
+         */
         if (dto == null) {
 
             return Result.fail(
@@ -290,10 +313,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查申报人是否属于该部门
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查申报人是否属于该部门
+         * =====================================================
+         */
         SysUserDepartment relation =
 
                 userDepartmentMapper.selectOne(
@@ -325,10 +349,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查部门申报权限
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查部门申报权限
+         * =====================================================
+         */
         if (!canApply(
                 relation.getPosition()
         )) {
@@ -339,10 +364,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           不能给自己申报
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 不能给自己申报
+         * =====================================================
+         */
         if (applicantId.equals(
                 dto.getStudentId()
         )) {
@@ -353,10 +379,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询被申报学生
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 查询被申报学生
+         * =====================================================
+         */
         SysUser student =
                 sysUserMapper.selectById(
                         dto.getStudentId()
@@ -382,10 +409,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询部门
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 查询部门
+         * =====================================================
+         */
         Department department =
                 departmentMapper.selectById(
                         dto.getDepartmentId()
@@ -411,10 +439,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询加减分模板
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 查询部门加减分模板
+         * =====================================================
+         */
         DepartmentScoreTemplate template =
                 templateService.getById(
                         dto.getTemplateId()
@@ -440,10 +469,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           模板必须属于当前部门
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 模板必须属于当前部门
+         * =====================================================
+         */
         if (!dto.getDepartmentId()
                 .equals(
                         template.getDepartmentId()
@@ -455,10 +485,14 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查模板加减分类型
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查模板加减分类型
+         *
+         * 1  = 加分
+         * -1 = 减分
+         * =====================================================
+         */
         if (template.getScoreType() == null) {
 
             return Result.fail(
@@ -476,10 +510,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查模板分值
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查模板分值
+         * =====================================================
+         */
         if (template.getScore() == null
                 || template.getScore()
                 .compareTo(BigDecimal.ZERO) <= 0) {
@@ -490,10 +525,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查模板名称
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查模板名称
+         * =====================================================
+         */
         if (template.getName() == null
                 || template.getName()
                 .trim()
@@ -505,10 +541,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           防止重复申报
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 防止重复申报
+         * =====================================================
+         */
         LambdaQueryWrapper<DepartmentScoreApply>
                 duplicateWrapper =
                 new LambdaQueryWrapper<>();
@@ -592,10 +629,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           创建部门申报记录
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 创建部门申报记录
+         * =====================================================
+         */
         DepartmentScoreApply apply =
                 new DepartmentScoreApply();
 
@@ -625,6 +663,11 @@ public class DepartmentScoreApplyController {
         );
 
 
+        /*
+         * department_score_apply.score
+         *
+         * 永远保存正数
+         */
         apply.setScore(
                 template.getScore()
         );
@@ -647,9 +690,9 @@ public class DepartmentScoreApplyController {
 
         /*
          * 部门审核：
+         *
          * 0 = 待审核
          */
-
         apply.setStatus(
                 (short) 0
         );
@@ -657,9 +700,9 @@ public class DepartmentScoreApplyController {
 
         /*
          * 辅导员终审：
+         *
          * 0 = 待审核
          */
-
         apply.setFinalStatus(
                 (short) 0
         );
@@ -669,15 +712,21 @@ public class DepartmentScoreApplyController {
                 LocalDateTime.now();
 
 
-        apply.setCreateTime(now);
+        apply.setCreateTime(
+                now
+        );
 
-        apply.setUpdateTime(now);
+
+        apply.setUpdateTime(
+                now
+        );
 
 
-        /* =====================================================
-           保存
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 保存
+         * =====================================================
+         */
         boolean saved =
                 applyService.save(
                         apply
@@ -764,14 +813,17 @@ public class DepartmentScoreApplyController {
         );
 
 
-        return Result.success(null);
+        return Result.success(
+                null
+        );
     }
 
 
-    /* =========================================================
-       兼容 /apply
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 兼容旧接口 /apply
+     * =========================================================
+     */
     @PostMapping("/apply")
     public Result<Void> apply(
             @RequestBody DepartmentScoreApplyAddDTO dto,
@@ -784,13 +836,15 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       当前用户部门权限
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 当前用户部门权限
+     * =========================================================
+     */
     @GetMapping("/my-permissions")
     public Result<Map<String, Object>> myPermissions(
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -808,6 +862,9 @@ public class DepartmentScoreApplyController {
         }
 
 
+        /*
+         * 查询当前用户所有在职部门身份
+         */
         List<SysUserDepartment> relations =
 
                 userDepartmentMapper.selectList(
@@ -846,6 +903,7 @@ public class DepartmentScoreApplyController {
 
         for (SysUserDepartment relation :
                 relations) {
+
 
             Department department =
                     departmentMapper.selectById(
@@ -890,7 +948,9 @@ public class DepartmentScoreApplyController {
             );
 
 
-            departments.add(item);
+            departments.add(
+                    item
+            );
 
 
             if (canAudit(
@@ -931,28 +991,15 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       我的申报记录
-
-       ★ 注意：
-       这里是“我提交的申报”。
-
-       不能查询 departmentIds。
-       直接通过 applicantId = 当前登录用户查询。
-
-       原来这里错误地写成了：
-
-       .in(departmentId, departmentIds)
-
-       所以出现：
-       找不到符号 departmentIds
-
-       现在已经彻底修正。
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 我的申报记录
+     * =========================================================
+     */
     @GetMapping("/my")
     public Result<List<DepartmentScoreApply>> my(
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -976,9 +1023,6 @@ public class DepartmentScoreApplyController {
 
                         new LambdaQueryWrapper<DepartmentScoreApply>()
 
-                                /*
-                                 * ★ 只查询当前用户自己提交的申报
-                                 */
                                 .eq(
                                         DepartmentScoreApply::getApplicantId,
                                         currentUserId
@@ -990,7 +1034,9 @@ public class DepartmentScoreApplyController {
                 );
 
 
-        fillNames(list);
+        fillNames(
+                list
+        );
 
 
         return Result.success(
@@ -999,53 +1045,40 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       兼容 /my-list
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 兼容 /my-list
+     * =========================================================
+     */
     @GetMapping("/my-list")
     public Result<List<DepartmentScoreApply>> myList(
             HttpServletRequest request) {
 
-        return my(request);
+        return my(
+                request
+        );
     }
 
 
-    /* =========================================================
-       部门干部待审核
-
-       ★★★ 核心修改就在这里 ★★★
-
-       查询条件：
-
-       1. 当前用户是部长 / 副部长
-       2. 查询自己负责的部门
-       3. status = 0
-       4. applicantId != 当前用户
-
-       因此：
-
-       A部长自己提交：
-       applicantId = A
-       ↓
-       A的审核列表：
-       applicantId != A
-       ↓
-       不显示
-
-       B副部长登录：
-       applicantId != B
-       ↓
-       A提交的记录可以显示
-
-       这样就实现：
-
-       “不能自己审核自己，但其他负责人可以审核”
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 部门干部待审核
+     *
+     * 当前用户必须是：
+     *
+     * 副部长 / 部长
+     *
+     * 并且：
+     *
+     * 1. 负责该部门
+     * 2. 申报状态 = 待审核
+     * 3. 申报人不是自己
+     * =========================================================
+     */
     @GetMapping("/audit/list")
     public Result<List<DepartmentScoreApply>> auditList(
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -1063,15 +1096,14 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询当前用户担任：
-
-           副部长
-           部长
-
-           的部门
-           ===================================================== */
-
+        /*
+         * 查询当前用户担任：
+         *
+         * 副部长
+         * 部长
+         *
+         * 的部门
+         */
         List<SysUserDepartment>
                 myPositions =
 
@@ -1107,16 +1139,19 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           提取当前用户负责的部门 ID
-           ===================================================== */
-
+        /*
+         * 提取负责部门 ID
+         */
         List<Long> departmentIds =
 
                 myPositions.stream()
 
                         .map(
                                 SysUserDepartment::getDepartmentId
+                        )
+
+                        .filter(
+                                id -> id != null
                         )
 
                         .distinct()
@@ -1126,44 +1161,33 @@ public class DepartmentScoreApplyController {
                         );
 
 
-        /* =====================================================
-           查询部门待审核记录
+        if (departmentIds.isEmpty()) {
 
-           ★★★ 最关键：
+            return Result.success(
+                    new ArrayList<>()
+            );
+        }
 
-           applicantId != currentUserId
 
-           排除自己提交的记录。
-           ===================================================== */
-
+        /*
+         * 查询待审核申报
+         */
         List<DepartmentScoreApply> list =
 
                 applyService.list(
 
                         new LambdaQueryWrapper<DepartmentScoreApply>()
 
-                                /*
-                                 * 当前用户负责的部门
-                                 */
                                 .in(
                                         DepartmentScoreApply::getDepartmentId,
                                         departmentIds
                                 )
 
-                                /*
-                                 * 部门待审核
-                                 */
                                 .eq(
                                         DepartmentScoreApply::getStatus,
                                         (short) 0
                                 )
 
-                                /*
-                                 * ★★★ 不能审核自己的申报
-                                 *
-                                 * 所以自己提交的记录
-                                 * 不会出现在自己的审核列表。
-                                 */
                                 .ne(
                                         DepartmentScoreApply::getApplicantId,
                                         currentUserId
@@ -1175,7 +1199,9 @@ public class DepartmentScoreApplyController {
                 );
 
 
-        fillNames(list);
+        fillNames(
+                list
+        );
 
 
         return Result.success(
@@ -1184,15 +1210,17 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       部门审核
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 部门单条审核
+     * =========================================================
+     */
     @PutMapping("/audit/{id}")
     public Result<Void> audit(
             @PathVariable Long id,
             @RequestBody DepartmentScoreApplyAuditDTO dto,
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -1210,10 +1238,9 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           参数检查
-           ===================================================== */
-
+        /*
+         * 参数检查
+         */
         if (dto == null
                 || dto.getStatus() == null) {
 
@@ -1227,6 +1254,10 @@ public class DepartmentScoreApplyController {
                 dto.getStatus();
 
 
+        /*
+         * 1 = 通过
+         * 2 = 驳回
+         */
         if (status != 1
                 && status != 2) {
 
@@ -1236,12 +1267,13 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询申请
-           ===================================================== */
-
+        /*
+         * 查询申请
+         */
         DepartmentScoreApply apply =
-                applyService.getById(id);
+                applyService.getById(
+                        id
+                );
 
 
         if (apply == null) {
@@ -1252,10 +1284,9 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           必须处于部门待审核状态
-           ===================================================== */
-
+        /*
+         * 必须处于部门待审核状态
+         */
         if (!Short.valueOf((short) 0)
                 .equals(
                         apply.getStatus()
@@ -1267,10 +1298,15 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           审核人必须是该部门副部长 / 部长
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 审核人必须属于该申报部门
+         *
+         * 并且必须是：
+         *
+         * 副部长 / 部长
+         * =====================================================
+         */
         SysUserDepartment reviewerRelation =
 
                 userDepartmentMapper.selectOne(
@@ -1310,16 +1346,9 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           ★★★ 最后一道保险
-
-           即使有人直接调用：
-
-           PUT /departmentScoreApply/audit/{id}
-
-           也不能审核自己提交的记录。
-           ===================================================== */
-
+        /*
+         * 不能审核自己的申报
+         */
         if (currentUserId.equals(
                 apply.getApplicantId()
         )) {
@@ -1330,10 +1359,9 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           更新部门审核
-           ===================================================== */
-
+        /*
+         * 更新部门审核
+         */
         apply.setStatus(
                 status
         );
@@ -1382,41 +1410,35 @@ public class DepartmentScoreApplyController {
         );
     }
 
-/* =========================================================
-   部门一键审批通过
-   =========================================================
 
-   当前登录用户：
-
-   部长 / 副部长
-
-   自动审核自己负责部门下的：
-
-   status = 0
-   待部门审核
-
-   的全部申报。
-
-   注意：
-
-   1. 不能审核自己提交的申报
-   2. 只审核自己负责的部门
-   3. 只审核待审核记录
-   4. 审核结果统一为通过
-   ========================================================= */
-
+    /*
+     * =========================================================
+     * 部门一键审批全部
+     *
+     * 当前用户：
+     *
+     * 副部长 / 部长
+     *
+     * 自动审批自己负责部门下：
+     *
+     * status = 0
+     *
+     * 且不是自己提交的申报。
+     *
+     * =========================================================
+     */
     @PutMapping("/audit/batch-pass")
     @Transactional
     public Result<Map<String, Object>> batchPass(
             HttpServletRequest request) {
 
+
         Long currentUserId;
 
 
-    /* =====================================================
-       获取当前登录用户
-       ===================================================== */
-
+        /*
+         * 获取当前用户
+         */
         try {
 
             currentUserId =
@@ -1430,16 +1452,15 @@ public class DepartmentScoreApplyController {
         }
 
 
-    /* =====================================================
-       查询当前用户担任：
-
-       副部长
-       部长
-
-       的部门
-       ===================================================== */
-
-        List<SysUserDepartment> myPositions =
+        /*
+         * 查询当前用户担任：
+         *
+         * 副部长 / 部长
+         *
+         * 的部门
+         */
+        List<SysUserDepartment>
+                myPositions =
 
                 userDepartmentMapper.selectList(
 
@@ -1465,11 +1486,11 @@ public class DepartmentScoreApplyController {
                 );
 
 
-    /* =====================================================
-       没有部门审核权限
-       ===================================================== */
-
-        if (myPositions.isEmpty()) {
+        /*
+         * 没有审核权限
+         */
+        if (myPositions == null
+                || myPositions.isEmpty()) {
 
             return Result.fail(
                     "你没有部门审核权限"
@@ -1477,16 +1498,19 @@ public class DepartmentScoreApplyController {
         }
 
 
-    /* =====================================================
-       获取当前用户负责的部门ID
-       ===================================================== */
-
+        /*
+         * 获取负责部门
+         */
         List<Long> departmentIds =
 
                 myPositions.stream()
 
                         .map(
                                 SysUserDepartment::getDepartmentId
+                        )
+
+                        .filter(
+                                id -> id != null
                         )
 
                         .distinct()
@@ -1504,22 +1528,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-    /* =====================================================
-       查询待审核记录
-
-       条件：
-
-       1. 属于当前用户负责的部门
-       2. status = 0
-       3. 不能是当前用户自己提交的
-
-       这样就不会出现：
-
-       部长自己提交
-              ↓
-       又出现在自己的一键审批范围
-       ===================================================== */
-
+        /*
+         * =====================================================
+         * 查询待审批记录
+         * =====================================================
+         */
         List<DepartmentScoreApply> list =
 
                 applyService.list(
@@ -1540,13 +1553,16 @@ public class DepartmentScoreApplyController {
                                         DepartmentScoreApply::getApplicantId,
                                         currentUserId
                                 )
+
+                                .orderByAsc(
+                                        DepartmentScoreApply::getCreateTime
+                                )
                 );
 
 
-    /* =====================================================
-       没有可以审批的记录
-       ===================================================== */
-
+        /*
+         * 没有待审批记录
+         */
         if (list == null
                 || list.isEmpty()) {
 
@@ -1560,16 +1576,31 @@ public class DepartmentScoreApplyController {
             );
 
 
+            data.put(
+                    "message",
+                    "当前没有可以审批的部门申报"
+            );
+
+
             return Result.success(
                     data
             );
         }
 
 
-    /* =====================================================
-       批量审批通过
-       ===================================================== */
-
+        /*
+         * =====================================================
+         * 开始批量审批
+         *
+         * 注意：
+         *
+         * 这里只改变部门初审状态。
+         *
+         * 不在这里生成 score_record。
+         *
+         * score_record 必须等辅导员终审通过后生成。
+         * =====================================================
+         */
         LocalDateTime now =
                 LocalDateTime.now();
 
@@ -1580,14 +1611,10 @@ public class DepartmentScoreApplyController {
         for (DepartmentScoreApply apply :
                 list) {
 
-        /* =================================================
-           再次确认：
 
-           当前记录仍然是待审核
-
-           防止并发情况下重复审批
-           ================================================= */
-
+            /*
+             * 再次确认状态
+             */
             if (!Short.valueOf((short) 0)
                     .equals(
                             apply.getStatus()
@@ -1597,58 +1624,108 @@ public class DepartmentScoreApplyController {
             }
 
 
-        /* =================================================
-           审核通过
-           ================================================= */
+            /*
+             * 再次确认不能审批自己的
+             */
+            if (currentUserId.equals(
+                    apply.getApplicantId()
+            )) {
 
+                continue;
+            }
+
+
+            /*
+             * =================================================
+             * 最后一层确认：
+             *
+             * 当前审核人确实属于该申报部门，
+             * 并且是部长 / 副部长。
+             *
+             * 防止一个干部负责多个部门时
+             * 错误审批其他部门。
+             * =================================================
+             */
+            SysUserDepartment reviewerRelation =
+
+                    userDepartmentMapper.selectOne(
+
+                            new LambdaQueryWrapper<SysUserDepartment>()
+
+                                    .eq(
+                                            SysUserDepartment::getUserId,
+                                            currentUserId
+                                    )
+
+                                    .eq(
+                                            SysUserDepartment::getDepartmentId,
+                                            apply.getDepartmentId()
+                                    )
+
+                                    .eq(
+                                            SysUserDepartment::getStatus,
+                                            (short) 1
+                                    )
+
+                                    .in(
+                                            SysUserDepartment::getPosition,
+                                            List.of(
+                                                    "副部长",
+                                                    "部长"
+                                            )
+                                    )
+                    );
+
+
+            if (reviewerRelation == null) {
+
+                continue;
+            }
+
+
+            /*
+             * 设置审核通过
+             */
             apply.setStatus(
                     (short) 1
             );
 
 
-        /* =================================================
-           审核人
-           ================================================= */
-
+            /*
+             * 审核人
+             */
             apply.setReviewerId(
                     currentUserId
             );
 
 
-        /* =================================================
-           审核时间
-           ================================================= */
-
-            apply.setReviewTime(
-                    now
-            );
-
-
-        /* =================================================
-           审核意见
-
-           一键审批不需要填写意见，
-           所以这里统一设置为空。
-           ================================================= */
-
+            /*
+             * 审核意见
+             */
             apply.setReviewRemark(
                     "一键审批通过"
             );
 
 
-        /* =================================================
-           更新时间
-           ================================================= */
+            /*
+             * 审核时间
+             */
+            apply.setReviewTime(
+                    now
+            );
 
+
+            /*
+             * 更新时间
+             */
             apply.setUpdateTime(
                     now
             );
 
 
-        /* =================================================
-           保存
-           ================================================= */
-
+            /*
+             * 保存
+             */
             boolean updated =
                     applyService.updateById(
                             apply
@@ -1662,10 +1739,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-    /* =====================================================
-       返回结果
-       ===================================================== */
-
+        /*
+         * =====================================================
+         * 返回结果
+         * =====================================================
+         */
         Map<String, Object> data =
                 new HashMap<>();
 
@@ -1676,18 +1754,33 @@ public class DepartmentScoreApplyController {
         );
 
 
+        data.put(
+                "message",
+                "一键审批完成"
+        );
+
+
         return Result.success(
                 data
         );
     }
-    /* =========================================================
-       辅导员待终审
-       ========================================================= */
 
+
+    /*
+     * =========================================================
+     * 辅导员待终审
+     *
+     * 当前辅导员负责哪些部门，
+     * 完全由 department.teacher_id 决定。
+     *
+     * 一个老师可以负责多个部门。
+     * =========================================================
+     */
     @GetMapping("/final-audit/list")
     public Result<List<DepartmentScoreApply>>
     finalAuditList(
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -1705,10 +1798,9 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询当前辅导员负责的部门
-           ===================================================== */
-
+        /*
+         * 查询当前辅导员负责的所有部门
+         */
         List<Department> departments =
 
                 departmentMapper.selectList(
@@ -1735,12 +1827,19 @@ public class DepartmentScoreApplyController {
         }
 
 
+        /*
+         * 提取部门 ID
+         */
         List<Long> departmentIds =
 
                 departments.stream()
 
                         .map(
                                 Department::getId
+                        )
+
+                        .filter(
+                                id -> id != null
                         )
 
                         .distinct()
@@ -1750,14 +1849,13 @@ public class DepartmentScoreApplyController {
                         );
 
 
-        /* =====================================================
-           查询：
-
-           部门审核通过
-           +
-           等待辅导员终审
-           ===================================================== */
-
+        /*
+         * 查询：
+         *
+         * 部门审核通过
+         * +
+         * 等待辅导员终审
+         */
         List<DepartmentScoreApply> list =
 
                 applyService.list(
@@ -1785,7 +1883,9 @@ public class DepartmentScoreApplyController {
                 );
 
 
-        fillNames(list);
+        fillNames(
+                list
+        );
 
 
         return Result.success(
@@ -1794,14 +1894,16 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       辅导员已处理
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 辅导员已处理
+     * =========================================================
+     */
     @GetMapping("/final-audit/processed")
     public Result<List<DepartmentScoreApply>>
     finalAuditProcessed(
             HttpServletRequest request) {
+
 
         Long currentUserId;
 
@@ -1819,6 +1921,9 @@ public class DepartmentScoreApplyController {
         }
 
 
+        /*
+         * 查询当前辅导员负责部门
+         */
         List<Department> departments =
 
                 departmentMapper.selectList(
@@ -1853,6 +1958,10 @@ public class DepartmentScoreApplyController {
                                 Department::getId
                         )
 
+                        .filter(
+                                id -> id != null
+                        )
+
                         .distinct()
 
                         .collect(
@@ -1860,6 +1969,12 @@ public class DepartmentScoreApplyController {
                         );
 
 
+        /*
+         * finalStatus：
+         *
+         * 1 = 通过
+         * 2 = 驳回
+         */
         List<DepartmentScoreApply> list =
 
                 applyService.list(
@@ -1885,7 +2000,9 @@ public class DepartmentScoreApplyController {
                 );
 
 
-        fillNames(list);
+        fillNames(
+                list
+        );
 
 
         return Result.success(
@@ -1894,10 +2011,13 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       辅导员历史
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 辅导员历史
+     *
+     * 兼容旧接口。
+     * =========================================================
+     */
     @GetMapping("/final-audit/history")
     public Result<List<DepartmentScoreApply>>
     finalAuditHistory(
@@ -1909,10 +2029,20 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       辅导员终审
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 辅导员终审
+     *
+     * finalStatus：
+     *
+     * 1 = 通过
+     * 2 = 驳回
+     *
+     * 终审通过：
+     *
+     * 自动生成 score_record。
+     * =========================================================
+     */
     @Transactional
     @PutMapping("/final-audit/{id}")
     public Result<Void> finalAudit(
@@ -1920,13 +2050,13 @@ public class DepartmentScoreApplyController {
             @RequestBody DepartmentScoreFinalAuditDTO dto,
             HttpServletRequest request) {
 
+
         Long currentUserId;
 
 
-        /* =====================================================
-           获取辅导员
-           ===================================================== */
-
+        /*
+         * 获取当前辅导员
+         */
         try {
 
             currentUserId =
@@ -1940,10 +2070,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           参数检查
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 参数检查
+         * =====================================================
+         */
         if (dto == null
                 || dto.getStatus() == null) {
 
@@ -1957,6 +2088,10 @@ public class DepartmentScoreApplyController {
                 dto.getStatus();
 
 
+        /*
+         * 1 = 通过
+         * 2 = 驳回
+         */
         if (finalStatus != 1
                 && finalStatus != 2) {
 
@@ -1966,12 +2101,15 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           查询申报
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 查询申报
+         * =====================================================
+         */
         DepartmentScoreApply apply =
-                applyService.getById(id);
+                applyService.getById(
+                        id
+                );
 
 
         if (apply == null) {
@@ -1982,10 +2120,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           必须已经部门审核通过
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 必须已经部门审核通过
+         * =====================================================
+         */
         if (!Short.valueOf((short) 1)
                 .equals(
                         apply.getStatus()
@@ -1997,10 +2136,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           必须等待终审
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 必须等待终审
+         * =====================================================
+         */
         if (!Short.valueOf((short) 0)
                 .equals(
                         apply.getFinalStatus()
@@ -2012,10 +2152,16 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           检查辅导员是否负责该部门
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 检查辅导员是否负责该部门
+         *
+         * department.teacher_id
+         * 必须等于当前辅导员 ID。
+         *
+         * 一个辅导员可以对应多个部门。
+         * =====================================================
+         */
         Department department =
 
                 departmentMapper.selectOne(
@@ -2047,10 +2193,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           更新终审结果
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 更新终审结果
+         * =====================================================
+         */
         LocalDateTime now =
                 LocalDateTime.now();
 
@@ -2094,10 +2241,11 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           终审驳回
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 终审驳回
+         * =====================================================
+         */
         if (finalStatus == 2) {
 
             System.out.println(
@@ -2118,6 +2266,12 @@ public class DepartmentScoreApplyController {
 
 
             System.out.println(
+                    "departmentId = "
+                            + apply.getDepartmentId()
+            );
+
+
+            System.out.println(
                     "finalReviewerId = "
                             + currentUserId
             );
@@ -2134,17 +2288,24 @@ public class DepartmentScoreApplyController {
         }
 
 
-        /* =====================================================
-           终审通过
-           开始生成正式成绩记录。
-           ===================================================== */
-
+        /*
+         * =====================================================
+         * 终审通过
+         *
+         * 下面开始生成正式成绩。
+         * =====================================================
+         */
         if (finalStatus == 1) {
 
-            /* =================================================
-               防止重复生成正式成绩
-               ================================================= */
 
+            /*
+             * =================================================
+             * 防止重复生成正式成绩
+             *
+             * source_type = DEPARTMENT
+             * source_id = department_score_apply.id
+             * =================================================
+             */
             Long recordCount =
 
                     scoreRecordMapper.selectCount(
@@ -2172,10 +2333,11 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               计算最终实际分值
-               ================================================= */
-
+            /*
+             * =================================================
+             * 检查申报分值
+             * =================================================
+             */
             BigDecimal realScore =
                     apply.getScore();
 
@@ -2188,6 +2350,21 @@ public class DepartmentScoreApplyController {
             }
 
 
+            /*
+             * =================================================
+             * 根据 scoreType 决定最终正负
+             *
+             * 1  = 加分
+             * -1 = 减分
+             *
+             * department_score_apply.score
+             * 保存正数。
+             *
+             * score_record.score
+             * 加分 = 正数
+             * 减分 = 负数
+             * =================================================
+             */
             if (Short.valueOf((short) -1)
                     .equals(
                             apply.getScoreType()
@@ -2198,10 +2375,11 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               查询当前正在进行的学期
-               ================================================= */
-
+            /*
+             * =================================================
+             * 当前学期
+             * =================================================
+             */
             SysSemester currentSemester =
                     getCurrentSemester();
 
@@ -2214,63 +2392,262 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               创建正式成绩记录
-               ================================================= */
+            /*
+             * =================================================
+             * ★★★ 关键修复
+             *
+             * 以前错误代码：
+             *
+             * record.setRuleId(
+             *     apply.getTemplateId()
+             * );
+             *
+             * 这是错误的。
+             *
+             * 因为：
+             *
+             * department_score_template.id
+             *
+             * 不等于：
+             *
+             * score_rule.id
+             *
+             * =================================================
+             */
 
+
+            /*
+             * =================================================
+             * 查找正式成绩规则
+             *
+             * 使用：
+             *
+             * 1. department_id
+             * 2. name
+             * 3. status
+             *
+             * 来找到真正的 score_rule。
+             *
+             * 例如：
+             *
+             * department_id = 3
+             * name = 档案整理
+             *
+             * 得到：
+             *
+             * score_rule.id = 2
+             * =================================================
+             */
+            ScoreRule scoreRule =
+
+                    scoreRuleMapper.selectOne(
+
+                            new LambdaQueryWrapper<ScoreRule>()
+
+                                    .eq(
+                                            ScoreRule::getDepartmentId,
+                                            apply.getDepartmentId()
+                                    )
+
+                                    .eq(
+                                            ScoreRule::getName,
+                                            apply.getTitle()
+                                    )
+
+                                    .eq(
+                                            ScoreRule::getStatus,
+                                            (short) 1
+                                    )
+
+                                    .last(
+                                            "LIMIT 1"
+                                    )
+                    );
+
+
+            /*
+             * =================================================
+             * 找不到正式规则
+             *
+             * 直接终止事务。
+             *
+             * 这样不会生成一条 rule_id 错误的成绩记录。
+             * =================================================
+             */
+            if (scoreRule == null) {
+
+                throw new IllegalArgumentException(
+
+                        "未找到对应的正式加减分规则：" +
+
+                                "部门ID=" +
+
+                                apply.getDepartmentId() +
+
+                                "，规则名称=" +
+
+                                apply.getTitle()
+                );
+            }
+
+
+            /*
+             * =================================================
+             * 检查正式规则分值
+             *
+             * 这里做一道保险。
+             *
+             * 如果 score_rule 中的分值
+             * 和部门申报模板不一致，
+             * 不允许继续生成正式成绩。
+             * =================================================
+             */
+            if (scoreRule.getScore() == null
+                    || scoreRule.getScore()
+                    .compareTo(BigDecimal.ZERO) <= 0) {
+
+                throw new IllegalArgumentException(
+                        "正式加减分规则分值配置错误：" +
+                                scoreRule.getName()
+                );
+            }
+
+
+            /*
+             * =================================================
+             * 检查正式规则分值
+             *
+             * 正常情况下：
+             *
+             * department_score_template.score
+             *
+             * =
+             *
+             * score_rule.score
+             *
+             * =================================================
+             */
+            if (apply.getScore() == null
+                    || scoreRule.getScore()
+                    .compareTo(
+                            apply.getScore()
+                    ) != 0) {
+
+                throw new IllegalArgumentException(
+
+                        "部门申报分值与正式加减分规则分值不一致：" +
+
+                                "申报分值=" +
+
+                                apply.getScore() +
+
+                                "，正式规则分值=" +
+
+                                scoreRule.getScore()
+                );
+            }
+
+
+            /*
+             * =================================================
+             * 创建正式成绩记录
+             * =================================================
+             */
             ScoreRecord record =
                     new ScoreRecord();
 
 
+            /*
+             * 学生
+             */
             record.setStudentId(
                     apply.getStudentId()
             );
 
 
+            /*
+             * =================================================
+             * ★★★ 正确的 rule_id
+             *
+             * 使用：
+             *
+             * score_rule.id
+             *
+             * 而不是：
+             *
+             * department_score_template.id
+             * =================================================
+             */
+            record.setRuleId(
+                    scoreRule.getId()
+            );
+
+
+            /*
+             * 最终实际分值
+             */
             record.setScore(
                     realScore
             );
 
 
-            record.setRuleId(
-                    apply.getTemplateId()
-            );
-
-
+            /*
+             * 当前学期
+             */
             record.setSemesterId(
                     currentSemester.getId()
             );
 
 
+            /*
+             * 来源类型
+             */
             record.setSourceType(
                     "DEPARTMENT"
             );
 
 
+            /*
+             * 来源业务 ID
+             *
+             * 对应：
+             *
+             * department_score_apply.id
+             */
             record.setSourceId(
                     apply.getId()
             );
 
 
+            /*
+             * 有效
+             */
             record.setStatus(
                     (short) 1
             );
 
 
+            /*
+             * 管理员不隐藏
+             */
             record.setAdminHidden(
                     (short) 0
             );
 
 
+            /*
+             * 创建时间
+             */
             record.setCreateTime(
                     now
             );
 
 
-            /* =================================================
-               保存正式成绩
-               ================================================= */
-
+            /*
+             * =================================================
+             * 保存正式成绩
+             * =================================================
+             */
             int result =
                     scoreRecordMapper.insert(
                             record
@@ -2285,10 +2662,11 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               输出日志
-               ================================================= */
-
+            /*
+             * =================================================
+             * 输出日志
+             * =================================================
+             */
             System.out.println(
                     "========== 部门加减分正式成绩生成成功 =========="
             );
@@ -2307,14 +2685,44 @@ public class DepartmentScoreApplyController {
 
 
             System.out.println(
-                    "score = "
-                            + record.getScore()
+                    "departmentId = "
+                            + apply.getDepartmentId()
+            );
+
+
+            System.out.println(
+                    "departmentName = "
+                            + department.getName()
+            );
+
+
+            System.out.println(
+                    "templateId = "
+                            + apply.getTemplateId()
             );
 
 
             System.out.println(
                     "ruleId = "
                             + record.getRuleId()
+            );
+
+
+            System.out.println(
+                    "ruleName = "
+                            + scoreRule.getName()
+            );
+
+
+            System.out.println(
+                    "ruleScore = "
+                            + scoreRule.getScore()
+            );
+
+
+            System.out.println(
+                    "score = "
+                            + record.getScore()
             );
 
 
@@ -2366,12 +2774,22 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /* =========================================================
-       补充姓名、部门名称
-       ========================================================= */
-
+    /*
+     * =========================================================
+     * 补充姓名、部门名称
+     *
+     * studentName
+     * applicantName
+     * departmentName
+     *
+     * 都是 exist = false
+     *
+     * 所以手动查询。
+     * =========================================================
+     */
     private void fillNames(
             List<DepartmentScoreApply> list) {
+
 
         if (list == null
                 || list.isEmpty()) {
@@ -2383,10 +2801,12 @@ public class DepartmentScoreApplyController {
         for (DepartmentScoreApply item :
                 list) {
 
-            /* =================================================
-               学生姓名
-               ================================================= */
 
+            /*
+             * =================================================
+             * 学生姓名
+             * =================================================
+             */
             if (item.getStudentId() != null) {
 
                 SysUser student =
@@ -2404,10 +2824,11 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               申报人姓名
-               ================================================= */
-
+            /*
+             * =================================================
+             * 申报人姓名
+             * =================================================
+             */
             if (item.getApplicantId() != null) {
 
                 SysUser applicant =
@@ -2425,10 +2846,11 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /* =================================================
-               部门名称
-               ================================================= */
-
+            /*
+             * =================================================
+             * 部门名称
+             * =================================================
+             */
             if (item.getDepartmentId() != null) {
 
                 Department department =

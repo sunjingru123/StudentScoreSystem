@@ -161,17 +161,87 @@
       </div>
 
 
+      <!-- ================================================== -->
+      <!-- 批量审核操作栏 -->
+      <!-- ================================================== -->
+
+      <div
+        v-if="auditList.length > 0"
+        class="batch-audit-toolbar"
+      >
+
+        <div class="batch-audit-left">
+
+          <span class="selected-count">
+            已选择
+            <strong>
+              {{ selectedAuditRows.length }}
+            </strong>
+            条申报
+          </span>
+
+          <el-button
+            size="small"
+            @click="selectAllAudit"
+          >
+            全选
+          </el-button>
+
+          <el-button
+            size="small"
+            @click="clearAuditSelection"
+          >
+            取消全选
+          </el-button>
+
+        </div>
+
+
+        <el-button
+          type="success"
+          :loading="batchAuditLoading"
+          :disabled="selectedAuditRows.length === 0"
+          @click="batchApproveAudit"
+        >
+          一键审批通过
+          <span
+            v-if="selectedAuditRows.length > 0"
+          >
+            （{{ selectedAuditRows.length }}）
+          </span>
+        </el-button>
+
+      </div>
+
+
+      <!-- ================================================== -->
       <!-- 审核表格 -->
+      <!-- ================================================== -->
 
       <el-table
+        ref="auditTableRef"
         v-loading="auditLoading"
         :data="auditList"
         border
         stripe
         empty-text="暂无待审核部门申报"
+        @selection-change="handleAuditSelectionChange"
       >
 
+        <!-- ================================================== -->
+        <!-- 全选复选框 -->
+        <!-- ================================================== -->
+
+        <el-table-column
+          type="selection"
+          width="55"
+          align="center"
+        />
+
+
+        <!-- ================================================== -->
         <!-- 序号 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="#"
@@ -181,19 +251,16 @@
 
           <template #default="{ $index }">
 
-            {{
-              (myApplyPageNum - 1) *
-              myApplyPageSize +
-              $index +
-              1
-            }}
+            {{ $index + 1 }}
 
           </template>
 
         </el-table-column>
 
 
+        <!-- ================================================== -->
         <!-- 加减分项目 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="title"
@@ -202,7 +269,9 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 被加减分学生 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="被加减分学生"
@@ -219,7 +288,9 @@
         </el-table-column>
 
 
+        <!-- ================================================== -->
         <!-- 部门 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="部门"
@@ -236,7 +307,9 @@
         </el-table-column>
 
 
+        <!-- ================================================== -->
         <!-- 类型 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="类型"
@@ -280,7 +353,9 @@
         </el-table-column>
 
 
+        <!-- ================================================== -->
         <!-- 分值 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="分值"
@@ -324,7 +399,9 @@
         </el-table-column>
 
 
+        <!-- ================================================== -->
         <!-- 项目说明 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="description"
@@ -334,7 +411,9 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 申报时间 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="createTime"
@@ -343,7 +422,9 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 操作 -->
+        <!-- ================================================== -->
 
         <el-table-column
           label="操作"
@@ -1074,9 +1155,9 @@
 
       <div
         v-if="
-    !listLoading &&
-    departmentApplyList.length > 0
-  "
+          !listLoading &&
+          departmentApplyList.length > 0
+        "
         class="pagination-wrapper"
       >
 
@@ -1103,9 +1184,9 @@
 
       <el-empty
         v-if="
-    !listLoading &&
-    departmentApplyList.length === 0
-  "
+          !listLoading &&
+          departmentApplyList.length === 0
+        "
         description="暂无部门学生加减分申报"
       />
 
@@ -1391,9 +1472,15 @@ const selectedTemplate = computed(() => {
 
 
 
+/* ====================================================== */
+/* 我的申报 */
+/* ====================================================== */
+
 const listLoading = ref(false)
 
 const departmentApplyList = ref([])
+
+
 
 /* ====================================================== */
 /* 我的申报分页 */
@@ -1403,6 +1490,8 @@ const myApplyPageNum = ref(1)
 
 const myApplyPageSize = ref(10)
 
+
+
 /* ====================================================== */
 /* 部门审核 */
 /* ====================================================== */
@@ -1410,6 +1499,27 @@ const myApplyPageSize = ref(10)
 const auditLoading = ref(false)
 
 const auditList = ref([])
+
+
+
+/* ====================================================== */
+/* 部门审核批量选择 */
+/* ====================================================== */
+
+/*
+ * 当前选中的部门申报
+ *
+ * 只有拥有 canDepartmentAudit 权限的
+ * 副部长、部长才能进入这个区域。
+ */
+
+const auditTableRef = ref(null)
+
+const selectedAuditRows = ref([])
+
+const batchAuditLoading = ref(false)
+
+
 
 /* ====================================================== */
 /* 当前页申报记录 */
@@ -1431,6 +1541,8 @@ const pagedDepartmentApplyList = computed(() => {
   )
 
 })
+
+
 
 /* ====================================================== */
 /* 获取当前用户部门权限 */
@@ -1515,6 +1627,20 @@ async function loadPermission() {
 
     }
 
+
+    /*
+     * 如果刷新权限后已经没有审核权限，
+     * 清空审核选择。
+     */
+
+    if (!permission.canDepartmentAudit) {
+
+      selectedAuditRows.value = []
+
+      auditList.value = []
+
+    }
+
   }
 
   catch (error) {
@@ -1530,6 +1656,10 @@ async function loadPermission() {
     permission.canDepartmentApply = false
 
     permission.canDepartmentAudit = false
+
+    selectedAuditRows.value = []
+
+    auditList.value = []
 
 
     ElMessage.error(
@@ -1548,6 +1678,7 @@ async function loadPermission() {
   }
 
 }
+
 
 
 /* ====================================================== */
@@ -1901,6 +2032,8 @@ async function loadStudentList() {
 
 }
 
+
+
 /* ====================================================== */
 /* 根据部门加载模板 */
 /* ====================================================== */
@@ -2057,6 +2190,8 @@ async function loadAuditList() {
 
     auditList.value = []
 
+    selectedAuditRows.value = []
+
     return
 
   }
@@ -2099,6 +2234,15 @@ async function loadAuditList() {
 
         : []
 
+
+    /*
+     * 刷新审核列表后清空之前的选择。
+     *
+     * 因为之前选择的对象可能已经被审核掉。
+     */
+
+    selectedAuditRows.value = []
+
   }
 
   catch (error) {
@@ -2113,6 +2257,8 @@ async function loadAuditList() {
 
 
     auditList.value = []
+
+    selectedAuditRows.value = []
 
 
     ElMessage.error(
@@ -2129,6 +2275,106 @@ async function loadAuditList() {
     auditLoading.value = false
 
   }
+
+}
+
+
+
+/* ====================================================== */
+/* 部门审核：选择变化 */
+/* ====================================================== */
+
+/*
+ * Element Plus el-table：
+ *
+ * type="selection"
+ *
+ * 会自动提供复选框。
+ *
+ * 用户勾选以后，
+ * selectedAuditRows 就保存当前选中的申报。
+ */
+
+function handleAuditSelectionChange(
+  selection,
+) {
+
+  selectedAuditRows.value =
+    Array.isArray(selection)
+      ? selection
+      : []
+
+}
+
+
+
+/* ====================================================== */
+/* 部门审核：全选 */
+/* ====================================================== */
+
+/*
+ * 全选当前审核列表。
+ *
+ * 只有副部长、部长才能进入这里，
+ * 因为整个审核 Card 已经由
+ * permission.canDepartmentAudit 控制。
+ */
+
+function selectAllAudit() {
+
+  if (!permission.canDepartmentAudit) {
+
+    return
+
+  }
+
+
+  if (!auditTableRef.value) {
+
+    return
+
+  }
+
+
+  /*
+   * 直接把当前审核列表全部勾选。
+   */
+
+  auditTableRef.value.clearSelection()
+
+
+  for (
+    const row
+    of auditList.value
+    ) {
+
+    auditTableRef.value.toggleRowSelection(
+      row,
+      true
+    )
+
+  }
+
+}
+
+
+
+/* ====================================================== */
+/* 部门审核：取消全选 */
+/* ====================================================== */
+
+function clearAuditSelection() {
+
+  if (!auditTableRef.value) {
+
+    selectedAuditRows.value = []
+
+    return
+
+  }
+
+
+  auditTableRef.value.clearSelection()
 
 }
 
@@ -2276,6 +2522,295 @@ async function auditApply(
       `部门申报${actionText}失败`,
 
     )
+
+  }
+
+}
+
+
+
+/* ====================================================== */
+/* 一键审批通过 */
+/* ====================================================== */
+
+/*
+ * 一键审批通过：
+ *
+ * 1. 必须是副部长 / 部长
+ * 2. 必须至少选择一条
+ * 3. 弹窗确认
+ * 4. 逐条调用原来的审核接口
+ * 5. status = 1
+ * 6. reviewRemark = ''
+ * 7. 完成以后刷新列表
+ *
+ *
+ * 这里没有新增后端接口。
+ *
+ * 直接复用：
+ *
+ * PUT /departmentScoreApply/audit/{id}
+ *
+ */
+
+async function batchApproveAudit() {
+
+  /*
+   * 前端再次检查权限。
+   *
+   * 即使按钮已经被 v-if 控制，
+   * 这里也再次检查一次。
+   */
+
+  if (!permission.canDepartmentAudit) {
+
+    ElMessage.error(
+      '你没有部门申报审核权限'
+    )
+
+    return
+
+  }
+
+
+  /*
+   * 没有选择
+   */
+
+  if (
+    selectedAuditRows.value.length === 0
+  ) {
+
+    ElMessage.warning(
+      '请先选择需要审批的申报'
+    )
+
+    return
+
+  }
+
+
+  const count =
+    selectedAuditRows.value.length
+
+
+  /*
+   * 获取学生名称，用于确认弹窗。
+   *
+   * 最多展示前 5 条，
+   * 防止全选几十条以后弹窗太长。
+   */
+
+  const previewNames =
+    selectedAuditRows.value
+      .slice(0, 5)
+      .map(
+        item =>
+          item.studentName ||
+          item.studentId ||
+          '未知学生'
+      )
+
+
+  const previewText =
+    previewNames.join('、') +
+    (
+      count > 5
+        ? ` 等 ${count} 条申报`
+        : ''
+    )
+
+
+  try {
+
+    /*
+     * 二次确认。
+     */
+
+    await ElMessageBox.confirm(
+
+      `确定要将选中的 ${count} 条部门申报全部审批通过吗？\n\n${previewText}`,
+
+      '一键审批通过',
+
+      {
+
+        confirmButtonText:
+          '确定通过',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'warning',
+
+      },
+
+    )
+
+  }
+
+  catch (error) {
+
+    /*
+     * 用户取消
+     */
+
+    return
+
+  }
+
+
+  batchAuditLoading.value = true
+
+
+  /*
+   * 记录成功和失败数量。
+   */
+
+  let successCount = 0
+
+  let failCount = 0
+
+
+  try {
+
+    /*
+     * 逐条调用现有审核接口。
+     *
+     * 不新增后端接口，
+     * 最大程度保证与你现在后端代码兼容。
+     */
+
+    for (
+      const row
+      of selectedAuditRows.value
+      ) {
+
+      try {
+
+        await request.put(
+
+          `/departmentScoreApply/audit/${row.id}`,
+
+          {
+
+            status: 1,
+
+            reviewRemark: '',
+
+          },
+
+        )
+
+
+        successCount++
+
+      }
+
+      catch (error) {
+
+        failCount++
+
+
+        console.error(
+
+          `申报 ${row.id} 审批失败：`,
+
+          error,
+
+        )
+
+      }
+
+    }
+
+
+    /*
+     * 根据最终结果提示。
+     */
+
+    if (
+      failCount === 0
+    ) {
+
+      ElMessage.success(
+
+        `已成功审批通过 ${successCount} 条部门申报`
+
+      )
+
+    }
+
+    else if (
+      successCount > 0
+    ) {
+
+      ElMessage.warning(
+
+        `批量审批完成：成功 ${successCount} 条，失败 ${failCount} 条`
+
+      )
+
+    }
+
+    else {
+
+      ElMessage.error(
+
+        '批量审批失败，请检查后端服务'
+
+      )
+
+    }
+
+
+    /*
+     * 刷新部门审核列表。
+     *
+     * 已经审批通过的记录会从待审核列表消失。
+     */
+
+    await loadAuditList()
+
+
+    /*
+     * 刷新我的申报记录。
+     *
+     * 如果这些申报中包含当前用户提交的记录，
+     * 状态也会立即更新。
+     */
+
+    await loadMyApply()
+
+  }
+
+  catch (error) {
+
+    console.error(
+
+      '一键审批通过失败：',
+
+      error,
+
+    )
+
+
+    ElMessage.error(
+
+      error?.response?.data?.message ||
+
+      error?.response?.data?.msg ||
+
+      '一键审批通过失败，请检查后端服务'
+
+    )
+
+  }
+
+  finally {
+
+    batchAuditLoading.value = false
 
   }
 
@@ -2588,6 +3123,8 @@ async function submitDepartment() {
 
 }
 
+
+
 /* ====================================================== */
 /* 重置部门申报表单 */
 /* ====================================================== */
@@ -2893,6 +3430,82 @@ onMounted(async () => {
 
   font-size:
     14px;
+
+}
+
+
+
+/* ====================================================== */
+/* 批量审核操作栏 */
+/* ====================================================== */
+
+.batch-audit-toolbar {
+
+  display:
+    flex;
+
+  justify-content:
+    space-between;
+
+  align-items:
+    center;
+
+  margin-bottom:
+    16px;
+
+  padding:
+    12px 16px;
+
+  border:
+    1px solid #ebeef5;
+
+  border-radius:
+    8px;
+
+  background:
+    #f8f9fa;
+
+}
+
+
+
+.batch-audit-left {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    8px;
+
+}
+
+
+
+.selected-count {
+
+  margin-right:
+    8px;
+
+  color:
+    #606266;
+
+  font-size:
+    14px;
+
+}
+
+
+
+.selected-count strong {
+
+  color:
+    #409eff;
+
+  font-size:
+    16px;
 
 }
 
@@ -3300,7 +3913,35 @@ onMounted(async () => {
 
   }
 
+
+  /* ================================================== */
+  /* 批量审核工具栏移动端 */
+  /* ================================================== */
+
+  .batch-audit-toolbar {
+
+    flex-direction:
+      column;
+
+    align-items:
+      stretch;
+
+    gap:
+      12px;
+
+  }
+
+
+  .batch-audit-left {
+
+    flex-wrap:
+      wrap;
+
+  }
+
 }
+
+
 /* ====================================================== */
 /* 我的申报分页 */
 /* ====================================================== */
@@ -3309,24 +3950,32 @@ onMounted(async () => {
 
   display: flex;
 
-  justify-content: space-between;
+  justify-content:
+    space-between;
 
-  align-items: center;
+  align-items:
+    center;
 
-  margin-top: 20px;
+  margin-top:
+    20px;
 
-  padding-top: 16px;
+  padding-top:
+    16px;
 
-  border-top: 1px solid #ebeef5;
+  border-top:
+    1px solid #ebeef5;
 
 }
 
 
+
 .pagination-total {
 
-  color: #909399;
+  color:
+    #909399;
 
-  font-size: 13px;
+  font-size:
+    13px;
 
 }
 
@@ -3339,13 +3988,17 @@ onMounted(async () => {
 
   .pagination-wrapper {
 
-    flex-direction: column;
+    flex-direction:
+      column;
 
-    align-items: flex-start;
+    align-items:
+      flex-start;
 
-    gap: 12px;
+    gap:
+      12px;
 
   }
 
 }
+
 </style>
