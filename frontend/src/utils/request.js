@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  // 弃用环境变量，直接写死为相对路径 '/api'
+  // 这样无论是在电脑还是手机，它都会自动拼接当前隧道的域名
+  baseURL: '/api',
   timeout: 15000,
   withCredentials: false
 })
@@ -14,6 +16,7 @@ request.interceptors.request.use((config) => {
   return config
 })
 
+// ... 后面的响应拦截器保持不变
 request.interceptors.response.use(
   response => {
     return response.data
