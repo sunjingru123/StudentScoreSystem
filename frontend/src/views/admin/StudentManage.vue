@@ -38,7 +38,7 @@
 
           <el-input
             v-model="keyword"
-            placeholder="学号 / 姓名 / 班级"
+            placeholder="学号 / 姓名 / 用户名 / 班级"
             clearable
             style="width: 280px"
             @keyup.enter="handleSearch"
@@ -88,7 +88,9 @@
         row-key="id"
       >
 
+        <!-- ================================================== -->
         <!-- 序号 -->
+        <!-- ================================================== -->
 
         <el-table-column
           type="index"
@@ -98,7 +100,9 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 学号 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="studentNo"
@@ -107,7 +111,9 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 姓名 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="realName"
@@ -116,12 +122,47 @@
         />
 
 
+        <!-- ================================================== -->
         <!-- 班级 -->
+        <!-- ================================================== -->
 
         <el-table-column
           prop="className"
           label="班级"
+          min-width="160"
         />
+
+
+        <!-- ================================================== -->
+        <!-- 状态 -->
+        <!-- ================================================== -->
+
+        <el-table-column
+          label="状态"
+          width="90"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-tag
+              v-if="Number(row.status) === 1"
+              type="success"
+            >
+              正常
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="danger"
+            >
+              禁用
+            </el-tag>
+
+          </template>
+
+        </el-table-column>
+
 
 
         <!-- ================================================== -->
@@ -138,13 +179,14 @@
 
             <span class="score">
 
-              {{ row.totalScore ?? 0 }}
+              {{ formatScore(row.totalScore) }}
 
             </span>
 
           </template>
 
         </el-table-column>
+
 
 
         <!-- ================================================== -->
@@ -205,6 +247,7 @@
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
           background
+          :hide-on-single-page="false"
           @current-change="handlePageChange"
           @size-change="handleSizeChange"
         />
@@ -241,7 +284,7 @@
           </span>
 
           <strong>
-            {{ currentStudent.realName }}
+            {{ currentStudent.realName || '-' }}
           </strong>
 
         </div>
@@ -254,7 +297,7 @@
           </span>
 
           <strong>
-            {{ currentStudent.studentNo }}
+            {{ currentStudent.studentNo || '-' }}
           </strong>
 
         </div>
@@ -267,8 +310,31 @@
           </span>
 
           <strong>
-            {{ currentStudent.className }}
+            {{ currentStudent.className || '-' }}
           </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            状态：
+          </span>
+
+          <el-tag
+            v-if="Number(currentStudent.status) === 1"
+            type="success"
+          >
+            正常
+          </el-tag>
+
+          <el-tag
+            v-else
+            type="danger"
+          >
+            禁用
+          </el-tag>
 
         </div>
 
@@ -282,7 +348,7 @@
           综合评分：
 
           <strong>
-            {{ currentTotal }}
+            {{ formatScore(currentTotal) }}
           </strong>
 
         </div>
@@ -306,7 +372,9 @@
         v-loading="detailLoading"
       >
 
+        <!-- ================================================= -->
         <!-- 评分项目 -->
+        <!-- ================================================= -->
 
         <el-table-column
           prop="ruleName"
@@ -315,7 +383,10 @@
         />
 
 
+
+        <!-- ================================================= -->
         <!-- 分数 -->
+        <!-- ================================================= -->
 
         <el-table-column
           label="分数"
@@ -339,7 +410,7 @@
                   : ''
               }}
 
-              {{ row.score }}
+              {{ formatScore(row.score) }}
 
             </span>
 
@@ -348,7 +419,10 @@
         </el-table-column>
 
 
+
+        <!-- ================================================= -->
         <!-- 来源 -->
+        <!-- ================================================= -->
 
         <el-table-column
           label="来源"
@@ -365,7 +439,10 @@
         </el-table-column>
 
 
+
+        <!-- ================================================= -->
         <!-- 状态 -->
+        <!-- ================================================= -->
 
         <el-table-column
           label="状态"
@@ -395,7 +472,10 @@
         </el-table-column>
 
 
+
+        <!-- ================================================= -->
         <!-- 操作 -->
+        <!-- ================================================= -->
 
         <el-table-column
           label="操作"
@@ -466,17 +546,33 @@ import request from '@/api/request'
  * =========================================================
  */
 
-const loading = ref(false)
+const loading =
+  ref(false)
 
-const students = ref([])
+const students =
+  ref([])
 
-const total = ref(0)
+const total =
+  ref(0)
 
-const pageNum = ref(1)
+/*
+ * 这里必须叫 pageNum
+ *
+ * 因为后端：
+ *
+ * @RequestParam(defaultValue = "1") long pageNum
+ *
+ * 前端不能再传 page。
+ */
 
-const pageSize = ref(10)
+const pageNum =
+  ref(1)
 
-const keyword = ref('')
+const pageSize =
+  ref(10)
+
+const keyword =
+  ref('')
 
 
 
@@ -486,29 +582,42 @@ const keyword = ref('')
  * =========================================================
  */
 
-const detailLoading = ref(false)
+const detailLoading =
+  ref(false)
 
-const drawerVisible = ref(false)
+const drawerVisible =
+  ref(false)
 
-const currentStudent = ref(null)
+const currentStudent =
+  ref(null)
 
-const scoreDetails = ref([])
+const scoreDetails =
+  ref([])
 
-const currentTotal = ref(0)
+const currentTotal =
+  ref(0)
 
 
 
 /*
  * =========================================================
  * 加载学生列表
+ * =========================================================
  *
- * 使用：
+ * 后端接口：
  *
- * /user/student/list
+ * GET /user/student/list
  *
- * 不再使用：
+ * 后端参数：
  *
- * /user/student/all
+ * pageNum
+ * pageSize
+ * keyword
+ * studentNo
+ * realName
+ * className
+ * status
+ *
  * =========================================================
  */
 
@@ -519,9 +628,27 @@ async function loadStudents() {
 
   try {
 
+    /*
+     * =====================================================
+     * 这里是本次最重要的修改
+     * =====================================================
+     *
+     * 原来：
+     *
+     * page: pageNum.value
+     *
+     * 错误！
+     *
+     * 后端接收的是：
+     *
+     * pageNum
+     *
+     * =====================================================
+     */
+
     const params = {
 
-      page:
+      pageNum:
       pageNum.value,
 
       pageSize:
@@ -530,8 +657,11 @@ async function loadStudents() {
     }
 
 
+
     /*
+     * =====================================================
      * 搜索
+     * =====================================================
      */
 
     const key =
@@ -540,67 +670,95 @@ async function loadStudents() {
 
     if (key) {
 
-      params.studentNo = key
+      /*
+       * 后端本身已经支持 keyword
+       *
+       * keyword 会同时搜索：
+       *
+       * 学号
+       * 姓名
+       * 用户名
+       * 班级
+       *
+       * 所以这里只传 keyword 即可。
+       */
 
-      params.realName = key
-
-      params.className = key
+      params.keyword =
+        key
 
     }
 
 
+
     /*
      * =====================================================
-     * 调用学生分页接口
+     * 请求后端
      * =====================================================
      */
 
+    console.log(
+      '正在请求学生分页：',
+      params,
+    )
+
+
     const res =
       await request.get(
-
         '/user/student/list',
-
         {
           params,
         },
-
       )
 
 
     console.log(
-      '成绩管理学生分页接口返回：',
+      '学生分页接口返回：',
       res,
     )
 
 
+
     /*
      * =====================================================
-     * 获取分页数据
+     * 获取后端 Result
+     * =====================================================
+     *
+     * 后端：
+     *
+     * return Result.success(voPage)
+     *
+     * 所以正常结构：
+     *
+     * res.data.data
+     *
      * =====================================================
      */
 
     const pageData =
-      res.data?.data ||
-      res.data ||
+      res.data?.data ??
       {}
 
 
+
     /*
+     * =====================================================
      * 学生列表
+     * =====================================================
      */
 
-    const list =
+    const records =
       Array.isArray(
         pageData.records
       )
-
         ? pageData.records
-
         : []
 
 
+
     /*
+     * =====================================================
      * 总数量
+     * =====================================================
      */
 
     const totalCount =
@@ -609,17 +767,46 @@ async function loadStudents() {
       )
 
 
+
+    /*
+     * =====================================================
+     * 更新页面
+     * =====================================================
+     */
+
     students.value =
-      list
+      records
 
     total.value =
       totalCount
 
 
 
+    console.log(
+      '当前页：',
+      pageNum.value,
+    )
+
+    console.log(
+      '每页数量：',
+      pageSize.value,
+    )
+
+    console.log(
+      '当前页学生数量：',
+      students.value.length,
+    )
+
+    console.log(
+      '学生总数量：',
+      total.value,
+    )
+
+
+
     /*
      * =====================================================
-     * 加载当前页学生综合评分
+     * 查询当前页学生的综合评分
      * =====================================================
      */
 
@@ -643,7 +830,8 @@ async function loadStudents() {
 
   finally {
 
-    loading.value = false
+    loading.value =
+      false
 
   }
 
@@ -654,34 +842,6 @@ async function loadStudents() {
 /*
  * =========================================================
  * 加载当前页综合评分
- *
- * 重点修改：
- *
- * 后端 getAdminStudentTotal()
- *
- * 返回的是：
- *
- * {
- *   studentName: "唐依胜",
- *   baseLimit: 40,
- *   bonusScore: 5,
- *   deductScore: 0,
- *   actualLimit: 40,
- *   totalScore: 5,
- *   avgScore: 1.6666666666666667,
- *   maxScore: 2,
- *   minScore: 1,
- *   detail: []
- * }
- *
- * 所以不能：
- *
- * student.totalScore = res.data.data
- *
- * 必须：
- *
- * student.totalScore =
- *     res.data.data.totalScore
  * =========================================================
  */
 
@@ -695,6 +855,7 @@ async function loadCurrentPageTotals() {
     return
 
   }
+
 
 
   /*
@@ -715,10 +876,12 @@ async function loadCurrentPageTotals() {
             )
 
 
+
           /*
-           * =================================================
-           * 后端返回 ScoreStatisticsVO
-           * =================================================
+           * 后端：
+           *
+           * Result<ScoreStatisticsVO>
+           *
            */
 
           const statistics =
@@ -727,12 +890,9 @@ async function loadCurrentPageTotals() {
             {}
 
 
+
           /*
-           * =================================================
-           * 真正的综合评分
-           *
-           * totalScore
-           * =================================================
+           * 综合评分
            */
 
           student.totalScore =
@@ -741,24 +901,14 @@ async function loadCurrentPageTotals() {
             )
 
 
+
           /*
-           * 顺便保存完整统计数据
-           *
-           * 后面如果要显示：
-           *
-           * 基础分
-           * 加分
-           * 扣分
-           * 实际上限
-           * 平均分
-           * 最高分
-           * 最低分
-           *
-           * 可以直接使用。
+           * 保存完整统计
            */
 
           student.scoreStatistics =
             statistics
+
 
 
           console.log(
@@ -777,9 +927,11 @@ async function loadCurrentPageTotals() {
           )
 
 
-          student.totalScore = 0
+          student.totalScore =
+            0
 
-          student.scoreStatistics = {}
+          student.scoreStatistics =
+            {}
 
         }
 
@@ -801,7 +953,13 @@ async function loadCurrentPageTotals() {
 
 function handleSearch() {
 
-  pageNum.value = 1
+  /*
+   * 搜索以后必须回到第一页
+   */
+
+  pageNum.value =
+    1
+
 
   loadStudents()
 
@@ -817,11 +975,15 @@ function handleSearch() {
 
 function handleReset() {
 
-  keyword.value = ''
+  keyword.value =
+    ''
 
-  pageNum.value = 1
+  pageNum.value =
+    1
 
-  pageSize.value = 10
+  pageSize.value =
+    10
+
 
   loadStudents()
 
@@ -837,7 +999,30 @@ function handleReset() {
 
 function handlePageChange(page) {
 
-  pageNum.value = page
+  /*
+   * Element Plus 返回当前页
+   *
+   * 例如：
+   *
+   * 第一页 -> 1
+   * 第二页 -> 2
+   * 第三页 -> 3
+   */
+
+  pageNum.value =
+    page
+
+
+  console.log(
+    '切换到第',
+    pageNum.value,
+    '页',
+  )
+
+
+  /*
+   * 重新请求后端
+   */
 
   loadStudents()
 
@@ -853,9 +1038,28 @@ function handlePageChange(page) {
 
 function handleSizeChange(size) {
 
-  pageSize.value = size
+  /*
+   * 更新每页数量
+   */
 
-  pageNum.value = 1
+  pageSize.value =
+    size
+
+
+  /*
+   * 改变每页数量后
+   * 回到第一页
+   */
+
+  pageNum.value =
+    1
+
+
+  console.log(
+    '每页数量修改为：',
+    pageSize.value,
+  )
+
 
   loadStudents()
 
@@ -873,14 +1077,61 @@ function indexMethod(index) {
 
   return (
 
-    (pageNum.value - 1) *
-    pageSize.value +
-
-    index +
-
+    (pageNum.value - 1)
+    *
+    pageSize.value
+    +
+    index
+    +
     1
 
   )
+
+}
+
+
+
+/*
+ * =========================================================
+ * 格式化分数
+ * =========================================================
+ */
+
+function formatScore(score) {
+
+  const value =
+    Number(score)
+
+
+  if (
+    Number.isNaN(value)
+  ) {
+
+    return '0'
+
+  }
+
+
+  /*
+   * 整数不显示小数
+   *
+   * 例如：
+   *
+   * 5 -> 5
+   *
+   * 5.5 -> 5.5
+   */
+
+  if (
+    Number.isInteger(value)
+  ) {
+
+    return String(value)
+
+  }
+
+
+  return value.toFixed(2)
 
 }
 
@@ -907,6 +1158,7 @@ async function openDetail(student) {
     []
 
 
+
   /*
    * 先使用列表中的综合评分
    */
@@ -917,6 +1169,7 @@ async function openDetail(student) {
     )
 
 
+
   try {
 
     /*
@@ -924,24 +1177,26 @@ async function openDetail(student) {
      * 同时获取：
      *
      * 1. 成绩明细
-     * 2. 综合评分统计
+     * 2. 综合评分
      * =====================================================
      */
 
     const [
       detailRes,
       totalRes,
-    ] = await Promise.all([
+    ] =
+      await Promise.all([
 
-      getAdminStudentScores(
-        student.id,
-      ),
+        getAdminStudentScores(
+          student.id,
+        ),
 
-      getAdminStudentTotal(
-        student.id,
-      ),
+        getAdminStudentTotal(
+          student.id,
+        ),
 
-    ])
+      ])
+
 
 
     /*
@@ -951,20 +1206,15 @@ async function openDetail(student) {
      */
 
     scoreDetails.value =
-      detailRes.data?.data ||
-      detailRes.data ||
+      detailRes.data?.data ??
+      detailRes.data ??
       []
+
 
 
     /*
      * =====================================================
-     * 综合评分统计
-     *
-     * 注意：
-     *
-     * totalRes 返回的是 ScoreStatisticsVO
-     *
-     * 不是数字。
+     * 综合评分
      * =====================================================
      */
 
@@ -974,9 +1224,6 @@ async function openDetail(student) {
       {}
 
 
-    /*
-     * 真正的综合评分
-     */
 
     currentTotal.value =
       Number(
@@ -984,16 +1231,18 @@ async function openDetail(student) {
       )
 
 
+
     /*
-     * 保存完整统计信息
+     * 保存统计数据
      */
 
     currentStudent.value.scoreStatistics =
       statistics
 
 
+
     /*
-     * 同步更新列表中的分数
+     * 同步更新列表分数
      */
 
     currentStudent.value.totalScore =
@@ -1043,14 +1292,16 @@ async function handleHide(row) {
       '隐藏成绩',
 
       {
-        type: 'warning',
+        type:
+          'warning',
       },
 
     )
 
 
+
     /*
-     * 隐藏成绩
+     * 隐藏
      */
 
     await hideScore(
@@ -1058,8 +1309,9 @@ async function handleHide(row) {
     )
 
 
+
     /*
-     * 当前学生 ID
+     * 当前学生
      */
 
     const studentId =
@@ -1073,8 +1325,9 @@ async function handleHide(row) {
     }
 
 
+
     /*
-     * 刷新当前学生成绩
+     * 刷新抽屉里的成绩
      */
 
     await refreshCurrentStudentScore(
@@ -1082,11 +1335,13 @@ async function handleHide(row) {
     )
 
 
+
     /*
-     * 刷新当前页
+     * 刷新列表
      */
 
     await loadStudents()
+
 
 
     ElMessage.success(
@@ -1143,14 +1398,16 @@ async function handleShow(row) {
       '恢复成绩',
 
       {
-        type: 'info',
+        type:
+          'info',
       },
 
     )
 
 
+
     /*
-     * 恢复成绩
+     * 恢复
      */
 
     await showScore(
@@ -1158,8 +1415,9 @@ async function handleShow(row) {
     )
 
 
+
     /*
-     * 当前学生 ID
+     * 当前学生
      */
 
     const studentId =
@@ -1173,6 +1431,7 @@ async function handleShow(row) {
     }
 
 
+
     /*
      * 刷新当前学生成绩
      */
@@ -1182,11 +1441,13 @@ async function handleShow(row) {
     )
 
 
+
     /*
-     * 刷新当前页
+     * 刷新列表
      */
 
     await loadStudents()
+
 
 
     ElMessage.success(
@@ -1235,17 +1496,19 @@ async function refreshCurrentStudentScore(
   const [
     detailRes,
     totalRes,
-  ] = await Promise.all([
+  ] =
+    await Promise.all([
 
-    getAdminStudentScores(
-      studentId,
-    ),
+      getAdminStudentScores(
+        studentId,
+      ),
 
-    getAdminStudentTotal(
-      studentId,
-    ),
+      getAdminStudentTotal(
+        studentId,
+      ),
 
-  ])
+    ])
+
 
 
   /*
@@ -1253,15 +1516,14 @@ async function refreshCurrentStudentScore(
    */
 
   scoreDetails.value =
-    detailRes.data?.data ||
-    detailRes.data ||
+    detailRes.data?.data ??
+    detailRes.data ??
     []
 
 
+
   /*
-   * =====================================================
-   * 综合评分统计
-   * =====================================================
+   * 综合评分
    */
 
   const statistics =
@@ -1270,9 +1532,6 @@ async function refreshCurrentStudentScore(
     {}
 
 
-  /*
-   * 真正综合评分
-   */
 
   currentTotal.value =
     Number(
@@ -1280,15 +1539,17 @@ async function refreshCurrentStudentScore(
     )
 
 
+
   /*
-   * 保存统计信息
+   * 更新当前学生
    */
 
-  if (currentStudent.value) {
+  if (
+    currentStudent.value
+  ) {
 
     currentStudent.value.scoreStatistics =
       statistics
-
 
     currentStudent.value.totalScore =
       currentTotal.value
@@ -1612,6 +1873,14 @@ onMounted(() => {
 
     grid-column:
       auto;
+
+  }
+
+
+  .pagination-wrapper {
+
+    justify-content:
+      center;
 
   }
 

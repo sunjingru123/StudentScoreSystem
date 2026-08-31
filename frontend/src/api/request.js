@@ -1,8 +1,10 @@
 import axios from 'axios'
 
-const request = axios.create({
-  baseURL: 'http://localhost:8080',
-})
+const
+  request = axios.create({
+    // 只需要这一行，注意不要多写
+    baseURL: '/api'
+  })
 
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
