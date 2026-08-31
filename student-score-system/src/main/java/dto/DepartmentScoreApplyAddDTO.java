@@ -4,7 +4,10 @@ import lombok.Data;
 
 @Data
 public class DepartmentScoreApplyAddDTO {
-
+    /**
+     * 学期ID
+     */
+    private Long semesterId;
     /**
      * 申报部门
      */
