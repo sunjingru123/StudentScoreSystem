@@ -215,22 +215,6 @@ const router = createRouter({
         },
 
 
-        // ---------------------------------------------------
-        // 部门加减分终审
-        // ---------------------------------------------------
-
-        {
-          path: 'department-final-audit',
-
-          name: 'StudentDepartmentAudit',
-
-          component: () =>
-            import(
-              '@/views/home/DepartmentAudit.vue'
-              ),
-        },
-
-
         // ===================================================
         // ★★★ 档案部加减分汇总导出
         //

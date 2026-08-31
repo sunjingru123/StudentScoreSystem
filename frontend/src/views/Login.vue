@@ -20,7 +20,7 @@
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { login } from '@/api/login'
+import request from '@/utils/request'
 
 const router = useRouter()
 
@@ -31,27 +31,23 @@ const form = reactive({
 
 const handleLogin = async () => {
   try {
-    const res = await login({
+    const res = await request.post('/login', {
       username: form.username,
       password: form.password,
     })
 
-    const code = res?.data?.code
-    const user = res?.data?.data
-
-    if (code === 200) {
+    if (res.code === 200) {
+      const user = res.data
       if (user) {
         localStorage.setItem('user', JSON.stringify(user))
         if (user.token) {
           localStorage.setItem('token', user.token)
         }
       }
-
       router.push('/admin/adminHome')
       return
     }
-
-    ElMessage.error(res?.data?.message || '登录失败')
+    ElMessage.error(res?.message || '登录失败')
   } catch (error) {
     ElMessage.error(error?.response?.data?.message || '请求异常，请稍后重试')
   }

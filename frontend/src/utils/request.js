@@ -1,20 +1,31 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: 'http://localhost:8080',
-
-  timeout: 5000,
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  timeout: 15000,
+  withCredentials: false
 })
 
-// 请求拦截器
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
-
   if (token) {
     config.headers.Authorization = 'Bearer ' + token
   }
-
   return config
 })
+
+request.interceptors.response.use(
+  response => {
+    return response.data
+  },
+  error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
 export default request
