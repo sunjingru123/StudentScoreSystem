@@ -110,44 +110,7 @@
         </el-menu-item>
 
 
-        <!-- =================================================
-             部门申报
-             部门干事 / 部门成员
-        ================================================== -->
 
-        <el-menu-item
-          index="/home/department-apply"
-        >
-
-          <el-icon>
-            <EditPen />
-          </el-icon>
-
-          <span>
-            部门加减分申报
-          </span>
-
-        </el-menu-item>
-
-
-        <!-- =================================================
-             ★ 部门负责人审核
-        ================================================== -->
-
-        <el-menu-item
-          v-if="departmentLeader"
-          index="/home/department-audit"
-        >
-
-          <el-icon>
-            <Checked />
-          </el-icon>
-
-          <span>
-            部门申报审核
-          </span>
-
-        </el-menu-item>
 
 
         <!-- =================================================
@@ -170,24 +133,7 @@
         </el-menu-item>
 
 
-        <!-- =================================================
-             ★ 档案部汇总导出
-        ================================================== -->
 
-        <el-menu-item
-          v-if="archiveLeader"
-          index="/home/score-export"
-        >
-
-          <el-icon>
-            <Download />
-          </el-icon>
-
-          <span>
-            加减分汇总导出
-          </span>
-
-        </el-menu-item>
 
 
         <!-- =================================================
@@ -430,27 +376,33 @@ async function loadPermission() {
 
     const res =
       await request.get(
-        '/user/department/permission'
+        '/departmentScoreApply/my-permissions'
       )
 
 
     console.log(
-      '部门权限：',
+      '========== MainLayout 部门权限 =========='
+    )
+
+    console.log(
+      '部门权限响应：',
       res
     )
 
 
-    const result =
-      res?.data?.code !== undefined
-        ? res.data
-        : res
-
+    /*
+     * request.js 已经返回 response.data
+     */
 
     if (
-      result?.code !== 200
-      &&
-      result?.code !== 0
+      !res ||
+      (Number(res.code) !== 200 &&
+        Number(res.code) !== 0)
     ) {
+
+      departmentLeader.value = false
+
+      archiveLeader.value = false
 
       return
 
@@ -458,57 +410,68 @@ async function loadPermission() {
 
 
     const data =
-      result?.data || {}
+      res.data || {}
 
 
-    // =====================================================
-    // 部门负责人 / 副负责人
-    //
-    // 只要是负责人或者副负责人，
-    // 就能看到部门审核。
-    // =====================================================
+    /*
+     * 部门审核权限：
+     *
+     * 只有副部长 / 部长
+     */
 
     departmentLeader.value =
-      data.departmentLeader === true
-      ||
-      data.isDepartmentLeader === true
-      ||
-      data.position === '部长'
-      ||
-      data.position === '副部长'
-      ||
-      data.position === '负责人'
-      ||
-      data.position === '副负责人'
+      data.canDepartmentAudit === true ||
+      Number(data.canDepartmentAudit) === 1
 
 
-    // =====================================================
-    // 档案部负责人 / 副负责人
-    // =====================================================
+    /*
+     * 档案部负责人：
+     *
+     * 档案部部长 / 副部长
+     */
 
     archiveLeader.value =
-      data.archiveLeader === true
-      ||
-      data.isArchiveLeader === true
-      ||
-      data.archiveDepartmentLeader === true
-      ||
-      data.archivePosition === '部长'
-      ||
-      data.archivePosition === '副部长'
+
+      Array.isArray(data.departments) &&
+
+      data.departments.some(
+        department =>
+
+          department.departmentName === '档案部' &&
+
+          (
+            department.position === '部长' ||
+            department.position === '副部长'
+          )
+      )
 
 
-  } catch (error) {
+    console.log(
+      'MainLayout 部门审核权限：',
+      departmentLeader.value
+    )
+
+    console.log(
+      'MainLayout 档案部负责人权限：',
+      archiveLeader.value
+    )
+
+
+  }
+  catch (error) {
 
     console.error(
       '获取部门权限失败：',
       error
     )
 
+    departmentLeader.value = false
+
+    archiveLeader.value = false
+
   }
 
 }
-
 
 // =========================================================
 // 退出登录

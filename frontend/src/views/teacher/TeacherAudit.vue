@@ -336,84 +336,45 @@ async function loadList() {
 
   try {
 
-    const user = getCurrentTeacher()
-
     console.log(
       '开始获取辅导员最终审核列表'
     )
 
-    console.log(
-      '当前辅导员：',
-      user
-    )
-
-    /*
-     * 注意：
-     *
-     * 这里不能再调用：
-     *
-     * /scoreApply/list
-     *
-     * 那是普通加分申请接口。
-     *
-     * 辅导员最终审核使用：
-     *
-     * /departmentScoreApply/final-audit/list
-     */
-
-    const res = await request.get(
-      '/departmentScoreApply/final-audit/list'
-    )
+    const res =
+      await request.get(
+        '/departmentScoreApply/final-audit/list'
+      )
 
     console.log(
       '辅导员最终审核完整响应：',
       res
     )
 
-    console.log(
-      '后端 data：',
-      res.data
-    )
-
-    console.log(
-      '最终 data：',
-      res.data?.data
-    )
-
-    const data = res.data?.data
-
     /*
-     * 后端可能直接返回：
+     * utils/request 已经把 Axios response 拆掉
      *
-     * [
-     *   {...},
-     *   {...}
-     * ]
+     * 正确结构：
      *
-     * 也可能返回分页：
+     * res.code
+     * res.message
+     * res.data
      *
-     * {
-     *   records: [],
-     *   total: 1
-     * }
+     * 其中 res.data 就是数组
      */
 
-    if (Array.isArray(data)) {
-
-      list.value = data
-
-    } else if (
-      data &&
-      Array.isArray(data.records)
+    if (
+      res?.code === 200 &&
+      Array.isArray(res.data)
     ) {
 
-      list.value = data.records
+      list.value =
+        res.data
 
     } else {
 
       console.warn(
-        '最终审核接口 data 格式：',
-        data
+        '辅导员最终审核接口返回异常：',
+        res
       )
 
       list.value = []
