@@ -6,17 +6,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.student.studentscoresystem.common.Result;
-import com.student.studentscoresystem.entity.ScoreApply;
-import com.student.studentscoresystem.entity.ScoreRule;
-import com.student.studentscoresystem.entity.SysUser;
-import com.student.studentscoresystem.mapper.ScoreApplyMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
-import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.entity.*;
+import com.student.studentscoresystem.mapper.*;
+import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ScoreApplyVO;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,11 +33,23 @@ public class ScoreApplyController {
 
     private final ObjectMapper objectMapper;
 
+    private final SysUserDepartmentMapper userDepartmentMapper;
+
+    private final DepartmentMapper departmentMapper;
+
+    private final ScoreRecordMapper scoreRecordMapper;
+
+    private final SysSemesterMapper sysSemesterMapper;
+
     public ScoreApplyController(
             ScoreApplyMapper scoreApplyMapper,
             SysUserMapper sysUserMapper,
             ScoreRuleMapper scoreRuleMapper,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            SysUserDepartmentMapper userDepartmentMapper,
+            DepartmentMapper departmentMapper,
+            ScoreRecordMapper scoreRecordMapper,
+            SysSemesterMapper sysSemesterMapper
     ) {
 
         this.scoreApplyMapper =
@@ -51,6 +63,228 @@ public class ScoreApplyController {
 
         this.objectMapper =
                 objectMapper;
+
+        this.userDepartmentMapper =
+                userDepartmentMapper;
+
+        this.departmentMapper =
+                departmentMapper;
+
+        this.scoreRecordMapper =
+                scoreRecordMapper;
+
+        this.sysSemesterMapper =
+                sysSemesterMapper;
+    }
+
+    /**
+     * ========================================================
+     * 获取当前登录用户ID
+     * ========================================================
+     */
+    private Long getCurrentUserId(
+            HttpServletRequest request
+    ) {
+
+        String token =
+                request.getHeader("Authorization");
+
+        if (
+                token == null
+                        || !token.startsWith("Bearer ")
+        ) {
+
+            throw new IllegalArgumentException(
+                    "请先登录"
+            );
+        }
+
+        try {
+
+            Claims claims =
+                    JwtUtil.parseToken(
+                            token.substring(7)
+                    );
+
+            Object userId =
+                    claims.get("userId");
+
+            if (userId == null) {
+
+                throw new IllegalArgumentException(
+                        "登录状态无效"
+                );
+            }
+
+            return Long.valueOf(
+                    userId.toString()
+            );
+
+        } catch (Exception e) {
+
+            throw new IllegalArgumentException(
+                    "登录状态无效，请重新登录"
+            );
+        }
+    }
+
+    /**
+     * ========================================================
+     * 判断是否为档案部干事 / 副部长 / 部长
+     * ========================================================
+     */
+    private boolean isArchiveDepartmentMember(
+            Long userId
+    ) {
+
+        if (userId == null) {
+            return false;
+        }
+
+        List<SysUserDepartment> relations =
+                userDepartmentMapper.selectList(
+                        new LambdaQueryWrapper<SysUserDepartment>()
+                                .eq(
+                                        SysUserDepartment::getUserId,
+                                        userId
+                                )
+                                .eq(
+                                        SysUserDepartment::getStatus,
+                                        (short) 1
+                                )
+                                .in(
+                                        SysUserDepartment::getPosition,
+                                        List.of(
+                                                "干事",
+                                                "副部长",
+                                                "部长"
+                                        )
+                                )
+                );
+
+        if (
+                relations == null
+                        || relations.isEmpty()
+        ) {
+
+            return false;
+        }
+
+        for (
+                SysUserDepartment relation :
+                relations
+        ) {
+
+            if (
+                    relation == null
+                            || relation.getDepartmentId() == null
+            ) {
+                continue;
+            }
+
+            Department department =
+                    departmentMapper.selectById(
+                            relation.getDepartmentId()
+                    );
+
+            if (
+                    department != null
+                            &&
+                            Short.valueOf((short) 1)
+                                    .equals(
+                                            department.getStatus()
+                                    )
+                            &&
+                            "档案部".equals(
+                                    department.getName()
+                            )
+            ) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * ========================================================
+     * 判断是否为档案部副部长 / 部长
+     *
+     * 只有副部长、部长可以终审
+     * ========================================================
+     */
+    private boolean isArchiveFinalReviewer(
+            Long userId
+    ) {
+
+        if (userId == null) {
+            return false;
+        }
+
+        List<SysUserDepartment> relations =
+                userDepartmentMapper.selectList(
+                        new LambdaQueryWrapper<SysUserDepartment>()
+                                .eq(
+                                        SysUserDepartment::getUserId,
+                                        userId
+                                )
+                                .eq(
+                                        SysUserDepartment::getStatus,
+                                        (short) 1
+                                )
+                                .in(
+                                        SysUserDepartment::getPosition,
+                                        List.of(
+                                                "副部长",
+                                                "部长"
+                                        )
+                                )
+                );
+
+        if (
+                relations == null
+                        || relations.isEmpty()
+        ) {
+
+            return false;
+        }
+
+        for (
+                SysUserDepartment relation :
+                relations
+        ) {
+
+            if (
+                    relation == null
+                            || relation.getDepartmentId() == null
+            ) {
+                continue;
+            }
+
+            Department department =
+                    departmentMapper.selectById(
+                            relation.getDepartmentId()
+                    );
+
+            if (
+                    department != null
+                            &&
+                            Short.valueOf((short) 1)
+                                    .equals(
+                                            department.getStatus()
+                                    )
+                            &&
+                            "档案部".equals(
+                                    department.getName()
+                            )
+            ) {
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -63,29 +297,17 @@ public class ScoreApplyController {
             HttpServletRequest request
     ) {
 
-        Object userIdObj =
-                request.getAttribute("userId");
-
-        if (userIdObj == null) {
-
-            return Result.fail(
-                    "请先登录"
-            );
-        }
-
         Long currentStudentId;
 
         try {
 
             currentStudentId =
-                    Long.valueOf(
-                            userIdObj.toString()
-                    );
+                    getCurrentUserId(request);
 
         } catch (Exception e) {
 
             return Result.fail(
-                    "登录用户信息无效"
+                    e.getMessage()
             );
         }
 
@@ -128,22 +350,14 @@ public class ScoreApplyController {
      * 学生提交个人证书申报
      * ========================================================
      *
-     * 学生只允许填写个人证书相关信息。
+     * 学生不能填写：
      *
-     * 不允许填写：
-     *
-     * departmentId
-     * departmentName
-     * activityId
      * ruleId
      * applyScore
      * score
      * studentId
-     * applyType
      *
-     * studentId 和 applyType 由后端自动设置。
-     *
-     * 最终加分由档案部审核确定。
+     * 最终分值由档案部初审人员确定。
      */
     @PostMapping("/add")
     public Result<Void> add(
@@ -151,29 +365,17 @@ public class ScoreApplyController {
             HttpServletRequest request
     ) {
 
-        Object userIdObj =
-                request.getAttribute("userId");
-
-        if (userIdObj == null) {
-
-            return Result.fail(
-                    "请先登录"
-            );
-        }
-
         Long currentStudentId;
 
         try {
 
             currentStudentId =
-                    Long.valueOf(
-                            userIdObj.toString()
-                    );
+                    getCurrentUserId(request);
 
         } catch (Exception e) {
 
             return Result.fail(
-                    "登录用户信息无效"
+                    e.getMessage()
             );
         }
 
@@ -258,13 +460,13 @@ public class ScoreApplyController {
 
         /*
          * =====================================================
-         * 获奖类别校验
+         * 获奖类别
          * =====================================================
          */
 
         if (
-                awardCategory == null ||
-                        awardCategory.isBlank()
+                awardCategory == null
+                        || awardCategory.isBlank()
         ) {
 
             return Result.error(
@@ -274,9 +476,12 @@ public class ScoreApplyController {
 
         if (
                 !(
-                        "A".equals(awardCategory) ||
-                                "B".equals(awardCategory) ||
-                                "C".equals(awardCategory) ||
+                        "A".equals(awardCategory)
+                                ||
+                                "B".equals(awardCategory)
+                                ||
+                                "C".equals(awardCategory)
+                                ||
                                 "OTHER".equals(awardCategory)
                 )
         ) {
@@ -293,8 +498,8 @@ public class ScoreApplyController {
          */
 
         if (
-                awardName == null ||
-                        awardName.isBlank()
+                awardName == null
+                        || awardName.isBlank()
         ) {
 
             return Result.error(
@@ -305,19 +510,12 @@ public class ScoreApplyController {
         /*
          * =====================================================
          * 获奖级别
-         *
-         * 与 Apply.vue 保持一致：
-         *
-         * 国家级
-         * 省级
-         * 校级
-         * 院级
          * =====================================================
          */
 
         if (
-                awardLevel == null ||
-                        awardLevel.isBlank()
+                awardLevel == null
+                        || awardLevel.isBlank()
         ) {
 
             return Result.error(
@@ -327,9 +525,12 @@ public class ScoreApplyController {
 
         if (
                 !(
-                        "国家级".equals(awardLevel) ||
-                                "省级".equals(awardLevel) ||
-                                "校级".equals(awardLevel) ||
+                        "国家级".equals(awardLevel)
+                                ||
+                                "省级".equals(awardLevel)
+                                ||
+                                "校级".equals(awardLevel)
+                                ||
                                 "院级".equals(awardLevel)
                 )
         ) {
@@ -346,8 +547,8 @@ public class ScoreApplyController {
          */
 
         if (
-                awardGrade == null ||
-                        awardGrade.isBlank()
+                awardGrade == null
+                        || awardGrade.isBlank()
         ) {
 
             return Result.error(
@@ -357,10 +558,14 @@ public class ScoreApplyController {
 
         if (
                 !(
-                        "一等奖".equals(awardGrade) ||
-                                "二等奖".equals(awardGrade) ||
-                                "三等奖".equals(awardGrade) ||
-                                "优秀奖".equals(awardGrade) ||
+                        "一等奖".equals(awardGrade)
+                                ||
+                                "二等奖".equals(awardGrade)
+                                ||
+                                "三等奖".equals(awardGrade)
+                                ||
+                                "优秀奖".equals(awardGrade)
+                                ||
                                 "OTHER".equals(awardGrade)
                 )
         ) {
@@ -375,8 +580,8 @@ public class ScoreApplyController {
         ) {
 
             if (
-                    awardGradeOther == null ||
-                            awardGradeOther.isBlank()
+                    awardGradeOther == null
+                            || awardGradeOther.isBlank()
             ) {
 
                 return Result.error(
@@ -392,8 +597,8 @@ public class ScoreApplyController {
          */
 
         if (
-                awardTime == null ||
-                        awardTime.isBlank()
+                awardTime == null
+                        || awardTime.isBlank()
         ) {
 
             return Result.error(
@@ -404,17 +609,12 @@ public class ScoreApplyController {
         /*
          * =====================================================
          * 奖项类型
-         *
-         * 与 Apply.vue 保持一致：
-         *
-         * 个人奖
-         * 团体奖
          * =====================================================
          */
 
         if (
-                awardType == null ||
-                        awardType.isBlank()
+                awardType == null
+                        || awardType.isBlank()
         ) {
 
             return Result.error(
@@ -424,7 +624,8 @@ public class ScoreApplyController {
 
         if (
                 !(
-                        "个人奖".equals(awardType) ||
+                        "个人奖".equals(awardType)
+                                ||
                                 "团体奖".equals(awardType)
                 )
         ) {
@@ -441,8 +642,8 @@ public class ScoreApplyController {
          */
 
         if (
-                hasCertificate == null ||
-                        hasCertificate.isBlank()
+                hasCertificate == null
+                        || hasCertificate.isBlank()
         ) {
 
             return Result.error(
@@ -452,7 +653,8 @@ public class ScoreApplyController {
 
         if (
                 !(
-                        "YES".equals(hasCertificate) ||
+                        "YES".equals(hasCertificate)
+                                ||
                                 "NO".equals(hasCertificate)
                 )
         ) {
@@ -462,19 +664,13 @@ public class ScoreApplyController {
             );
         }
 
-        /*
-         * =====================================================
-         * 有凭证
-         * =====================================================
-         */
-
         if (
                 "YES".equals(hasCertificate)
         ) {
 
             if (
-                    materialFile == null ||
-                            materialFile.isBlank()
+                    materialFile == null
+                            || materialFile.isBlank()
             ) {
 
                 return Result.error(
@@ -483,19 +679,13 @@ public class ScoreApplyController {
             }
         }
 
-        /*
-         * =====================================================
-         * 无凭证
-         * =====================================================
-         */
-
         if (
                 "NO".equals(hasCertificate)
         ) {
 
             if (
-                    certificateReason == null ||
-                            certificateReason.isBlank()
+                    certificateReason == null
+                            || certificateReason.isBlank()
             ) {
 
                 return Result.error(
@@ -572,61 +762,54 @@ public class ScoreApplyController {
         ScoreApply apply =
                 new ScoreApply();
 
-        /*
-         * 当前登录学生
-         */
         apply.setStudentId(
                 currentStudentId
         );
 
-        /*
-         * 明确设置为个人证书
-         */
         apply.setApplyType(
                 "CERTIFICATE"
         );
 
         /*
-         * 学生不能填写最终分值
+         * 学生不能填写分值
          */
         apply.setApplyScore(
                 null
         );
 
-        /*
-         * 个人证书不属于活动申报
-         */
         apply.setActivityId(
                 null
         );
 
         /*
-         * 个人证书暂时不绑定规则
+         * 个人证书暂不绑定规则
          */
         apply.setRuleId(
                 null
         );
 
-        /*
-         * 有凭证才保存文件
-         */
         apply.setMaterialFile(
                 "YES".equals(hasCertificate)
                         ? materialFile
                         : null
         );
 
-        /*
-         * 证书详细信息
-         */
         apply.setDescription(
                 descriptionJson
         );
 
         /*
-         * 0 = 待审核
+         * 0 = 待初审
          */
         apply.setStatus(
+                (short) 0
+        );
+
+        apply.setPreliminaryStatus(
+                (short) 0
+        );
+
+        apply.setFinalStatus(
                 (short) 0
         );
 
@@ -645,9 +828,7 @@ public class ScoreApplyController {
                             apply
                     );
 
-            if (
-                    result > 0
-            ) {
+            if (result > 0) {
 
                 return Result.success(
                         null
@@ -673,7 +854,7 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
-     * 档案部查询个人证书申请
+     * 档案部查询所有个人证书申请
      * ========================================================
      */
     @GetMapping("/list")
@@ -714,29 +895,27 @@ public class ScoreApplyController {
             Integer status
     ) {
 
-        /*
-         * =====================================================
-         * 根据学号 / 班级筛选学生
-         * =====================================================
-         */
-
         List<Long> studentIds =
                 null;
 
-        if (
+        /*
+         * =====================================================
+         * 根据学生信息筛选
+         * =====================================================
+         */
 
+        if (
                 (
-                        studentNo != null &&
+                        studentNo != null
+                                &&
                                 !studentNo.isBlank()
                 )
-
                         ||
-
                         (
-                                className != null &&
+                                className != null
+                                        &&
                                         !className.isBlank()
                         )
-
         ) {
 
             LambdaQueryWrapper<SysUser>
@@ -744,8 +923,8 @@ public class ScoreApplyController {
                     new LambdaQueryWrapper<>();
 
             if (
-                    studentNo != null &&
-                            !studentNo.isBlank()
+                    studentNo != null
+                            && !studentNo.isBlank()
             ) {
 
                 userWrapper.like(
@@ -755,8 +934,8 @@ public class ScoreApplyController {
             }
 
             if (
-                    className != null &&
-                            !className.isBlank()
+                    className != null
+                            && !className.isBlank()
             ) {
 
                 userWrapper.like(
@@ -783,10 +962,6 @@ public class ScoreApplyController {
                 );
             }
 
-            /*
-             * 搜不到学生
-             */
-
             if (
                     studentIds.isEmpty()
             ) {
@@ -810,7 +985,7 @@ public class ScoreApplyController {
 
         /*
          * =====================================================
-         * 查询个人证书
+         * 查询申请
          * =====================================================
          */
 
@@ -859,12 +1034,6 @@ public class ScoreApplyController {
                         wrapper
                 );
 
-        /*
-         * =====================================================
-         * 转换 VO
-         * =====================================================
-         */
-
         List<ScoreApplyVO> voList =
                 new ArrayList<>();
 
@@ -878,48 +1047,32 @@ public class ScoreApplyController {
                             apply
                     );
 
-            /*
-             * 获奖类别筛选
-             */
-
             if (
-
-                    awardCategory != null &&
-
+                    awardCategory != null
+                            &&
                             !awardCategory.isBlank()
-
             ) {
 
                 if (
-
                         !awardCategory.equals(
                                 vo.getAwardCategory()
                         )
-
                 ) {
 
                     continue;
                 }
             }
 
-            /*
-             * 是否有凭证筛选
-             */
-
             if (
-
-                    hasCertificate != null &&
-
+                    hasCertificate != null
+                            &&
                             !hasCertificate.isBlank()
-
             ) {
 
                 if (
-
                         !hasCertificate.equals(
                                 vo.getHasCertificate()
                         )
-
                 ) {
 
                     continue;
@@ -949,7 +1102,9 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
-     * 查询待审核个人证书
+     * 初审待审核
+     *
+     * 干事 / 副部长 / 部长均可以审核
      * ========================================================
      */
     @GetMapping("/pending")
@@ -982,41 +1137,615 @@ public class ScoreApplyController {
             @RequestParam(
                     required = false
             )
-            String hasCertificate
+            String hasCertificate,
+
+            HttpServletRequest request
     ) {
 
-        return list(
-                pageNum,
-                pageSize,
-                studentNo,
-                className,
-                awardCategory,
-                hasCertificate,
-                0
+        Long currentUserId;
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * 必须是档案部干事 / 副部长 / 部长
+         */
+        if (
+                !isArchiveDepartmentMember(
+                        currentUserId
+                )
+        ) {
+
+            return Result.fail(
+                    "你没有档案部个人证书初审权限"
+            );
+        }
+
+        /*
+         * 只查询：
+         *
+         * 初审状态 = 0
+         *
+         * 不再使用旧 status 判断
+         */
+        LambdaQueryWrapper<ScoreApply>
+                wrapper =
+                new LambdaQueryWrapper<>();
+
+        wrapper.eq(
+                ScoreApply::getApplyType,
+                "CERTIFICATE"
+        );
+
+        wrapper.eq(
+                ScoreApply::getPreliminaryStatus,
+                (short) 0
+        );
+
+        wrapper.orderByDesc(
+                ScoreApply::getCreateTime
+        );
+
+        Page<ScoreApply> page =
+                new Page<>(
+                        pageNum,
+                        pageSize
+                );
+
+        Page<ScoreApply> applyPage =
+                scoreApplyMapper.selectPage(
+                        page,
+                        wrapper
+                );
+
+        List<ScoreApplyVO> voList =
+                new ArrayList<>();
+
+        for (
+                ScoreApply apply :
+                applyPage.getRecords()
+        ) {
+
+            ScoreApplyVO vo =
+                    convertToVO(
+                            apply
+                    );
+
+            /*
+             * 学生筛选
+             */
+            if (
+                    studentNo != null
+                            &&
+                            !studentNo.isBlank()
+            ) {
+
+                if (
+                        vo.getStudentNo() == null
+                                ||
+                                !vo.getStudentNo()
+                                        .contains(studentNo)
+                ) {
+
+                    continue;
+                }
+            }
+
+            /*
+             * 班级筛选
+             */
+            if (
+                    className != null
+                            &&
+                            !className.isBlank()
+            ) {
+
+                if (
+                        vo.getClassName() == null
+                                ||
+                                !vo.getClassName()
+                                        .contains(className)
+                ) {
+
+                    continue;
+                }
+            }
+
+            /*
+             * 获奖类别
+             */
+            if (
+                    awardCategory != null
+                            &&
+                            !awardCategory.isBlank()
+            ) {
+
+                if (
+                        !awardCategory.equals(
+                                vo.getAwardCategory()
+                        )
+                ) {
+
+                    continue;
+                }
+            }
+
+            /*
+             * 是否有凭证
+             */
+            if (
+                    hasCertificate != null
+                            &&
+                            !hasCertificate.isBlank()
+            ) {
+
+                if (
+                        !hasCertificate.equals(
+                                vo.getHasCertificate()
+                        )
+                ) {
+
+                    continue;
+                }
+            }
+
+            voList.add(
+                    vo
+            );
+        }
+
+        Page<ScoreApplyVO> voPage =
+                new Page<>(
+                        pageNum,
+                        pageSize,
+                        voList.size()
+                );
+
+        voPage.setRecords(
+                voList
+        );
+
+        return Result.success(
+                voPage
         );
     }
 
     /**
      * ========================================================
-     * 档案部审核个人证书
+     * 初审
+     *
+     * 干事 / 副部长 / 部长
+     *
+     * 通过时必须填写认定分值
      * ========================================================
-     *
-     * status：
-     *
-     * 1 = 审核通过
-     * 2 = 审核驳回
-     *
-     * 审核通过：
-     * 必须填写最终加分。
-     *
-     * 审核驳回：
-     * 最终加分为空。
      */
-    @PostMapping("/audit")
-    public Result<Void> audit(
+    @PostMapping("/preliminary-audit")
+    public Result<Void> preliminaryAudit(
             @RequestBody AuditRequest request,
             HttpServletRequest httpRequest
     ) {
+
+        Long reviewerId;
+
+        try {
+
+            reviewerId =
+                    getCurrentUserId(
+                            httpRequest
+                    );
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * 权限
+         */
+        if (
+                !isArchiveDepartmentMember(
+                        reviewerId
+                )
+        ) {
+
+            return Result.fail(
+                    "你没有档案部个人证书初审权限"
+            );
+        }
+
+        /*
+         * 参数
+         */
+        if (
+                request == null
+        ) {
+
+            return Result.error(
+                    "审核参数不能为空"
+            );
+        }
+
+        if (
+                request.getId() == null
+        ) {
+
+            return Result.error(
+                    "申请ID不能为空"
+            );
+        }
+
+        if (
+                request.getStatus() == null
+        ) {
+
+            return Result.error(
+                    "审核状态不能为空"
+            );
+        }
+
+        if (
+                request.getStatus() != 1
+                        &&
+                        request.getStatus() != 2
+        ) {
+
+            return Result.error(
+                    "审核状态无效"
+            );
+        }
+
+        ScoreApply apply =
+                scoreApplyMapper.selectById(
+                        request.getId()
+                );
+
+        if (
+                apply == null
+        ) {
+
+            return Result.error(
+                    "申请不存在"
+            );
+        }
+
+        if (
+                !"CERTIFICATE".equals(
+                        apply.getApplyType()
+                )
+        ) {
+
+            return Result.error(
+                    "该申请不是个人证书申请"
+            );
+        }
+
+        /*
+         * 防止重复初审
+         */
+        if (
+                !Short.valueOf((short) 0)
+                        .equals(
+                                apply.getPreliminaryStatus()
+                        )
+        ) {
+
+            return Result.error(
+                    "该申请已经完成初审，不能重复审核"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 初审通过
+         * =====================================================
+         */
+        if (
+                request.getStatus() == 1
+        ) {
+
+            /*
+             * 必须填写分值
+             */
+            if (
+                    request.getFinalScore() == null
+            ) {
+
+                return Result.error(
+                        "初审通过时必须填写认定分值"
+                );
+            }
+
+            /*
+             * 分值必须 > 0
+             */
+            if (
+                    request.getFinalScore()
+                            .compareTo(
+                                    BigDecimal.ZERO
+                            ) <= 0
+            ) {
+
+                return Result.error(
+                        "认定分值必须大于0"
+                );
+            }
+
+            /*
+             * 保存档案部认定分值
+             */
+            apply.setApplyScore(
+                    request.getFinalScore()
+            );
+
+            /*
+             * 初审通过
+             */
+            apply.setPreliminaryStatus(
+                    (short) 1
+            );
+
+            /*
+             * 进入终审
+             */
+            apply.setFinalStatus(
+                    (short) 0
+            );
+
+            /*
+             * 旧总状态暂时保持待审核
+             */
+            apply.setStatus(
+                    (short) 0
+            );
+
+        } else {
+
+            /*
+             * =================================================
+             * 初审驳回
+             * =================================================
+             */
+
+            apply.setApplyScore(
+                    null
+            );
+
+            apply.setPreliminaryStatus(
+                    (short) 2
+            );
+
+            /*
+             * 驳回以后无需终审
+             */
+            apply.setFinalStatus(
+                    (short) 2
+            );
+
+            apply.setStatus(
+                    (short) 2
+            );
+        }
+
+        apply.setPreliminaryReviewerId(
+                reviewerId
+        );
+
+        apply.setPreliminaryReviewTime(
+                LocalDateTime.now()
+        );
+
+        apply.setUpdateTime(
+                LocalDateTime.now()
+        );
+
+        int result =
+                scoreApplyMapper.updateById(
+                        apply
+                );
+
+        if (
+                result <= 0
+        ) {
+
+            return Result.error(
+                    "初审操作失败"
+            );
+        }
+
+        return Result.success(
+                null
+        );
+    }
+
+    /**
+     * ========================================================
+     * 终审待审核
+     *
+     * 只有档案部副部长 / 部长可以查看
+     * ========================================================
+     */
+    @GetMapping("/final-pending")
+    public Result<Page<ScoreApplyVO>> finalPending(
+            @RequestParam(
+                    defaultValue = "1"
+            )
+            long pageNum,
+
+            @RequestParam(
+                    defaultValue = "10"
+            )
+            long pageSize,
+
+            HttpServletRequest request
+    ) {
+
+        Long currentUserId;
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * 只有副部长 / 部长
+         */
+        if (
+                !isArchiveFinalReviewer(
+                        currentUserId
+                )
+        ) {
+
+            return Result.fail(
+                    "只有档案部副部长、部长可以进行终审"
+            );
+        }
+
+        LambdaQueryWrapper<ScoreApply>
+                wrapper =
+                new LambdaQueryWrapper<>();
+
+        wrapper.eq(
+                ScoreApply::getApplyType,
+                "CERTIFICATE"
+        );
+
+        /*
+         * 初审通过
+         */
+        wrapper.eq(
+                ScoreApply::getPreliminaryStatus,
+                (short) 1
+        );
+
+        /*
+         * 等待终审
+         */
+        wrapper.eq(
+                ScoreApply::getFinalStatus,
+                (short) 0
+        );
+
+        wrapper.orderByDesc(
+                ScoreApply::getCreateTime
+        );
+
+        Page<ScoreApply> page =
+                new Page<>(
+                        pageNum,
+                        pageSize
+                );
+
+        Page<ScoreApply> result =
+                scoreApplyMapper.selectPage(
+                        page,
+                        wrapper
+                );
+
+        List<ScoreApplyVO> records =
+                new ArrayList<>();
+
+        for (
+                ScoreApply apply :
+                result.getRecords()
+        ) {
+
+            records.add(
+                    convertToVO(apply)
+            );
+        }
+
+        Page<ScoreApplyVO> voPage =
+                new Page<>(
+                        result.getCurrent(),
+                        result.getSize(),
+                        result.getTotal()
+                );
+
+        voPage.setRecords(
+                records
+        );
+
+        return Result.success(
+                voPage
+        );
+    }
+
+    /**
+     * ========================================================
+     * 终审
+     *
+     * 只有副部长 / 部长
+     *
+     * 终审通过以后：
+     *
+     * ScoreRecord
+     *       ↓
+     * 正式成绩
+     * ========================================================
+     */
+    @PostMapping("/final-audit")
+    @Transactional
+    public Result<Void> finalAudit(
+            @RequestBody AuditRequest request,
+            HttpServletRequest httpRequest
+    ) {
+
+        Long reviewerId;
+
+        try {
+
+            reviewerId =
+                    getCurrentUserId(
+                            httpRequest
+                    );
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * =====================================================
+         * 权限
+         * =====================================================
+         */
+
+        if (
+                !isArchiveFinalReviewer(
+                        reviewerId
+                )
+        ) {
+
+            return Result.fail(
+                    "只有档案部副部长、部长可以进行终审"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 参数
+         * =====================================================
+         */
 
         if (
                 request == null
@@ -1046,11 +1775,9 @@ public class ScoreApplyController {
         }
 
         if (
-
-                request.getStatus() != 1 &&
-
+                request.getStatus() != 1
+                        &&
                         request.getStatus() != 2
-
         ) {
 
             return Result.error(
@@ -1072,10 +1799,6 @@ public class ScoreApplyController {
             );
         }
 
-        /*
-         * 必须是个人证书
-         */
-
         if (
                 !"CERTIFICATE".equals(
                         apply.getApplyType()
@@ -1088,50 +1811,38 @@ public class ScoreApplyController {
         }
 
         /*
-         * =====================================================
-         * 审核通过
-         * =====================================================
+         * 必须通过初审
          */
-
         if (
-                request.getStatus() == 1
+                !Short.valueOf((short) 1)
+                        .equals(
+                                apply.getPreliminaryStatus()
+                        )
         ) {
 
-            if (
-                    request.getFinalScore() == null
-            ) {
+            return Result.error(
+                    "该申请尚未通过初审，不能进行终审"
+            );
+        }
 
-                return Result.error(
-                        "审核通过时必须填写最终加分"
-                );
-            }
+        /*
+         * 防止重复终审
+         */
+        if (
+                !Short.valueOf((short) 0)
+                        .equals(
+                                apply.getFinalStatus()
+                        )
+        ) {
 
-            if (
-
-                    request.getFinalScore()
-                            .compareTo(
-                                    BigDecimal.ZERO
-                            ) < 0
-
-            ) {
-
-                return Result.error(
-                        "最终加分不能小于0"
-                );
-            }
-
-            /*
-             * 最终加分由档案部确定
-             */
-
-            apply.setApplyScore(
-                    request.getFinalScore()
+            return Result.error(
+                    "该申请已经完成终审，不能重复审核"
             );
         }
 
         /*
          * =====================================================
-         * 审核驳回
+         * 终审驳回
          * =====================================================
          */
 
@@ -1139,39 +1850,239 @@ public class ScoreApplyController {
                 request.getStatus() == 2
         ) {
 
-            apply.setApplyScore(
+            apply.setFinalStatus(
+                    (short) 2
+            );
+
+            apply.setStatus(
+                    (short) 2
+            );
+
+            apply.setFinalReviewerId(
+                    reviewerId
+            );
+
+            apply.setFinalReviewTime(
+                    LocalDateTime.now()
+            );
+
+            apply.setUpdateTime(
+                    LocalDateTime.now()
+            );
+
+            scoreApplyMapper.updateById(
+                    apply
+            );
+
+            return Result.success(
                     null
             );
         }
 
         /*
          * =====================================================
-         * 更新状态
+         * 终审通过
          * =====================================================
          */
 
+        if (
+                apply.getApplyScore() == null
+        ) {
+
+            return Result.error(
+                    "该申请没有档案部认定分值，无法终审"
+            );
+        }
+
+        if (
+                apply.getApplyScore()
+                        .compareTo(
+                                BigDecimal.ZERO
+                        ) <= 0
+        ) {
+
+            return Result.error(
+                    "档案部认定分值必须大于0"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 查询当前学期
+         * =====================================================
+         */
+
+        LocalDate today =
+                LocalDate.now();
+
+        SysSemester semester =
+                sysSemesterMapper.selectOne(
+                        new LambdaQueryWrapper<SysSemester>()
+                                .le(
+                                        SysSemester::getStartDate,
+                                        today
+                                )
+                                .ge(
+                                        SysSemester::getEndDate,
+                                        today
+                                )
+                                .eq(
+                                        SysSemester::getStatus,
+                                        (short) 1
+                                )
+                                .orderByDesc(
+                                        SysSemester::getStartDate
+                                )
+                                .last(
+                                        "LIMIT 1"
+                                )
+                );
+
+        if (
+                semester == null
+        ) {
+
+            return Result.error(
+                    "当前没有正在进行的学期，无法生成正式成绩记录"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 防止重复生成 ScoreRecord
+         * =====================================================
+         */
+
+        Long existCount =
+                scoreRecordMapper.selectCount(
+                        new LambdaQueryWrapper<ScoreRecord>()
+                                .eq(
+                                        ScoreRecord::getSourceType,
+                                        "CERTIFICATE"
+                                )
+                                .eq(
+                                        ScoreRecord::getSourceId,
+                                        apply.getId()
+                                )
+                );
+
+        if (
+                existCount != null
+                        &&
+                        existCount > 0
+        ) {
+
+            return Result.error(
+                    "该证书已经生成正式成绩记录，不能重复审批"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 创建正式成绩记录
+         * =====================================================
+         */
+
+        ScoreRecord record =
+                new ScoreRecord();
+
+        record.setStudentId(
+                apply.getStudentId()
+        );
+
+        /*
+         * 个人证书暂时没有 ruleId
+         */
+        record.setRuleId(
+                apply.getRuleId()
+        );
+
+        record.setScore(
+                apply.getApplyScore()
+        );
+
+        record.setSemesterId(
+                semester.getId()
+        );
+
+        /*
+         * 来源类型
+         */
+        record.setSourceType(
+                "CERTIFICATE"
+        );
+
+        /*
+         * 来源申请ID
+         */
+        record.setSourceId(
+                apply.getId()
+        );
+
+        /*
+         * 正常
+         */
+        record.setStatus(
+                (short) 1
+        );
+
+        /*
+         * 管理员未隐藏
+         */
+        record.setAdminHidden(
+                (short) 0
+        );
+
+        record.setCreateTime(
+                LocalDateTime.now()
+        );
+
+        int insertResult =
+                scoreRecordMapper.insert(
+                        record
+                );
+
+        if (
+                insertResult <= 0
+        ) {
+
+            return Result.error(
+                    "正式成绩生成失败"
+            );
+        }
+
+        /*
+         * =====================================================
+         * 更新申请最终状态
+         * =====================================================
+         */
+
+        apply.setFinalStatus(
+                (short) 1
+        );
+
+        apply.setFinalReviewerId(
+                reviewerId
+        );
+
+        apply.setFinalReviewTime(
+                LocalDateTime.now()
+        );
+
+        /*
+         * 1 = 整个证书审核完成
+         */
         apply.setStatus(
-                request.getStatus()
-                        .shortValue()
+                (short) 1
         );
 
         apply.setUpdateTime(
                 LocalDateTime.now()
         );
 
-        int result =
-                scoreApplyMapper.updateById(
-                        apply
-                );
-
-        if (
-                result <= 0
-        ) {
-
-            return Result.error(
-                    "审核操作失败"
-            );
-        }
+        scoreApplyMapper.updateById(
+                apply
+        );
 
         return Result.success(
                 null
@@ -1202,20 +2113,24 @@ public class ScoreApplyController {
                 apply.getApplyType()
         );
 
+        /*
+         * 档案部认定分值
+         *
+         * 学生提交时为 null
+         * 初审通过以后才有值
+         */
         vo.setApplyScore(
                 apply.getApplyScore()
         );
-
-        /*
-         * score 与申请最终分值保持一致
-         */
 
         vo.setScore(
                 apply.getApplyScore()
         );
 
         /*
-         * 审核状态
+         * =====================================================
+         * 总状态
+         * =====================================================
          */
 
         vo.setStatus(
@@ -1225,7 +2140,49 @@ public class ScoreApplyController {
         );
 
         /*
+         * =====================================================
+         * 初审状态
+         * =====================================================
+         */
+
+        vo.setPreliminaryStatus(
+                apply.getPreliminaryStatus() != null
+                        ? apply.getPreliminaryStatus().intValue()
+                        : 0
+        );
+
+        vo.setPreliminaryReviewerId(
+                apply.getPreliminaryReviewerId()
+        );
+
+        vo.setPreliminaryReviewTime(
+                apply.getPreliminaryReviewTime()
+        );
+
+        /*
+         * =====================================================
+         * 终审状态
+         * =====================================================
+         */
+
+        vo.setFinalStatus(
+                apply.getFinalStatus() != null
+                        ? apply.getFinalStatus().intValue()
+                        : 0
+        );
+
+        vo.setFinalReviewerId(
+                apply.getFinalReviewerId()
+        );
+
+        vo.setFinalReviewTime(
+                apply.getFinalReviewTime()
+        );
+
+        /*
+         * =====================================================
          * 材料
+         * =====================================================
          */
 
         vo.setMaterialFile(
@@ -1233,7 +2190,9 @@ public class ScoreApplyController {
         );
 
         /*
+         * =====================================================
          * 创建时间
+         * =====================================================
          */
 
         vo.setCreateTime(
@@ -1259,26 +2218,26 @@ public class ScoreApplyController {
                     user != null
             ) {
 
+                /*
+                 * 学号
+                 */
                 vo.setStudentNo(
                         user.getStudentNo()
                 );
 
+                /*
+                 * 班级
+                 */
                 vo.setClassName(
                         user.getClassName()
                 );
 
                 /*
-                 * 如果 ScoreApplyVO 中存在 realName 字段，
-                 * 可以使用：
-                 *
-                 * vo.setRealName(user.getRealName());
-                 *
-                 * 当前不强制设置，避免 VO 没有该字段再次报错。
-                 *
-                 * 注意：
-                 * SysUser 没有 getName()。
-                 * 正确的是 getRealName()。
+                 * 学生姓名
                  */
+                vo.setStudentName(
+                        user.getRealName()
+                );
             }
         }
 
@@ -1300,26 +2259,12 @@ public class ScoreApplyController {
             );
 
             /*
-             * 个人证书属于加分申请。
-             *
-             * 注意：
-             * 这里不再调用：
-             *
-             * vo.setScoreType(...)
-             *
-             * 因为当前 ScoreApplyVO 没有这个方法。
+             * 页面标题
              */
-
-            /*
-             * 项目名称
-             */
-
             if (
-
-                    vo.getAwardName() != null &&
-
+                    vo.getAwardName() != null
+                            &&
                             !vo.getAwardName().isBlank()
-
             ) {
 
                 vo.setTitle(
@@ -1336,7 +2281,7 @@ public class ScoreApplyController {
 
         /*
          * =====================================================
-         * 规则名称
+         * 规则
          * =====================================================
          */
 
@@ -1364,7 +2309,7 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
-     * 解析个人证书 JSON
+     * 解析个人证书JSON
      * ========================================================
      */
     private void parseCertificateDescription(
@@ -1373,11 +2318,8 @@ public class ScoreApplyController {
     ) {
 
         if (
-
-                description == null ||
-
-                        description.isBlank()
-
+                description == null
+                        || description.isBlank()
         ) {
 
             return;
@@ -1472,7 +2414,7 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
-     * JSON 字段读取
+     * JSON字段读取
      * ========================================================
      */
     private String getText(
@@ -1481,13 +2423,11 @@ public class ScoreApplyController {
     ) {
 
         if (
-
-                node == null ||
-
-                        !node.has(field) ||
-
+                node == null
+                        ||
+                        !node.has(field)
+                        ||
                         node.get(field).isNull()
-
         ) {
 
             return null;
@@ -1568,20 +2508,10 @@ public class ScoreApplyController {
 
         public String awardType;
 
-        /*
-         * YES = 有凭证
-         * NO = 无凭证
-         */
         public String hasCertificate;
 
-        /*
-         * 没有凭证时填写的原因
-         */
         public String certificateReason;
 
-        /*
-         * 学生补充说明
-         */
         public String description;
     }
 }
