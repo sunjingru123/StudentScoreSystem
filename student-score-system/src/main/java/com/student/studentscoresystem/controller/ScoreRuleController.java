@@ -25,6 +25,7 @@ public class ScoreRuleController {
     public Result<List<ScoreRule>> list() {
         List<ScoreRule> rules = scoreRuleService.list(
                 new LambdaQueryWrapper<ScoreRule>()
+                        .isNotNull(ScoreRule::getDepartmentId)
                         .orderByDesc(ScoreRule::getCreateTime)
         );
         return Result.success(rules);

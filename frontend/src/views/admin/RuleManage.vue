@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>规则管理</h2>
-        <p>查看当前评分规则列表</p>
+        <p>仅管理部门加减分的固定评分项目，部门临时/非固定模板不在这里维护</p>
       </div>
     </div>
 
@@ -51,14 +51,14 @@ async function loadRules() {
 
     rules.value = Array.isArray(list)
       ? list.map((item) => ({
-          id: item.id ?? item.ruleId ?? item.rule_id,
-          ruleName: item.ruleName ?? item.name ?? item.rule_name ?? '未命名规则',
-          category: item.category ?? item.type ?? item.ruleType ?? item.classify ?? '其他',
-          score: item.score ?? item.ruleScore ?? item.value ?? 0,
-          description: item.description ?? item.remark ?? item.memo ?? '-',
-          status: item.status ?? item.enabled ?? item.state ?? 1,
-          createTime: item.createTime ?? item.createdTime ?? item.create_time ?? '-',
-        }))
+        id: item.id ?? item.ruleId ?? item.rule_id,
+        ruleName: item.ruleName ?? item.name ?? item.rule_name ?? '未命名规则',
+        category: item.category ?? item.type ?? item.ruleType ?? item.classify ?? '其他',
+        score: item.score ?? item.ruleScore ?? item.value ?? 0,
+        description: item.description ?? item.remark ?? item.memo ?? '-',
+        status: item.status ?? item.enabled ?? item.state ?? 1,
+        createTime: item.createTime ?? item.createdTime ?? item.create_time ?? '-',
+      }))
       : []
   } catch (error) {
     console.error('加载规则失败：', error)

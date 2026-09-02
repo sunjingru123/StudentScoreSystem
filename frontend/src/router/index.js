@@ -18,11 +18,8 @@ import Login from '@/views/Login.vue'
 import MainLayout from '@/layout/MainLayout.vue'
 
 import Home from '@/views/Home.vue'
-
 import Score from '@/views/Score.vue'
-
 import Apply from '@/views/Apply.vue'
-
 import Record from '@/views/Record.vue'
 
 import StudentMessage from '@/views/student/Message.vue'
@@ -35,15 +32,8 @@ import StudentMessage from '@/views/student/Message.vue'
 import AdminLayout from '@/layout/AdminLayout.vue'
 
 import AdminHome from '@/views/admin/AdminHome.vue'
-
-import ApplyAudit from '@/views/admin/ApplyAudit.vue'
-
 import StudentManage from '@/views/admin/StudentManage.vue'
-
 import RuleManage from '@/views/admin/RuleManage.vue'
-
-import AdminScore from '@/views/admin/AdminScore.vue'
-
 import ExcelImport from '@/views/admin/ExcelImport.vue'
 
 
@@ -54,11 +44,8 @@ import ExcelImport from '@/views/admin/ExcelImport.vue'
 import TeacherLayout from '@/layout/TeacherLayout.vue'
 
 import TeacherHome from '@/views/teacher/TeacherHome.vue'
-
 import TeacherActivity from '@/views/teacher/TeacherActivity.vue'
-
 import TeacherScore from '@/views/teacher/TeacherScore.vue'
-
 import TeacherMessage from '@/views/teacher/TeacherMessage.vue'
 
 
@@ -354,25 +341,9 @@ const router = createRouter({
         },
 
 
-        {
-          path: 'score',
-
-          name: 'AdminScore',
-
-          component: AdminScore,
-
-        },
-
-
-        {
-          path: 'apply',
-
-          name: 'AdminApplyAudit',
-
-          component: ApplyAudit,
-
-        },
-
+        // ---------------------------------------------------
+        // 学生管理
+        // ---------------------------------------------------
 
         {
           path: 'student',
@@ -383,6 +354,10 @@ const router = createRouter({
 
         },
 
+
+        // ---------------------------------------------------
+        // 学生详情
+        // ---------------------------------------------------
 
         {
           path: 'student/:id',
@@ -397,6 +372,10 @@ const router = createRouter({
         },
 
 
+        // ---------------------------------------------------
+        // 加分规则
+        // ---------------------------------------------------
+
         {
           path: 'rule',
 
@@ -406,6 +385,10 @@ const router = createRouter({
 
         },
 
+
+        // ---------------------------------------------------
+        // 成绩调整
+        // ---------------------------------------------------
 
         {
           path: 'score-adjustment',
@@ -419,6 +402,10 @@ const router = createRouter({
 
         },
 
+
+        // ---------------------------------------------------
+        // Excel 导入
+        // ---------------------------------------------------
 
         {
           path: 'excel-import',
@@ -557,7 +544,7 @@ router.addRoute({
 
   path: '/:pathMatch(.*)*',
 
-  redirect: '/login',
+  redirect: '/login'
 
 })
 
@@ -665,17 +652,20 @@ router.beforeEach(async (to) => {
 
     }
 
+
     if (role === '学生') {
 
       return '/home'
 
     }
 
+
     if (role === '辅导员') {
 
       return '/teacher'
 
     }
+
 
     return '/login'
 
@@ -787,6 +777,7 @@ router.beforeEach(async (to) => {
 
     }
 
+
     return true
 
   }
@@ -806,6 +797,7 @@ router.beforeEach(async (to) => {
 
     }
 
+
     return true
 
   }
@@ -824,6 +816,7 @@ router.beforeEach(async (to) => {
       return '/teacher'
 
     }
+
 
     return true
 
