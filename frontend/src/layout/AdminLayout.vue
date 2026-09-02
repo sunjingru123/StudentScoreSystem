@@ -2,7 +2,6 @@
 
   <el-container class="layout">
 
-
     <!-- =====================================================
          左侧菜单
     ====================================================== -->
@@ -24,13 +23,11 @@
 
       </div>
 
-
       <el-menu
         :default-active="route.path"
         router
         class="menu"
       >
-
 
         <el-menu-item
           index="/admin/adminHome"
@@ -46,7 +43,6 @@
 
         </el-menu-item>
 
-
         <el-menu-item
           index="/admin/student"
         >
@@ -60,7 +56,6 @@
           </span>
 
         </el-menu-item>
-
 
         <el-menu-item
           index="/admin/rule"
@@ -76,28 +71,8 @@
 
         </el-menu-item>
 
-
         <!-- =================================================
-             个人申请审核
-        ================================================== -->
-
-        <el-menu-item
-          index="/admin/apply"
-        >
-
-          <el-icon>
-            <DocumentChecked />
-          </el-icon>
-
-          <span>
-            个人加分审核
-          </span>
-
-        </el-menu-item>
-
-
-        <!-- =================================================
-             部门申报管理
+             加减分调整
         ================================================== -->
 
         <el-menu-item
@@ -114,7 +89,6 @@
 
         </el-menu-item>
 
-
         <el-menu-item
           index="/admin/excel-import"
         >
@@ -128,22 +102,6 @@
           </span>
 
         </el-menu-item>
-
-
-        <el-menu-item
-          index="/admin/score"
-        >
-
-          <el-icon>
-            <DataAnalysis />
-          </el-icon>
-
-          <span>
-            成绩管理
-          </span>
-
-        </el-menu-item>
-
 
         <!-- =================================================
              汇总导出
@@ -163,18 +121,15 @@
 
         </el-menu-item>
 
-
       </el-menu>
 
     </el-aside>
-
 
     <!-- =====================================================
          右侧
     ====================================================== -->
 
     <el-container>
-
 
       <el-header class="header">
 
@@ -194,7 +149,6 @@
 
         </div>
 
-
         <div class="header-right">
 
           <div class="admin-info">
@@ -207,7 +161,6 @@
               {{ adminName.charAt(0) }}
 
             </el-avatar>
-
 
             <div class="admin-text">
 
@@ -222,7 +175,6 @@
             </div>
 
           </div>
-
 
           <el-button
             type="danger"
@@ -242,13 +194,11 @@
 
       </el-header>
 
-
       <el-main class="main">
 
         <router-view />
 
       </el-main>
-
 
     </el-container>
 
@@ -263,21 +213,17 @@ import {
   computed
 } from 'vue'
 
-
 import {
   useRouter,
   useRoute
 } from 'vue-router'
 
-
 import {
   House,
   User,
   Tickets,
-  DocumentChecked,
   EditPen,
   Upload,
-  DataAnalysis,
   Download,
   SwitchButton
 } from '@element-plus/icons-vue'
@@ -363,17 +309,6 @@ const currentPageName =
 
     if (
       path.startsWith(
-        '/admin/apply'
-      )
-    ) {
-
-      return '个人加分审核'
-
-    }
-
-
-    if (
-      path.startsWith(
         '/admin/score-adjustment'
       )
     ) {
@@ -390,15 +325,6 @@ const currentPageName =
     ) {
 
       return 'Excel数据导入'
-
-    }
-
-
-    if (
-      path === '/admin/score'
-    ) {
-
-      return '成绩管理'
 
     }
 
