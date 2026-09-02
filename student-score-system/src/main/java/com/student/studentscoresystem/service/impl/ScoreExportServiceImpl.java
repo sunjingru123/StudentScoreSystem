@@ -58,7 +58,7 @@ public class ScoreExportServiceImpl
 
 
     /* =========================================================
-       导出
+       Excel 导出
        ========================================================= */
 
     @Override
@@ -66,6 +66,12 @@ public class ScoreExportServiceImpl
             Long semesterId,
             String className,
             HttpServletResponse response) {
+
+        /*
+         * =====================================================
+         * 1. 参数检查
+         * =====================================================
+         */
 
         if (semesterId == null) {
 
@@ -75,8 +81,10 @@ public class ScoreExportServiceImpl
         }
 
 
-        if (className == null
-                || className.trim().isEmpty()) {
+        if (
+                className == null
+                        || className.trim().isEmpty()
+        ) {
 
             throw new IllegalArgumentException(
                     "请输入班级"
@@ -84,13 +92,19 @@ public class ScoreExportServiceImpl
         }
 
 
+        /*
+         * 去掉用户输入的前后空格
+         */
+
         className =
                 className.trim();
 
 
-        /* =====================================================
-           查询学期
-           ===================================================== */
+        /*
+         * =====================================================
+         * 2. 查询学期
+         * =====================================================
+         */
 
         SysSemester semester =
                 sysSemesterMapper.selectById(
@@ -106,34 +120,91 @@ public class ScoreExportServiceImpl
         }
 
 
-        /* =====================================================
-           查询指定班级学生
-           ===================================================== */
+        /*
+         * =====================================================
+         * 3. 查询指定班级的所有学生
+         *
+         * ★★★ 这里是这次最重要的修改
+         *
+         * 以前：
+         *
+         *     class_name = '25级1班'
+         *
+         * 现在：
+         *
+         *     TRIM(class_name) LIKE '%25级1班%'
+         *
+         * 这样可以处理：
+         *
+         * 25级1班
+         * 25级1班
+         * 25级1班软件工程
+         *
+         * 等情况。
+         *
+         * =====================================================
+         */
 
         List<SysUser> students =
                 sysUserMapper.selectList(
 
                         new LambdaQueryWrapper<SysUser>()
 
-                                .eq(
-                                        SysUser::getClassName,
+                                /*
+                                 * 去掉数据库 class_name
+                                 * 两边可能存在的空格，
+                                 * 然后进行模糊匹配。
+                                 *
+                                 * PostgreSQL：
+                                 *
+                                 * TRIM(class_name)
+                                 * LIKE '%xxx%'
+                                 */
+                                .apply(
+                                        "TRIM(class_name) LIKE CONCAT('%', {0}, '%')",
                                         className
                                 )
 
-                                .eq(
-                                        SysUser::getStatus,
-                                        (short) 1
-                                )
-
+                                /*
+                                 * 按学号排序
+                                 */
                                 .orderByAsc(
                                         SysUser::getStudentNo
+                                )
+
+                                /*
+                                 * 再按照用户ID排序，
+                                 * 保证排序稳定。
+                                 */
+                                .orderByAsc(
+                                        SysUser::getId
                                 )
                 );
 
 
-        /* =====================================================
-           创建 Excel
-           ===================================================== */
+        /*
+         * =====================================================
+         * ★★★ 不在这里因为“没有成绩”过滤学生
+         *
+         * students 里面查到多少学生，
+         * Excel 就必须生成多少学生。
+         *
+         * 即使这个学生完全没有 score_record，
+         * 也必须出现：
+         *
+         * 加分 = 0
+         * 减分 = 0
+         * 具体情况 = 空
+         *
+         * =====================================================
+         */
+
+
+        /*
+         * =====================================================
+         * 4. 创建 Excel
+         * =====================================================
+         */
 
         try (
                 Workbook workbook =
@@ -146,9 +217,11 @@ public class ScoreExportServiceImpl
                     );
 
 
-            /* =================================================
-               样式
-               ================================================= */
+            /*
+             * =================================================
+             * 5. 创建样式
+             * =================================================
+             */
 
             CellStyle headerStyle =
                     createHeaderStyle(
@@ -168,26 +241,22 @@ public class ScoreExportServiceImpl
                     );
 
 
-            /* =================================================
-               表头
-               ================================================= */
+            /*
+             * =================================================
+             * 6. 创建表头
+             * =================================================
+             */
 
             Row header =
                     sheet.createRow(0);
 
 
             String[] headers = {
-
                     "姓名",
-
                     "学号",
-
                     "加分",
-
                     "减分",
-
                     "加减分具体情况"
-
             };
 
 
@@ -200,9 +269,11 @@ public class ScoreExportServiceImpl
                 Cell cell =
                         header.createCell(i);
 
+
                 cell.setCellValue(
                         headers[i]
                 );
+
 
                 cell.setCellStyle(
                         headerStyle
@@ -210,32 +281,36 @@ public class ScoreExportServiceImpl
             }
 
 
-            /* =================================================
-               获取所有学生ID
-               ================================================= */
+            /*
+             * =================================================
+             * 7. 获取所有学生ID
+             * =================================================
+             */
 
             List<Long> studentIds =
                     students.stream()
-
                             .map(
                                     SysUser::getId
                             )
-
                             .filter(
                                     Objects::nonNull
                             )
-
                             .collect(
                                     Collectors.toList()
                             );
 
 
             /*
+             * =================================================
+             * 8. 创建成绩 Map
+             *
              * key：
-             * studentId
+             *     studentId
              *
              * value：
-             * 该学生所有部门加减分记录
+             *     这个学生在当前学期的所有正式成绩
+             *
+             * =================================================
              */
 
             Map<Long, List<ScoreRecord>>
@@ -244,7 +319,22 @@ public class ScoreExportServiceImpl
 
 
             /*
-             * 所有正式成绩记录
+             * =================================================
+             * 9. 查询正式成绩
+             *
+             * ★★★ 不再限制：
+             *
+             *     sourceType = DEPARTMENT
+             *
+             * 所有正式、未隐藏的成绩都参与导出。
+             *
+             * 包括：
+             *
+             * DEPARTMENT
+             * CERTIFICATE
+             * 以及以后其他正式成绩来源。
+             *
+             * =================================================
              */
 
             if (!studentIds.isEmpty()) {
@@ -254,64 +344,106 @@ public class ScoreExportServiceImpl
 
                                 new LambdaQueryWrapper<ScoreRecord>()
 
+                                        /*
+                                         * 当前班级学生
+                                         */
                                         .in(
                                                 ScoreRecord::getStudentId,
                                                 studentIds
                                         )
 
+                                        /*
+                                         * 当前学期
+                                         */
                                         .eq(
                                                 ScoreRecord::getSemesterId,
                                                 semesterId
                                         )
 
+                                        /*
+                                         * 正式有效成绩
+                                         */
                                         .eq(
                                                 ScoreRecord::getStatus,
                                                 (short) 1
                                         )
 
+                                        /*
+                                         * 管理员没有隐藏
+                                         */
                                         .eq(
                                                 ScoreRecord::getAdminHidden,
                                                 (short) 0
                                         )
 
                                         /*
-                                         * 只统计部门申报产生的成绩
+                                         * 按学生排序
                                          */
-                                        .eq(
-                                                ScoreRecord::getSourceType,
-                                                "DEPARTMENT"
-                                        )
-
                                         .orderByAsc(
                                                 ScoreRecord::getStudentId
                                         )
 
+                                        /*
+                                         * 同一个学生按照创建时间排序
+                                         */
                                         .orderByAsc(
                                                 ScoreRecord::getCreateTime
                                         )
                         );
 
 
-                recordMap =
-                        records.stream()
+                /*
+                 * =================================================
+                 * 分组：
+                 *
+                 * studentId
+                 *     ↓
+                 * List<ScoreRecord>
+                 * =================================================
+                 */
 
-                                .collect(
-                                        Collectors.groupingBy(
-                                                ScoreRecord::getStudentId
-                                        )
-                                );
+                if (
+                        records != null
+                                && !records.isEmpty()
+                ) {
+
+                    recordMap =
+                            records.stream()
+                                    .filter(
+                                            Objects::nonNull
+                                    )
+                                    .collect(
+                                            Collectors.groupingBy(
+                                                    ScoreRecord::getStudentId
+                                            )
+                                    );
+                }
             }
 
 
-            /* =================================================
-               获取所有部门申报ID
-               ================================================= */
+            /*
+             * =================================================
+             * 10. 获取部门申报ID
+             *
+             * 只有 DEPARTMENT 类型的成绩需要查询
+             * department_score_apply。
+             * =================================================
+             */
 
             Set<Long> applyIds =
                     recordMap.values()
                             .stream()
                             .flatMap(
                                     Collection::stream
+                            )
+                            .filter(
+                                    Objects::nonNull
+                            )
+                            .filter(
+                                    record ->
+                                            "DEPARTMENT".equals(
+                                                    record.getSourceType()
+                                            )
                             )
                             .map(
                                     ScoreRecord::getSourceId
@@ -325,10 +457,9 @@ public class ScoreExportServiceImpl
 
 
             /*
-             * 根据 sourceId 查询原始部门申报
-             *
-             * sourceId =
-             * department_score_apply.id
+             * =================================================
+             * 11. 查询部门申报
+             * =================================================
              */
 
             Map<Long, DepartmentScoreApply>
@@ -351,28 +482,61 @@ public class ScoreExportServiceImpl
                         );
 
 
-                applyMap =
-                        applies.stream()
+                if (
+                        applies != null
+                                && !applies.isEmpty()
+                ) {
 
-                                .collect(
-                                        Collectors.toMap(
-                                                DepartmentScoreApply::getId,
-                                                item -> item,
-                                                (a, b) -> a
-                                        )
-                                );
+                    applyMap =
+                            applies.stream()
+                                    .filter(
+                                            Objects::nonNull
+                                    )
+                                    .filter(
+                                            item ->
+                                                    item.getId() != null
+                                    )
+                                    .collect(
+                                            Collectors.toMap(
+                                                    DepartmentScoreApply::getId,
+                                                    item -> item,
+                                                    (a, b) -> a
+                                            )
+                                    );
+                }
             }
 
 
-            /* =================================================
-               开始写入学生数据
-               ================================================= */
+            /*
+             * =================================================
+             * 12. 开始生成学生数据
+             *
+             * ★★★ students 是“所有学生”
+             *
+             * 所以：
+             *
+             * 没成绩的学生也会进入这里。
+             *
+             * =================================================
+             */
 
             int rowIndex = 1;
 
 
-            for (SysUser student :
-                    students) {
+            for (
+                    SysUser student
+                    : students
+            ) {
+
+                if (student == null) {
+
+                    continue;
+                }
+
+
+                /*
+                 * 创建 Excel 行
+                 */
 
                 Row row =
                         sheet.createRow(
@@ -381,11 +545,14 @@ public class ScoreExportServiceImpl
 
 
                 /*
-                 * 学生姓名
+                 * =================================================
+                 * 13. 姓名
+                 * =================================================
                  */
 
                 Cell nameCell =
                         row.createCell(0);
+
 
                 nameCell.setCellValue(
                         safeString(
@@ -393,17 +560,21 @@ public class ScoreExportServiceImpl
                         )
                 );
 
+
                 nameCell.setCellStyle(
                         normalStyle
                 );
 
 
                 /*
-                 * 学号
+                 * =================================================
+                 * 14. 学号
+                 * =================================================
                  */
 
                 Cell studentNoCell =
                         row.createCell(1);
+
 
                 studentNoCell.setCellValue(
                         safeString(
@@ -411,13 +582,22 @@ public class ScoreExportServiceImpl
                         )
                 );
 
+
                 studentNoCell.setCellStyle(
                         normalStyle
                 );
 
 
                 /*
-                 * 获取学生成绩
+                 * =================================================
+                 * 15. 获取这个学生的成绩
+                 *
+                 * ★★★ 如果没有成绩：
+                 *
+                 * Collections.emptyList()
+                 *
+                 * 不会跳过学生。
+                 * =================================================
                  */
 
                 List<ScoreRecord> records =
@@ -427,6 +607,14 @@ public class ScoreExportServiceImpl
                         );
 
 
+                /*
+                 * =================================================
+                 * 16. 初始化加分、减分
+                 *
+                 * ★★★ 默认就是 0
+                 * =================================================
+                 */
+
                 BigDecimal addScore =
                         BigDecimal.ZERO;
 
@@ -435,20 +623,29 @@ public class ScoreExportServiceImpl
                         BigDecimal.ZERO;
 
 
+                /*
+                 * =================================================
+                 * 17. 明细
+                 * =================================================
+                 */
+
                 List<String> details =
                         new ArrayList<>();
 
 
-                /* =================================================
-                   汇总该学生所有加减分
-                   ================================================= */
+                /*
+                 * =================================================
+                 * 18. 汇总成绩
+                 * =================================================
+                 */
 
                 for (
-                        ScoreRecord record :
-                        records
+                        ScoreRecord record
+                        : records
                 ) {
 
                     if (record == null) {
+
                         continue;
                     }
 
@@ -458,12 +655,15 @@ public class ScoreExportServiceImpl
 
 
                     if (score == null) {
+
                         continue;
                     }
 
 
                     /*
+                     * =================================================
                      * 加分
+                     * =================================================
                      */
 
                     if (
@@ -480,7 +680,9 @@ public class ScoreExportServiceImpl
 
 
                     /*
+                     * =================================================
                      * 减分
+                     * =================================================
                      */
 
                     else if (
@@ -496,79 +698,144 @@ public class ScoreExportServiceImpl
                     }
 
 
-                    /* =================================================
-                       具体情况
-                       ================================================= */
+                    /*
+                     * =================================================
+                     * 19. 生成具体情况
+                     * =================================================
+                     */
 
-                    DepartmentScoreApply apply =
-                            applyMap.get(
-                                    record.getSourceId()
-                            );
+                    String title = "";
 
 
-                    if (apply != null) {
+                    /*
+                     * -------------------------------------------------
+                     * 部门加减分
+                     * -------------------------------------------------
+                     */
 
-                        String title =
-                                safeString(
-                                        apply.getTitle()
+                    if (
+                            "DEPARTMENT".equals(
+                                    record.getSourceType()
+                            )
+                    ) {
+
+                        DepartmentScoreApply apply =
+                                applyMap.get(
+                                        record.getSourceId()
                                 );
 
 
+                        if (apply != null) {
+
+                            title =
+                                    safeString(
+                                            apply.getTitle()
+                                    );
+                        }
+                    }
+
+
+                    /*
+                     * -------------------------------------------------
+                     * 个人证书加分
+                     * -------------------------------------------------
+                     *
+                     * 这里暂时显示：
+                     *
+                     * 个人证书加分+2
+                     *
+                     * 后面如果你需要，我还可以把证书名称、
+                     * 获奖级别等具体内容也解析出来。
+                     *
+                     * -------------------------------------------------
+                     */
+
+                    else if (
+                            "CERTIFICATE".equals(
+                                    record.getSourceType()
+                            )
+                    ) {
+
+                        title =
+                                "个人证书加分";
+                    }
+
+
+                    /*
+                     * -------------------------------------------------
+                     * 其他类型
+                     * -------------------------------------------------
+                     */
+
+                    else if (
+                            record.getSourceType() != null
+                    ) {
+
+                        title =
+                                safeString(
+                                        record.getSourceType()
+                                );
+                    }
+
+
+                    /*
+                     * =================================================
+                     * 20. 生成明细字符串
+                     *
+                     * ★★★ 不要括号
+                     *
+                     * 加分：
+                     *
+                     * 志愿服务+2
+                     *
+                     * 减分：
+                     *
+                     * 无故缺席-1
+                     * =================================================
+                     */
+
+                    if (
+                            !title.isEmpty()
+                    ) {
+
+                        String detail;
+
+
                         if (
-                                !title.isEmpty()
+                                score.compareTo(
+                                        BigDecimal.ZERO
+                                ) > 0
                         ) {
 
-                            /*
-                             * 加分显示：
-                             *
-                             * 优秀志愿服务(+2)
-                             *
-                             * 减分显示：
-                             *
-                             * 无故缺席(-1)
-                             */
+                            detail =
+                                    title
+                                            + "+"
+                                            + formatScore(
+                                            score
+                                    );
 
-                            String detail;
+                        } else {
 
-
-                            if (
-                                    score.compareTo(
-                                            BigDecimal.ZERO
-                                    ) > 0
-                            ) {
-
-                                detail =
-                                        title
-                                                + "(+"
-                                                + formatScore(
-                                                score
-                                        )
-                                                + ")";
-
-                            }
-
-                            else {
-
-                                detail =
-                                        title
-                                                + "(-"
-                                                + formatScore(
-                                                score.abs()
-                                        )
-                                                + ")";
-                            }
-
-
-                            details.add(
-                                    detail
-                            );
+                            detail =
+                                    title
+                                            + "-"
+                                            + formatScore(
+                                            score.abs()
+                                    );
                         }
+
+
+                        details.add(
+                                detail
+                        );
                     }
                 }
 
 
                 /*
-                 * 加分
+                 * =================================================
+                 * 21. 写入加分
+                 * =================================================
                  */
 
                 Cell addCell =
@@ -588,7 +855,9 @@ public class ScoreExportServiceImpl
 
 
                 /*
-                 * 减分
+                 * =================================================
+                 * 22. 写入减分
+                 * =================================================
                  */
 
                 Cell deductCell =
@@ -608,15 +877,18 @@ public class ScoreExportServiceImpl
 
 
                 /*
-                 * 加减分具体情况
+                 * =================================================
+                 * 23. 写入加减分具体情况
                  *
-                 * ★★★ 这里就是你要求的格式
-                 *
-                 * 每条之间用：
+                 * ★★★ 每条之间使用中文分号：
                  *
                  * ；
                  *
-                 * 不换行。
+                 * 没有成绩：
+                 *
+                 * 空字符串
+                 *
+                 * =================================================
                  */
 
                 Cell detailCell =
@@ -637,9 +909,11 @@ public class ScoreExportServiceImpl
             }
 
 
-            /* =================================================
-               设置列宽
-               ================================================= */
+            /*
+             * =================================================
+             * 24. 设置列宽
+             * =================================================
+             */
 
             /*
              * 姓名
@@ -683,8 +957,6 @@ public class ScoreExportServiceImpl
 
             /*
              * 加减分具体情况
-             *
-             * 不自动换行
              */
 
             sheet.setColumnWidth(
@@ -694,7 +966,9 @@ public class ScoreExportServiceImpl
 
 
             /*
-             * 冻结第一行
+             * =================================================
+             * 25. 冻结第一行
+             * =================================================
              */
 
             sheet.createFreezePane(
@@ -703,9 +977,11 @@ public class ScoreExportServiceImpl
             );
 
 
-            /* =================================================
-               自动筛选
-               ================================================= */
+            /*
+             * =================================================
+             * 26. 自动筛选
+             * =================================================
+             */
 
             if (rowIndex > 1) {
 
@@ -720,9 +996,11 @@ public class ScoreExportServiceImpl
             }
 
 
-            /* =================================================
-               设置文件名
-               ================================================= */
+            /*
+             * =================================================
+             * 27. 文件名
+             * =================================================
+             */
 
             String fileName =
                     className
@@ -741,6 +1019,12 @@ public class ScoreExportServiceImpl
                     );
 
 
+            /*
+             * =================================================
+             * 28. 设置响应头
+             * =================================================
+             */
+
             response.setContentType(
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             );
@@ -758,9 +1042,11 @@ public class ScoreExportServiceImpl
             );
 
 
-            /* =================================================
-               输出
-               ================================================= */
+            /*
+             * =================================================
+             * 29. 输出 Excel
+             * =================================================
+             */
 
             workbook.write(
                     response.getOutputStream()
@@ -803,7 +1089,9 @@ public class ScoreExportServiceImpl
         );
 
 
-        style.setFont(font);
+        style.setFont(
+                font
+        );
 
 
         style.setAlignment(
@@ -862,12 +1150,12 @@ public class ScoreExportServiceImpl
 
 
         /*
-         * ★★★ 最重要
-         *
-         * 禁止自动换行
+         * 不自动换行
          */
 
-        style.setWrapText(false);
+        style.setWrapText(
+                false
+        );
 
 
         style.setBorderTop(
@@ -927,6 +1215,7 @@ public class ScoreExportServiceImpl
 
             return "";
         }
+
 
         return value.trim();
     }

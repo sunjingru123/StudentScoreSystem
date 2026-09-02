@@ -14,7 +14,7 @@
       <div class="logo">
 
         <div class="logo-title">
-          综合测评系统
+          学生综合测评系统
         </div>
 
         <div class="logo-subtitle">
@@ -136,7 +136,7 @@
         <div class="header-left">
 
           <span class="system-name">
-            综合测评系统
+            学生综合测评系统
           </span>
 
           <span class="divider">
