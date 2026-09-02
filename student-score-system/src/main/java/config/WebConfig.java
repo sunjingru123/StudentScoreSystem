@@ -51,22 +51,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
 
                 .excludePathPatterns(
-                        "/login"
-                )
-
-                /*
-                 * 文件访问不需要重新进行 JWT 拦截
-                 *
-                 * 因为文件上传时已经验证过登录身份。
-                 *
-                 * 否则：
-                 *
-                 * /uploads/xxx.pdf
-                 *
-                 * 可能再次被 JWT 拦截器拦截。
-                 */
-                .excludePathPatterns(
-                        "/uploads/**"
+                        "/login",
+                        "/uploads/**",
+                        "/file/view/**"
                 );
 
 
@@ -75,11 +62,9 @@ public class WebConfig implements WebMvcConfigurer {
 
                 .addPathPatterns("/**")
 
-                /*
-                 * 静态文件同样排除
-                 */
                 .excludePathPatterns(
-                        "/uploads/**"
+                        "/uploads/**",
+                        "/file/view/**"
                 );
 
     }

@@ -3,11 +3,15 @@ package com.student.studentscoresystem.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.Department;
+import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUserDepartment;
+import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
+import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
+import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.IScoreExportService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -31,12 +35,34 @@ public class ScoreExportController {
 
     private final DepartmentMapper departmentMapper;
 
+    /*
+     * =========================================================
+     * 用户岗位
+     * =========================================================
+     *
+     * 管理员身份实际上保存在：
+     *
+     * sys_user_position
+     *       ↓
+     * sys_position
+     *
+     * JWT 里面目前没有 role，
+     * 所以管理员权限直接从数据库判断。
+     *
+     * =========================================================
+     */
+    private final SysUserPositionMapper sysUserPositionMapper;
+
+    private final SysPositionMapper sysPositionMapper;
+
 
     public ScoreExportController(
             IScoreExportService scoreExportService,
             SysSemesterMapper sysSemesterMapper,
             SysUserDepartmentMapper userDepartmentMapper,
-            DepartmentMapper departmentMapper) {
+            DepartmentMapper departmentMapper,
+            SysUserPositionMapper sysUserPositionMapper,
+            SysPositionMapper sysPositionMapper) {
 
         this.scoreExportService =
                 scoreExportService;
@@ -49,6 +75,12 @@ public class ScoreExportController {
 
         this.departmentMapper =
                 departmentMapper;
+
+        this.sysUserPositionMapper =
+                sysUserPositionMapper;
+
+        this.sysPositionMapper =
+                sysPositionMapper;
     }
 
 
@@ -58,6 +90,10 @@ public class ScoreExportController {
 
     private Long getCurrentUserId(
             HttpServletRequest request) {
+
+        /*
+         * JWT 拦截器已经把 userId 放进 request
+         */
 
         Object userIdAttr =
                 request.getAttribute(
@@ -77,6 +113,11 @@ public class ScoreExportController {
             }
         }
 
+
+        /*
+         * 如果 request 中没有，
+         * 再从 Authorization 中解析。
+         */
 
         String token =
                 request.getHeader(
@@ -132,118 +173,123 @@ public class ScoreExportController {
 
 
     /* =========================================================
-       获取当前用户角色
+       判断当前用户是不是管理员
        ========================================================= */
 
-    private String getCurrentUserRole(
-            HttpServletRequest request) {
+    private boolean isAdmin(
+            Long userId) {
 
-        /*
-         * 登录过滤器如果已经把角色放进 request，
-         * 优先使用。
-         */
+        if (userId == null) {
 
-        Object roleAttr =
-                request.getAttribute(
-                        "userRole"
-                );
-
-
-        if (roleAttr != null) {
-
-            return roleAttr.toString();
+            return false;
         }
 
 
-        String token =
-                request.getHeader(
-                        "Authorization"
+        /*
+         * 查询当前用户所有岗位
+         */
+
+        List<SysUserPosition>
+                userPositions =
+                sysUserPositionMapper.selectList(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getUserId,
+                                        userId
+                                )
                 );
 
 
         if (
-                token == null
-                        || !token.startsWith(
-                        "Bearer "
-                )
+                userPositions == null
+                        || userPositions.isEmpty()
         ) {
 
-            return null;
+            return false;
         }
 
 
-        try {
+        /*
+         * 逐个查询岗位
+         */
 
-            Claims claims =
-                    JwtUtil.parseToken(
-                            token.substring(7)
+        for (
+                SysUserPosition userPosition
+                : userPositions
+        ) {
+
+            if (userPosition == null) {
+
+                continue;
+            }
+
+
+            if (
+                    userPosition.getPositionId()
+                            == null
+            ) {
+
+                continue;
+            }
+
+
+            SysPosition position =
+                    sysPositionMapper.selectById(
+                            userPosition.getPositionId()
                     );
 
 
+            if (position == null) {
+
+                continue;
+            }
+
+
             /*
-             * 登录接口目前返回 LoginVO.role，
-             * JWT 中一般也会保存 role。
+             * 岗位必须是启用状态
              */
 
-            Object role =
-                    claims.get("role");
+            if (
+                    position.getStatus() != null
+                            && position.getStatus() != 1
+            ) {
 
-
-            if (role == null) {
-
-                /*
-                 * 兼容 userRole
-                 */
-
-                role =
-                        claims.get(
-                                "userRole"
-                        );
+                continue;
             }
 
 
-            if (role == null) {
-                return null;
+            /*
+             * 管理员
+             */
+
+            if (
+                    "管理员".equals(
+                            position.getName()
+                    )
+                            ||
+                            "ADMIN".equalsIgnoreCase(
+                                    position.getName()
+                            )
+            ) {
+
+                return true;
             }
-
-
-            return role.toString();
-
-
-        } catch (Exception e) {
-
-            return null;
         }
+
+
+        return false;
     }
 
 
     /* =========================================================
-       判断管理员
-       ========================================================= */
-
-    private boolean isAdmin(
-            HttpServletRequest request) {
-
-        String role =
-                getCurrentUserRole(
-                        request
-                );
-
-
-        return "管理员".equals(role)
-                || "ADMIN".equalsIgnoreCase(role)
-                || "admin".equalsIgnoreCase(role);
-    }
-
-
-    /* =========================================================
-       判断是否为档案部部长/副部长
+       判断是否为档案部部长 / 副部长
        ========================================================= */
 
     private boolean isArchiveLeader(
             Long userId) {
 
         if (userId == null) {
+
             return false;
         }
 
@@ -296,6 +342,7 @@ public class ScoreExportController {
                     relation.getDepartmentId()
                             == null
             ) {
+
                 continue;
             }
 
@@ -307,9 +354,14 @@ public class ScoreExportController {
 
 
             if (department == null) {
+
                 continue;
             }
 
+
+            /*
+             * 部门必须启用
+             */
 
             if (
                     !Short.valueOf((short) 1)
@@ -321,6 +373,10 @@ public class ScoreExportController {
                 continue;
             }
 
+
+            /*
+             * 必须是档案部
+             */
 
             if (
                     "档案部".equals(
@@ -338,19 +394,21 @@ public class ScoreExportController {
 
 
     /* =========================================================
-       导出权限
+       判断是否拥有导出权限
        ========================================================= */
 
     private boolean canExport(
-            Long userId,
-            HttpServletRequest request) {
+            Long userId) {
 
         /*
-         * 管理员
+         * 1. 系统管理员
+         *
+         * 管理员拥有最高权限，
+         * 不需要绑定档案部。
          */
 
         if (
-                isAdmin(request)
+                isAdmin(userId)
         ) {
 
             return true;
@@ -358,7 +416,7 @@ public class ScoreExportController {
 
 
         /*
-         * 档案部部长 / 副部长
+         * 2. 档案部部长 / 副部长
          */
 
         return isArchiveLeader(
@@ -396,7 +454,7 @@ public class ScoreExportController {
 
         boolean admin =
                 isAdmin(
-                        request
+                        userId
                 );
 
 
@@ -461,10 +519,13 @@ public class ScoreExportController {
         }
 
 
+        /*
+         * 权限检查
+         */
+
         if (
                 !canExport(
-                        userId,
-                        request
+                        userId
                 )
         ) {
 
@@ -473,6 +534,10 @@ public class ScoreExportController {
             );
         }
 
+
+        /*
+         * 查询全部学期
+         */
 
         List<SysSemester> list =
                 sysSemesterMapper.selectList(
@@ -490,7 +555,7 @@ public class ScoreExportController {
 
 
     /* =========================================================
-       导出
+       Excel 导出
        ========================================================= */
 
     @GetMapping("/department")
@@ -519,13 +584,14 @@ public class ScoreExportController {
 
 
         /*
+         * =====================================================
          * 权限检查
+         * =====================================================
          */
 
         if (
                 !canExport(
-                        userId,
-                        request
+                        userId
                 )
         ) {
 
@@ -536,7 +602,9 @@ public class ScoreExportController {
 
 
         /*
+         * =====================================================
          * 参数检查
+         * =====================================================
          */
 
         if (semesterId == null) {
@@ -559,7 +627,9 @@ public class ScoreExportController {
 
 
         /*
-         * 检查学期是否存在
+         * =====================================================
+         * 检查学期
+         * =====================================================
          */
 
         SysSemester semester =
@@ -577,7 +647,9 @@ public class ScoreExportController {
 
 
         /*
+         * =====================================================
          * 开始导出
+         * =====================================================
          */
 
         scoreExportService.export(
