@@ -63,7 +63,30 @@ public class ScoreApplyVO {
      * 个人证书申请固定为 1
      */
     private Integer scoreType;
+    /**
+     * 初审状态
+     */
+    private Integer preliminaryStatus;
 
+    /**
+     * 初审审核人
+     */
+    private Long preliminaryReviewerId;
+
+    /**
+     * 初审时间
+     */
+    private LocalDateTime preliminaryReviewTime;
+
+    /**
+     * 终审审核人
+     */
+    private Long finalReviewerId;
+
+    /**
+     * 终审时间
+     */
+    private LocalDateTime finalReviewTime;
     /**
      * 项目名称
      *

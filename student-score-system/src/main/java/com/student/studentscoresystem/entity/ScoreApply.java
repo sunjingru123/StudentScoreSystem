@@ -154,7 +154,43 @@ public class ScoreApply implements Serializable {
      * 直接进入档案部审核。
      */
     private Short status;
+    /**
+     * 初审状态
+     *
+     * 0 = 待初审
+     * 1 = 初审通过
+     * 2 = 初审驳回
+     */
+    private Short preliminaryStatus;
 
+    /**
+     * 初审审核人
+     */
+    private Long preliminaryReviewerId;
+
+    /**
+     * 初审时间
+     */
+    private LocalDateTime preliminaryReviewTime;
+
+    /**
+     * 终审状态
+     *
+     * 0 = 待终审
+     * 1 = 终审通过
+     * 2 = 终审驳回
+     */
+    private Short finalStatus;
+
+    /**
+     * 终审审核人
+     */
+    private Long finalReviewerId;
+
+    /**
+     * 终审时间
+     */
+    private LocalDateTime finalReviewTime;
     /**
      * 创建时间
      */

@@ -113,9 +113,10 @@
 
 
 
-        <!-- =================================================
-             ★ 档案部个人证书审核
-        ================================================== -->
+        <!--
+ ★ 档案部个人证书审核
+ ★ 干事 / 副部长 / 部长均可审核
+-->
 
         <el-menu-item
           v-if="archiveLeader"
@@ -425,10 +426,10 @@ async function loadPermission() {
 
 
     /*
-     * 档案部负责人：
-     *
-     * 档案部部长 / 副部长
-     */
+ * 档案部证书审核人员：
+ *
+ * 档案部干事 / 副部长 / 部长
+ */
 
     archiveLeader.value =
 
@@ -440,8 +441,9 @@ async function loadPermission() {
           department.departmentName === '档案部' &&
 
           (
-            department.position === '部长' ||
-            department.position === '副部长'
+            department.position === '干事' ||
+            department.position === '副部长' ||
+            department.position === '部长'
           )
       )
 
