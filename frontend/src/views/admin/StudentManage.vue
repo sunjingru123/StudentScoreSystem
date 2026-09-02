@@ -153,24 +153,32 @@
         </el-table-column>
 
 
-        <!-- 综合评分 -->
+        <!-- 加分 -->
 
         <el-table-column
-          label="综合评分"
-          width="130"
+          label="加分"
+          width="90"
           align="center"
         >
-
           <template #default="{ row }">
-
-            <span class="score">
-
-              {{ formatScore(row.totalScore) }}
-
-            </span>
-
+    <span class="score">
+      {{ formatScore(row.scoreStatistics?.bonusScore ?? 0) }}
+    </span>
           </template>
+        </el-table-column>
 
+        <!-- 减分 -->
+
+        <el-table-column
+          label="减分"
+          width="90"
+          align="center"
+        >
+          <template #default="{ row }">
+    <span class="score">
+      {{ formatScore(row.scoreStatistics?.deductScore ?? 0) }}
+    </span>
+          </template>
         </el-table-column>
 
 
@@ -319,15 +327,23 @@
         </div>
 
 
-        <!-- 综合评分 -->
+        <!-- 加减分 -->
 
         <div class="total-score">
 
-          综合评分：
+  <span>
+    加分：
+    <strong>
+      {{ formatScore(currentStudent?.scoreStatistics?.bonusScore ?? 0) }}
+    </strong>
+  </span>
 
-          <strong>
-            {{ formatScore(currentTotal) }}
-          </strong>
+          <span style="margin-left: 30px;">
+    减分：
+    <strong>
+      {{ formatScore(currentStudent?.scoreStatistics?.deductScore ?? 0) }}
+    </strong>
+  </span>
 
         </div>
 
