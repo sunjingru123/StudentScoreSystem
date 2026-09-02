@@ -170,25 +170,32 @@
         />
 
 
-        <!-- 综合评分 -->
+        <!-- 加分 -->
 
         <el-table-column
-          prop="totalScore"
-          label="综合评分"
-          min-width="120"
+          label="加分"
+          min-width="100"
           align="center"
         >
-
           <template #default="scope">
-
-            <span class="score">
-
-              {{ scope.row.totalScore ?? 0 }}
-
-            </span>
-
+    <span class="score">
+      {{ scope.row.bonusScore ?? 0 }}
+    </span>
           </template>
+        </el-table-column>
 
+        <!-- 减分 -->
+
+        <el-table-column
+          label="减分"
+          min-width="100"
+          align="center"
+        >
+          <template #default="scope">
+    <span class="score">
+      {{ scope.row.deductScore ?? 0 }}
+    </span>
+          </template>
         </el-table-column>
 
 
@@ -670,7 +677,8 @@ async function load() {
           student.classNameName ??
           '',
 
-        totalScore: 0
+        bonusScore: 0,
+        deductScore: 0
 
       }
 
@@ -698,10 +706,11 @@ async function load() {
           typeof scoreData === 'object'
         ) {
 
-          row.totalScore =
-            scoreData.totalScore ??
-            scoreData.score ??
-            0
+          row.bonusScore =
+            Number(scoreData.bonusScore ?? 0)
+
+          row.deductScore =
+            Number(scoreData.deductScore ?? 0)
 
         }
 
@@ -714,7 +723,8 @@ async function load() {
           error
         )
 
-        row.totalScore = 0
+        row.bonusScore = 0
+        row.deductScore = 0
 
       }
 
