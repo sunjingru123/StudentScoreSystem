@@ -546,135 +546,65 @@ async function loadPending() {
         '/departmentScoreApply/final-audit/list'
       )
 
-
     console.log(
       '辅导员最终审核完整响应：',
       res
     )
 
-
-    const result =
-      res?.data
-
-
-    console.log(
-      '接口 data：',
-      result
-    )
-
-
     /*
-     * 情况1
+     * utils/request 已经返回后端 Result
      *
-     * {
-     *   code: 200,
-     *   data: []
-     * }
+     * 所以：
+     *
+     * res.code
+     * res.data
+     *
+     * res.data 就是申报数组
      */
 
     if (
-      Array.isArray(
-        result?.data
-      )
+      res?.code === 200 &&
+      Array.isArray(res.data)
     ) {
 
       pendingList.value =
-        result.data
+        res.data
 
       pendingCount.value =
-        result.data.length
+        res.data.length
 
-      return
+    } else {
 
-    }
-
-
-    /*
-     * 情况2
-     *
-     * {
-     *   code: 200,
-     *   data: {
-     *      list: []
-     *   }
-     * }
-     */
-
-    if (
-      Array.isArray(
-        result?.data?.list
+      console.warn(
+        '辅导员最终审核接口返回异常：',
+        res
       )
-    ) {
 
-      pendingList.value =
-        result.data.list
+      pendingList.value = []
 
-      pendingCount.value =
-        result.data.list.length
-
-      return
-
+      pendingCount.value = 0
     }
-
-
-    /*
-     * 情况3
-     *
-     * {
-     *   code: 200,
-     *   data: {
-     *      records: []
-     *   }
-     * }
-     */
-
-    if (
-      Array.isArray(
-        result?.data?.records
-      )
-    ) {
-
-      pendingList.value =
-        result.data.records
-
-      pendingCount.value =
-        result.data.records.length
-
-      return
-
-    }
-
-
-    console.warn(
-      '最终审核接口没有找到数组数据：',
-      result
-    )
-
-
-    pendingList.value = []
-
-    pendingCount.value = 0
-
 
   } catch (error) {
 
     console.error(
-      '获取部门最终审核申请失败：',
+      '获取辅导员最终审核列表失败：',
       error
     )
-
 
     pendingList.value = []
 
     pendingCount.value = 0
 
+    ElMessage.error(
+      '获取最终审核列表失败，请检查后端服务'
+    )
 
   } finally {
 
     loading.value = false
 
   }
-
 }
 
 

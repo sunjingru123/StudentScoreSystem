@@ -566,8 +566,7 @@ async function loadList() {
     )
 
 
-    const result =
-      res?.data
+    const result = res
 
 
     /*
@@ -882,8 +881,7 @@ async function finalAuditRequest(
 
 
   const result =
-    res?.data
-
+    res
 
   /*
    * =====================================================

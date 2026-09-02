@@ -764,32 +764,38 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /*
-     * =========================================================
-     * 当前用户部门权限
+    /**
+     * ============================================================
+     * 获取当前用户部门权限
+     * ============================================================
      *
-     * ★★★ 这里重点修改
+     * 权限规则：
      *
-     * 不再先筛选部门再判断权限，
-     * 而是明确查询：
+     * 干事：
+     *      可以部门加减分申报
+     *      不可以部门申报审核
      *
-     * 当前用户
-     * +
-     * 在职
-     * +
-     * 干事 / 副部长 / 部长
+     * 副部长：
+     *      可以部门加减分申报
+     *      可以部门申报审核
      *
-     * 的所有部门身份。
+     * 部长：
+     *      可以部门加减分申报
+     *      可以部门申报审核
      *
-     * =========================================================
+     * 普通学生：
+     *      不可以部门加减分申报
+     *      不可以部门申报审核
      */
     @GetMapping("/my-permissions")
     public Result<Map<String, Object>> myPermissions(
             HttpServletRequest request) {
 
+    /* ========================================================
+       1. 获取当前登录用户
+       ======================================================== */
 
         Long currentUserId;
-
 
         try {
 
@@ -801,93 +807,160 @@ public class DepartmentScoreApplyController {
             return Result.fail(
                     e.getMessage()
             );
+
+        }
+
+
+        if (currentUserId == null) {
+
+            return Result.fail(
+                    "请先登录"
+            );
+
         }
 
 
         System.out.println(
-                "========== 查询部门权限 =========="
+                "========================================"
         );
 
         System.out.println(
-                "currentUserId = "
+                "部门权限检查，当前用户ID = "
                         + currentUserId
         );
 
 
-        /*
-         * 查询当前用户所有在职部门身份
-         */
+    /* ========================================================
+       2. 查询当前用户所有有效部门关系
+
+       这里非常重要：
+
+       不要在 SQL 查询阶段直接过滤 position。
+
+       先把用户所有有效部门关系查出来，
+       然后 Java 再判断岗位。
+
+       这样可以避免数据库中的岗位文字
+       与前端显示存在轻微差异时，
+       直接导致整个部门消失。
+       ======================================================== */
+
         List<SysUserDepartment> relations =
-
                 userDepartmentMapper.selectList(
-
                         new LambdaQueryWrapper<SysUserDepartment>()
-
                                 .eq(
                                         SysUserDepartment::getUserId,
                                         currentUserId
                                 )
-
                                 .eq(
                                         SysUserDepartment::getStatus,
                                         (short) 1
-                                )
-
-                                .in(
-                                        SysUserDepartment::getPosition,
-                                        List.of(
-                                                "干事",
-                                                "副部长",
-                                                "部长"
-                                        )
-                                )
-
-                                .orderByAsc(
-                                        SysUserDepartment::getDepartmentId
                                 )
                 );
 
 
         System.out.println(
-                "在职部门身份数量 = "
+                "当前用户有效部门关系数量 = "
                         + relations.size()
         );
 
 
-        List<Map<String, Object>>
-                departments =
+    /* ========================================================
+       3. 准备返回数据
+       ======================================================== */
+
+        List<Map<String, Object>> departments =
                 new ArrayList<>();
 
 
-        boolean canDepartmentApply =
-                false;
+        boolean canDepartmentApply = false;
+
+        boolean canDepartmentAudit = false;
 
 
-        boolean canDepartmentAudit =
-                false;
+    /* ========================================================
+       4. 遍历部门关系
+       ======================================================== */
+
+        for (
+                SysUserDepartment relation
+                : relations
+        ) {
+
+            if (
+                    relation == null
+                            || relation.getDepartmentId() == null
+            ) {
+
+                continue;
+
+            }
 
 
-        for (SysUserDepartment relation :
-                relations) {
+            String position =
+                    relation.getPosition();
 
 
             System.out.println(
-                    "用户身份：userId="
-                            + relation.getUserId()
-                            + "，departmentId="
+                    "部门关系："
+                            + "departmentId="
                             + relation.getDepartmentId()
-                            + "，position="
-                            + relation.getPosition()
-                            + "，status="
-                            + relation.getStatus()
+                            + ", position="
+                            + position
             );
 
 
-            if (relation.getDepartmentId() == null) {
+        /* ====================================================
+           5. 岗位判断
+
+           干事 / 副部长 / 部长
+           都可以进行部门申报
+           ==================================================== */
+
+            boolean applyPermission =
+                    canApply(position);
+
+
+        /* ====================================================
+           6. 岗位判断
+
+           副部长 / 部长
+           可以进行部门审核
+           ==================================================== */
+
+            boolean auditPermission =
+                    canAudit(position);
+
+
+            /*
+             * 如果岗位本身不是部门干部，
+             * 直接跳过。
+             *
+             * 例如：
+             *
+             * 普通成员
+             * 普通学生
+             * 其他岗位
+             */
+            if (
+                    !applyPermission
+                            && !auditPermission
+            ) {
 
                 continue;
+
             }
 
+
+        /* ====================================================
+           7. 查询部门
+
+           注意：
+           这里不再因为 department.status
+           导致整个权限直接消失。
+
+           只要部门存在，就返回部门身份。
+           ==================================================== */
 
             Department department =
                     departmentMapper.selectById(
@@ -895,30 +968,37 @@ public class DepartmentScoreApplyController {
                     );
 
 
-            if (department == null) {
+            String departmentName;
 
-                System.out.println(
-                        "部门不存在："
-                                + relation.getDepartmentId()
-                );
 
-                continue;
+            if (department != null) {
+
+                departmentName =
+                        department.getName();
+
+            } else {
+
+                /*
+                 * 如果部门表查询不到，
+                 * 至少保留部门 ID。
+                 *
+                 * 这样前端不会直接显示：
+                 *
+                 * 当前没有部门干部身份
+                 *
+                 * 而是可以明确看到部门关系存在。
+                 */
+
+                departmentName =
+                        "部门 " +
+                                relation.getDepartmentId();
+
             }
 
 
-            if (!Short.valueOf((short) 1)
-                    .equals(
-                            department.getStatus()
-                    )) {
-
-                System.out.println(
-                        "部门未启用："
-                                + department.getId()
-                );
-
-                continue;
-            }
-
+        /* ====================================================
+           8. 构造部门信息
+           ==================================================== */
 
             Map<String, Object> item =
                     new HashMap<>();
@@ -932,56 +1012,42 @@ public class DepartmentScoreApplyController {
 
             item.put(
                     "departmentName",
-                    department.getName()
+                    departmentName
             );
 
 
             item.put(
                     "position",
-                    relation.getPosition()
+                    position
             );
 
 
-            departments.add(
-                    item
-            );
+            departments.add(item);
 
 
-            /*
-             * 只要存在一个可以申报的部门身份，
-             * 就拥有部门申报权限。
-             */
-            if (canApply(
-                    relation.getPosition()
-            )) {
+        /* ====================================================
+           9. 设置权限
+           ==================================================== */
 
-                canDepartmentApply =
-                        true;
+            if (applyPermission) {
+
+                canDepartmentApply = true;
+
             }
 
 
-            /*
-             * 只要存在一个部长 / 副部长身份，
-             * 就拥有部门审核权限。
-             */
-            if (canAudit(
-                    relation.getPosition()
-            )) {
+            if (auditPermission) {
 
-                canDepartmentAudit =
-                        true;
+                canDepartmentAudit = true;
+
             }
+
         }
 
 
-        /*
-         * ★★★ 这里不要用：
-         *
-         * canDepartmentApply = !departments.isEmpty()
-         *
-         * 直接根据实际职位计算。
-         */
-
+    /* ========================================================
+       10. 返回权限
+       ======================================================== */
 
         Map<String, Object> data =
                 new HashMap<>();
@@ -1006,6 +1072,12 @@ public class DepartmentScoreApplyController {
 
 
         System.out.println(
+                "最终部门数量 = "
+                        + departments.size()
+        );
+
+
+        System.out.println(
                 "canDepartmentApply = "
                         + canDepartmentApply
         );
@@ -1018,13 +1090,7 @@ public class DepartmentScoreApplyController {
 
 
         System.out.println(
-                "departments = "
-                        + departments
-        );
-
-
-        System.out.println(
-                "=================================="
+                "========================================"
         );
 
 
@@ -1288,15 +1354,53 @@ public class DepartmentScoreApplyController {
 
                         new LambdaQueryWrapper<DepartmentScoreApply>()
 
+                                /*
+                                 * =====================================================
+                                 * 只查询当前用户负责部门的待审核申报
+                                 * =====================================================
+                                 */
+
                                 .in(
                                         DepartmentScoreApply::getDepartmentId,
                                         departmentIds
                                 )
 
+                                /*
+                                 * 只查询待审核
+                                 *
+                                 * 0 = 待审核
+                                 */
+
                                 .eq(
                                         DepartmentScoreApply::getStatus,
                                         (short) 0
                                 )
+
+                                /*
+                                 * =====================================================
+                                 * ★★★ 最关键
+                                 *
+                                 * 不能审核自己提交的申报。
+                                 *
+                                 * 这里直接从“待审核列表”里排除自己提交的，
+                                 * 而不是等点击审核以后才报错。
+                                 *
+                                 * 所以：
+                                 *
+                                 * 部长自己提交的 → 不显示
+                                 * 副部长自己提交的 → 不显示
+                                 * 其他人提交的     → 正常显示
+                                 * =====================================================
+                                 */
+
+                                .ne(
+                                        DepartmentScoreApply::getApplicantId,
+                                        currentUserId
+                                )
+
+                                /*
+                                 * 最新申报排在前面
+                                 */
 
                                 .orderByDesc(
                                         DepartmentScoreApply::getCreateTime

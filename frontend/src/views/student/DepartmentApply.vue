@@ -1552,7 +1552,6 @@ async function loadPermission() {
 
   loadingPermission.value = true
 
-
   try {
 
     const res =
@@ -1560,10 +1559,37 @@ async function loadPermission() {
         '/departmentScoreApply/my-permissions',
       )
 
+    console.log(
+      '部门权限：',
+      res
+    )
+
+    /*
+     * @/utils/request 已经返回后端 Result
+     *
+     * 所以：
+     * res.code
+     * res.data
+     *
+     * 不能再写成 res.data.data
+     */
+
+    const result = res || {}
+
+    if (
+      Number(result.code) !== 200 &&
+      Number(result.code) !== 0
+    ) {
+
+      throw new Error(
+        result.message ||
+        '获取部门权限失败'
+      )
+
+    }
 
     const data =
-      res.data?.data || {}
-
+      result.data || {}
 
     /*
      * 部门列表
@@ -1574,22 +1600,39 @@ async function loadPermission() {
         ? data.departments
         : []
 
-
     /*
      * 部门申报权限
+     *
+     * 干事 / 副部长 / 部长
      */
 
     permission.canDepartmentApply =
-      data.canDepartmentApply === true
-
+      data.canDepartmentApply === true ||
+      Number(data.canDepartmentApply) === 1
 
     /*
      * 部门审核权限
+     *
+     * 副部长 / 部长
      */
 
     permission.canDepartmentAudit =
-      data.canDepartmentAudit === true
+      data.canDepartmentAudit === true ||
+      Number(data.canDepartmentAudit) === 1
 
+    console.log(
+      '最终部门权限：',
+      {
+        departments:
+        permission.departments,
+
+        canDepartmentApply:
+        permission.canDepartmentApply,
+
+        canDepartmentAudit:
+        permission.canDepartmentAudit
+      }
+    )
 
 
     /*
@@ -1598,25 +1641,18 @@ async function loadPermission() {
 
     const validDepartmentIds =
       permission.departments.map(
-        (item) => item.departmentId,
+        item => item.departmentId
       )
-
 
     if (
-
       departmentForm.departmentId &&
-
       !validDepartmentIds.some(
-
-        (id) =>
-
+        id =>
           String(id) ===
           String(
-            departmentForm.departmentId,
-          ),
-
+            departmentForm.departmentId
+          )
       )
-
     ) {
 
       departmentForm.departmentId = null
@@ -1629,11 +1665,13 @@ async function loadPermission() {
 
 
     /*
-     * 如果刷新权限后已经没有审核权限，
-     * 清空审核选择。
+     * 如果没有审核权限，
+     * 清空审核数据。
      */
 
-    if (!permission.canDepartmentAudit) {
+    if (
+      !permission.canDepartmentAudit
+    ) {
 
       selectedAuditRows.value = []
 
@@ -1642,14 +1680,12 @@ async function loadPermission() {
     }
 
   }
-
   catch (error) {
 
     console.error(
       '获取部门权限失败：',
-      error,
+      error
     )
-
 
     permission.departments = []
 
@@ -1661,16 +1697,15 @@ async function loadPermission() {
 
     auditList.value = []
 
-
     ElMessage.error(
 
+      error?.message ||
       error?.response?.data?.message ||
-      '获取部门权限失败',
+      '获取部门权限失败'
 
     )
 
   }
-
   finally {
 
     loadingPermission.value = false
@@ -1678,8 +1713,6 @@ async function loadPermission() {
   }
 
 }
-
-
 
 /* ====================================================== */
 /* 加载全部学生 */
@@ -2086,8 +2119,8 @@ async function loadDepartmentTemplates(
 
 
     const list =
-      Array.isArray(res.data?.data)
-        ? res.data.data
+      Array.isArray(res?.data)
+        ? res.data
         : []
 
 
@@ -2183,7 +2216,7 @@ watch(
 async function loadAuditList() {
 
   /*
-   * 没有权限不加载
+   * 没有部门审核权限
    */
 
   if (!permission.canDepartmentAudit) {
@@ -2204,55 +2237,95 @@ async function loadAuditList() {
 
     const res =
       await request.get(
-
         '/departmentScoreApply/audit/list',
-
       )
 
 
     /*
-     * 后端返回成功
+     * @/utils/request 已经把 Axios 外层拆掉了。
+     *
+     * 所以这里直接使用：
+     *
+     * res.code
+     * res.data
+     */
+
+    if (
+      Number(res?.code) !== 200 &&
+      Number(res?.code) !== 0
+    ) {
+
+      throw new Error(
+        res?.message ||
+        '获取待审核申请失败'
+      )
+
+    }
+
+
+    const data =
+      Array.isArray(res?.data)
+        ? res.data
+        : []
+
+
+    /*
+     * =====================================================
+     * ★★★ 双保险
+     *
+     * 后端已经排除了当前用户自己提交的申报。
+     *
+     * 前端这里再过滤一次：
+     *
+     * applicantId === 当前登录用户ID
+     *
+     * 的记录绝不进入审核列表。
+     *
+     * =====================================================
+     *
+     * 注意：
+     * 如果当前页面没有可靠的当前用户ID，
+     * 就不在这里强行猜 ID。
+     *
+     * 后端是最终权限控制。
+     *
+     * 所以下面只过滤后端已经明确标记的
+     * applicantId 与 currentUserId 相等的情况。
      */
 
     auditList.value =
-
-      res.data?.code === 200 &&
-      Array.isArray(res.data.data)
-
-        ? res.data.data.map(
-
-          (item) => ({
+      data
+        .filter(
+          item =>
+            Number(item.status) === 0
+        )
+        .map(
+          item => ({
 
             ...item,
 
             scoreType:
               Number(item.scoreType),
 
-          }),
-
+          })
         )
-
-        : []
 
 
     /*
-     * 刷新审核列表后清空之前的选择。
+     * 刷新以后清空之前的选择。
      *
-     * 因为之前选择的对象可能已经被审核掉。
+     * 因为之前选择的记录可能已经审核完成。
      */
 
     selectedAuditRows.value = []
 
-  }
 
+  }
   catch (error) {
 
     console.error(
-
       '获取待审核申请失败：',
-
-      error,
-
+      error
     )
 
 
@@ -2263,13 +2336,15 @@ async function loadAuditList() {
 
     ElMessage.error(
 
+      error?.message ||
+
       error?.response?.data?.message ||
-      '获取待审核申请失败',
+
+      '获取待审核申请失败'
 
     )
 
   }
-
   finally {
 
     auditLoading.value = false
@@ -2277,7 +2352,6 @@ async function loadAuditList() {
   }
 
 }
-
 
 
 /* ====================================================== */
@@ -2385,42 +2459,19 @@ function clearAuditSelection() {
 /* ====================================================== */
 
 async function auditApply(
-
   row,
-
   status,
-
 ) {
 
-  /*
-   * status 是审核状态。
-   *
-   * 不是 scoreType。
-   *
-   *
-   * status：
-   *
-   * 1 = 部门审核通过
-   * 2 = 部门审核驳回
-   */
-
   const actionText =
-
     status === 1
-
       ? '通过'
-
       : '驳回'
 
 
   try {
 
-    /*
-     * 输入审核意见
-     */
-
     const { value } =
-
       await ElMessageBox.prompt(
 
         `请输入${actionText}意见`,
@@ -2450,44 +2501,82 @@ async function auditApply(
      * 调用审核接口
      */
 
-    await request.put(
+    const res =
+      await request.put(
 
-      `/departmentScoreApply/audit/${row.id}`,
+        `/departmentScoreApply/audit/${row.id}`,
 
-      {
+        {
 
-        status,
+          status,
 
-        reviewRemark:
-          value || '',
+          reviewRemark:
+            value || '',
 
-      },
+        },
 
-    )
+      )
+
+
+    /*
+     * 判断后端业务结果
+     */
+
+    if (
+      Number(res?.code) !== 200 &&
+      Number(res?.code) !== 0
+    ) {
+
+      throw new Error(
+        res?.message ||
+        `部门申报${actionText}失败`
+      )
+
+    }
+
+
+    /*
+     * 先从前端待审核列表中删除。
+     *
+     * 这样点击后立即消失，
+     * 不需要等页面重新渲染。
+     */
+
+    auditList.value =
+      auditList.value.filter(
+        item =>
+          String(item.id) !==
+          String(row.id)
+      )
+
+
+    /*
+     * 清除选中状态
+     */
+
+    selectedAuditRows.value =
+      selectedAuditRows.value.filter(
+        item =>
+          String(item.id) !==
+          String(row.id)
+      )
 
 
     ElMessage.success(
-
-      `部门申报已${actionText}`,
-
+      `部门申报已${actionText}`
     )
 
 
     /*
-     * 刷新审核列表
+     * 再从后端重新加载一次，
+     * 确保前端和数据库完全一致。
      */
 
     await loadAuditList()
 
-
-    /*
-     * 刷新我的申报
-     */
-
     await loadMyApply()
 
   }
-
   catch (error) {
 
     /*
@@ -2495,10 +2584,8 @@ async function auditApply(
      */
 
     if (
-
       error === 'cancel' ||
       error === 'close'
-
     ) {
 
       return
@@ -2507,26 +2594,26 @@ async function auditApply(
 
 
     console.error(
-
       '部门申报审核失败：',
-
-      error,
-
+      error
     )
 
 
     ElMessage.error(
 
+      error?.message ||
+
       error?.response?.data?.message ||
 
-      `部门申报${actionText}失败`,
+      error?.response?.data?.msg ||
+
+      `部门申报${actionText}失败`
 
     )
 
   }
 
 }
-
 
 
 /* ====================================================== */
@@ -2555,14 +2642,9 @@ async function auditApply(
 
 async function batchApproveAudit() {
 
-  /*
-   * 前端再次检查权限。
-   *
-   * 即使按钮已经被 v-if 控制，
-   * 这里也再次检查一次。
-   */
-
-  if (!permission.canDepartmentAudit) {
+  if (
+    !permission.canDepartmentAudit
+  ) {
 
     ElMessage.error(
       '你没有部门申报审核权限'
@@ -2572,10 +2654,6 @@ async function batchApproveAudit() {
 
   }
 
-
-  /*
-   * 没有选择
-   */
 
   if (
     selectedAuditRows.value.length === 0
@@ -2593,13 +2671,6 @@ async function batchApproveAudit() {
   const count =
     selectedAuditRows.value.length
 
-
-  /*
-   * 获取学生名称，用于确认弹窗。
-   *
-   * 最多展示前 5 条，
-   * 防止全选几十条以后弹窗太长。
-   */
 
   const previewNames =
     selectedAuditRows.value
@@ -2623,10 +2694,6 @@ async function batchApproveAudit() {
 
   try {
 
-    /*
-     * 二次确认。
-     */
-
     await ElMessageBox.confirm(
 
       `确定要将选中的 ${count} 条部门申报全部审批通过吗？\n\n${previewText}`,
@@ -2649,12 +2716,7 @@ async function batchApproveAudit() {
     )
 
   }
-
   catch (error) {
-
-    /*
-     * 用户取消
-     */
 
     return
 
@@ -2664,60 +2726,85 @@ async function batchApproveAudit() {
   batchAuditLoading.value = true
 
 
-  /*
-   * 记录成功和失败数量。
-   */
-
   let successCount = 0
 
   let failCount = 0
+
+  /*
+   * 记录真正审核成功的 ID
+   */
+
+  const successfulIds = []
 
 
   try {
 
     /*
-     * 逐条调用现有审核接口。
-     *
-     * 不新增后端接口，
-     * 最大程度保证与你现在后端代码兼容。
+     * 注意：
+     * 这里先复制一份，
+     * 避免审核过程中 selectedAuditRows
+     * 被修改导致循环异常。
      */
 
+    const rows =
+      [...selectedAuditRows.value]
+
+
     for (
-      const row
-      of selectedAuditRows.value
+      const row of rows
       ) {
 
       try {
 
-        await request.put(
+        const res =
+          await request.put(
 
-          `/departmentScoreApply/audit/${row.id}`,
+            `/departmentScoreApply/audit/${row.id}`,
 
-          {
+            {
 
-            status: 1,
+              status: 1,
 
-            reviewRemark: '',
+              reviewRemark: '',
 
-          },
+            },
 
-        )
+          )
+
+
+        /*
+         * 必须检查后端业务状态。
+         */
+
+        if (
+          Number(res?.code) !== 200 &&
+          Number(res?.code) !== 0
+        ) {
+
+          throw new Error(
+            res?.message ||
+            '审核失败'
+          )
+
+        }
 
 
         successCount++
 
-      }
+        successfulIds.push(
+          row.id
+        )
 
+      }
       catch (error) {
 
         failCount++
-
 
         console.error(
 
           `申报 ${row.id} 审批失败：`,
 
-          error,
+          error
 
         )
 
@@ -2727,7 +2814,43 @@ async function batchApproveAudit() {
 
 
     /*
-     * 根据最终结果提示。
+     * 立即从前端列表删除成功的记录
+     */
+
+    if (
+      successfulIds.length > 0
+    ) {
+
+      auditList.value =
+        auditList.value.filter(
+          item =>
+            !successfulIds.some(
+              id =>
+                String(id) ===
+                String(item.id)
+            )
+        )
+
+    }
+
+
+    /*
+     * 清除已经审核成功的选中项
+     */
+
+    selectedAuditRows.value =
+      selectedAuditRows.value.filter(
+        item =>
+          !successfulIds.some(
+            id =>
+              String(id) ===
+              String(item.id)
+          )
+      )
+
+
+    /*
+     * 提示结果
      */
 
     if (
@@ -2735,68 +2858,47 @@ async function batchApproveAudit() {
     ) {
 
       ElMessage.success(
-
         `已成功审批通过 ${successCount} 条部门申报`
-
       )
 
     }
-
     else if (
       successCount > 0
     ) {
 
       ElMessage.warning(
-
         `批量审批完成：成功 ${successCount} 条，失败 ${failCount} 条`
-
       )
 
     }
-
     else {
 
       ElMessage.error(
-
         '批量审批失败，请检查后端服务'
-
       )
 
     }
 
 
     /*
-     * 刷新部门审核列表。
-     *
-     * 已经审批通过的记录会从待审核列表消失。
+     * 最后从后端重新同步一次。
      */
 
     await loadAuditList()
 
-
-    /*
-     * 刷新我的申报记录。
-     *
-     * 如果这些申报中包含当前用户提交的记录，
-     * 状态也会立即更新。
-     */
-
     await loadMyApply()
 
   }
-
   catch (error) {
 
     console.error(
-
       '一键审批通过失败：',
-
-      error,
-
+      error
     )
 
-
     ElMessage.error(
+
+      error?.message ||
 
       error?.response?.data?.message ||
 
@@ -2807,7 +2909,6 @@ async function batchApproveAudit() {
     )
 
   }
-
   finally {
 
     batchAuditLoading.value = false
@@ -2867,7 +2968,6 @@ async function submitDepartment() {
   const valid =
     await departmentFormRef.value.validate()
 
-
   if (!valid) {
 
     return
@@ -2926,10 +3026,6 @@ async function submitDepartment() {
 
   try {
 
-    /* ================================================== */
-    /* 提交数据 */
-    /* ================================================== */
-
     const data = {
 
       departmentId:
@@ -2942,7 +3038,6 @@ async function submitDepartment() {
       departmentForm.templateId,
 
       evidenceUrl:
-
         departmentFile.value
           ? departmentFile.value.name
           : null,
@@ -2959,38 +3054,6 @@ async function submitDepartment() {
       data
     )
 
-    console.log(
-      '部门ID：',
-      data.departmentId
-    )
-
-    console.log(
-      '学生ID：',
-      data.studentId
-    )
-
-    console.log(
-      '模板ID：',
-      data.templateId
-    )
-
-    console.log(
-      '学生姓名：',
-      studentList.value.find(
-        item =>
-          String(item.id) ===
-          String(data.studentId)
-      )?.realName
-    )
-
-    console.log(
-      '================================'
-    )
-
-
-    /* ================================================== */
-    /* 调用后端 */
-    /* ================================================== */
 
     const res =
       await request.post(
@@ -3005,28 +3068,32 @@ async function submitDepartment() {
     )
 
 
-    /* ================================================== */
-    /* 重点：检查后端业务状态 */
-    /* ================================================== */
+    /*
+     * 关键：
+     *
+     * request 是 @/utils/request
+     *
+     * 所以 res 本身就是 Result。
+     *
+     * 正确：
+     * res.code
+     * res.message
+     *
+     * 错误：
+     * res.data.code
+     */
 
     const responseData =
-      res?.data
+      res || {}
 
 
     const code =
-      Number(
-        responseData?.code
-      )
+      Number(responseData.code)
 
-
-    /*
-     * 后端 Result.success
-     *
-     * code = 200
-     */
 
     if (
-      code !== 200
+      code !== 200 &&
+      code !== 0
     ) {
 
       console.error(
@@ -3034,24 +3101,22 @@ async function submitDepartment() {
         responseData
       )
 
-
       ElMessage.error(
 
-        responseData?.message ||
-        responseData?.msg ||
+        responseData.message ||
+        responseData.msg ||
         '部门加减分申报提交失败'
 
       )
-
 
       return
 
     }
 
 
-    /* ================================================== */
-    /* 真正成功 */
-    /* ================================================== */
+    /*
+     * 真正成功
+     */
 
     ElMessage.success(
       '部门加减分申报提交成功，等待本部门副部长或部长审核'
@@ -3071,9 +3136,10 @@ async function submitDepartment() {
 
     await loadMyApply()
 
+
     /*
-     * 如果当前用户本身有部门审核权限，
-     * 同时刷新部门审核列表。
+     * 如果当前用户有审核权限，
+     * 同时刷新待审核列表
      */
 
     if (
@@ -3085,18 +3151,12 @@ async function submitDepartment() {
     }
 
   }
-
   catch (error) {
 
     console.error(
       '提交部门加减分申报失败：',
       error
     )
-
-
-    /*
-     * HTTP 层错误
-     */
 
     const message =
 
@@ -3114,7 +3174,6 @@ async function submitDepartment() {
     )
 
   }
-
   finally {
 
     departmentSubmitting.value = false
@@ -3122,8 +3181,6 @@ async function submitDepartment() {
   }
 
 }
-
-
 
 /* ====================================================== */
 /* 重置部门申报表单 */
@@ -3171,78 +3228,80 @@ function resetDepartment() {
 /* ====================================================== */
 /* 加载我的申报记录 */
 /* ====================================================== */
-
 async function loadMyApply() {
 
   listLoading.value = true
-
 
   try {
 
     const res =
       await request.get(
-
         '/departmentScoreApply/my',
-
       )
 
 
-    departmentApplyList.value =
+    if (
+      Number(res?.code) !== 200 &&
+      Number(res?.code) !== 0
+    ) {
 
-      Array.isArray(res.data?.data)
+      throw new Error(
+        res?.message ||
+        '获取申报记录失败'
+      )
 
-        ? res.data.data.map(
+    }
 
-          (item) => ({
 
-            ...item,
-
-            title:
-              item.title ||
-              '部门加减分',
-
-            scoreType:
-              Number(item.scoreType),
-
-          }),
-
-        )
-
+    const data =
+      Array.isArray(res?.data)
+        ? res.data
         : []
+
+
+    departmentApplyList.value =
+      data.map(
+        item => ({
+
+          ...item,
+
+          title:
+            item.title ||
+            '部门加减分',
+
+          scoreType:
+            Number(item.scoreType),
+
+        })
+      )
 
 
     /*
      * 每次重新加载申报记录，
-     * 默认回到第一页。
+     * 回到第一页
      */
 
     myApplyPageNum.value = 1
 
   }
-
   catch (error) {
 
     console.error(
-
       '获取申报记录失败：',
-
-      error,
-
+      error
     )
-
 
     departmentApplyList.value = []
 
-
     ElMessage.error(
 
+      error?.message ||
       error?.response?.data?.message ||
-      '获取申报记录失败',
+      '获取申报记录失败'
 
     )
 
   }
-
   finally {
 
     listLoading.value = false
@@ -3250,9 +3309,6 @@ async function loadMyApply() {
   }
 
 }
-
-
-
 /* ====================================================== */
 /* 页面初始化 */
 /* ====================================================== */
