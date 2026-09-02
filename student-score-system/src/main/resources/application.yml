@@ -1,28 +1,32 @@
 spring:
-  # 数据库配置
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/student_score_system
     username: postgres
     password: jingru20070507
 
-  # HTTP 编码配置（属于 spring 层级）
   http:
     encoding:
       charset: UTF-8
       enabled: true
       force: true
 
-# Server 配置（与 spring 平级，不要缩进到里面）
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+
 server:
-  port: 8080 # 建议显式写出端口
+  port: 8080
+
   servlet:
     encoding:
       charset: UTF-8
       enabled: true
       force: true
 
-# MyBatis-Plus 配置（顶格写）
+
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
