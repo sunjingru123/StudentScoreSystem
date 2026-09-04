@@ -9,6 +9,7 @@ import {
 // =========================================================
 
 import Login from '@/views/Login.vue'
+import ChangePassword from '@/views/ChangePassword.vue'
 
 
 // =========================================================
@@ -31,10 +32,12 @@ import StudentMessage from '@/views/student/Message.vue'
 
 import AdminLayout from '@/layout/AdminLayout.vue'
 
+import TeacherManage from '@/views/admin/TeacherManage.vue'
 import AdminHome from '@/views/admin/AdminHome.vue'
 import StudentManage from '@/views/admin/StudentManage.vue'
 import RuleManage from '@/views/admin/RuleManage.vue'
 import ExcelImport from '@/views/admin/ExcelImport.vue'
+import SemesterManage from '@/views/admin/SemesterManage.vue'
 
 
 // =========================================================
@@ -65,9 +68,7 @@ const router = createRouter({
 
     {
       path: '/',
-
       redirect: '/login',
-
     },
 
 
@@ -77,11 +78,19 @@ const router = createRouter({
 
     {
       path: '/login',
-
       name: 'Login',
-
       component: Login,
+    },
 
+
+    // =======================================================
+    // 修改密码
+    // =======================================================
+
+    {
+      path: '/change-password',
+      name: 'ChangePassword',
+      component: ChangePassword,
     },
 
 
@@ -115,7 +124,6 @@ const router = createRouter({
           name: 'StudentHome',
 
           component: Home,
-
         },
 
 
@@ -129,7 +137,6 @@ const router = createRouter({
           name: 'StudentScore',
 
           component: Score,
-
         },
 
 
@@ -145,7 +152,6 @@ const router = createRouter({
           name: 'StudentApply',
 
           component: Apply,
-
         },
 
 
@@ -159,7 +165,6 @@ const router = createRouter({
           name: 'StudentRecord',
 
           component: Record,
-
         },
 
 
@@ -173,7 +178,6 @@ const router = createRouter({
           name: 'StudentMessage',
 
           component: StudentMessage,
-
         },
 
 
@@ -190,7 +194,6 @@ const router = createRouter({
             import(
               '@/views/admin/StudentDetail.vue'
               ),
-
         },
 
 
@@ -209,12 +212,11 @@ const router = createRouter({
             import(
               '@/views/student/DepartmentApply.vue'
               ),
-
         },
 
 
         // ===================================================
-        // ★ 部门负责人审核
+        // 部门负责人审核
         //
         // 部门负责人 / 副负责人
         //
@@ -243,7 +245,7 @@ const router = createRouter({
 
 
         // ===================================================
-        // ★ 个人证书审核
+        // 个人证书审核
         //
         // 仅档案部负责人 / 副负责人
         //
@@ -312,7 +314,6 @@ const router = createRouter({
       path: '/archive/score-export',
 
       redirect: '/home/score-export',
-
     },
 
 
@@ -331,13 +332,16 @@ const router = createRouter({
 
       children: [
 
+        // ---------------------------------------------------
+        // 管理员首页
+        // ---------------------------------------------------
+
         {
           path: 'adminHome',
 
           name: 'AdminHome',
 
           component: AdminHome,
-
         },
 
 
@@ -351,7 +355,19 @@ const router = createRouter({
           name: 'AdminStudent',
 
           component: StudentManage,
+        },
 
+
+        // ---------------------------------------------------
+        // 学期管理
+        // ---------------------------------------------------
+
+        {
+          path: 'semester',
+
+          name: 'AdminSemester',
+
+          component: SemesterManage,
         },
 
 
@@ -368,6 +384,25 @@ const router = createRouter({
             import(
               '@/views/admin/StudentDetail.vue'
               ),
+        },
+
+
+        // ---------------------------------------------------
+        // 教师管理
+        // ---------------------------------------------------
+
+        {
+          path: 'teacher',
+
+          name: 'AdminTeacher',
+
+          component: TeacherManage,
+
+          meta: {
+
+            title: '教师管理',
+
+          },
 
         },
 
@@ -382,7 +417,6 @@ const router = createRouter({
           name: 'AdminRule',
 
           component: RuleManage,
-
         },
 
 
@@ -399,7 +433,6 @@ const router = createRouter({
             import(
               '@/views/admin/ScoreAdjustment.vue'
               ),
-
         },
 
 
@@ -413,7 +446,6 @@ const router = createRouter({
           name: 'AdminExcelImport',
 
           component: ExcelImport,
-
         },
 
 
@@ -459,13 +491,16 @@ const router = createRouter({
 
       children: [
 
+        // ---------------------------------------------------
+        // 辅导员首页
+        // ---------------------------------------------------
+
         {
           path: '',
 
           name: 'TeacherHome',
 
           component: TeacherHome,
-
         },
 
 
@@ -482,7 +517,6 @@ const router = createRouter({
             import(
               '@/views/teacher/DepartmentScoreAudit.vue'
               ),
-
         },
 
 
@@ -496,7 +530,6 @@ const router = createRouter({
           name: 'TeacherActivity',
 
           component: TeacherActivity,
-
         },
 
 
@@ -510,7 +543,6 @@ const router = createRouter({
           name: 'TeacherScore',
 
           component: TeacherScore,
-
         },
 
 
@@ -524,7 +556,6 @@ const router = createRouter({
           name: 'TeacherMessage',
 
           component: TeacherMessage,
-
         },
 
       ],
@@ -544,7 +575,7 @@ router.addRoute({
 
   path: '/:pathMatch(.*)*',
 
-  redirect: '/login'
+  redirect: '/login',
 
 })
 
@@ -559,9 +590,9 @@ router.beforeEach(async (to) => {
     localStorage.getItem('user')
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // 登录页
-  // -------------------------------------------------------
+  // =======================================================
 
   if (to.path === '/login') {
 
@@ -570,9 +601,9 @@ router.beforeEach(async (to) => {
   }
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // 未登录
-  // -------------------------------------------------------
+  // =======================================================
 
   if (!userStr) {
 
@@ -581,11 +612,12 @@ router.beforeEach(async (to) => {
   }
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // 解析用户
-  // -------------------------------------------------------
+  // =======================================================
 
   let user
+
 
   try {
 
@@ -599,18 +631,45 @@ router.beforeEach(async (to) => {
       error
     )
 
-    localStorage.removeItem('user')
+    localStorage.removeItem(
+      'user'
+    )
 
-    localStorage.removeItem('token')
+    localStorage.removeItem(
+      'token'
+    )
 
     return '/login'
 
   }
 
 
-  // -------------------------------------------------------
+  // =======================================================
+  // 首次登录强制修改密码
+  // =======================================================
+
+  if (
+    user.firstLogin === true
+    ||
+    user.firstLogin === 1
+  ) {
+
+    if (
+      to.path === '/change-password'
+    ) {
+
+      return true
+
+    }
+
+    return '/change-password'
+
+  }
+
+
+  // =======================================================
   // 系统角色
-  // -------------------------------------------------------
+  // =======================================================
 
   const role =
     user.role
@@ -618,20 +677,33 @@ router.beforeEach(async (to) => {
 
   const rolePrefixMap = {
 
-    学生: '/home',
+    学生:
+      '/home',
 
-    管理员: '/admin',
+    管理员:
+      '/admin',
 
-    辅导员: '/teacher',
+    辅导员:
+      '/teacher',
 
   }
 
 
-  if (!rolePrefixMap[role]) {
+  // =======================================================
+  // 无效角色
+  // =======================================================
 
-    localStorage.removeItem('user')
+  if (
+    !rolePrefixMap[role]
+  ) {
 
-    localStorage.removeItem('token')
+    localStorage.removeItem(
+      'user'
+    )
+
+    localStorage.removeItem(
+      'token'
+    )
 
     return '/login'
 
@@ -646,21 +718,27 @@ router.beforeEach(async (to) => {
     to.meta.requiresAdminExportPermission
   ) {
 
-    if (role === '管理员') {
+    if (
+      role === '管理员'
+    ) {
 
       return true
 
     }
 
 
-    if (role === '学生') {
+    if (
+      role === '学生'
+    ) {
 
       return '/home'
 
     }
 
 
-    if (role === '辅导员') {
+    if (
+      role === '辅导员'
+    ) {
 
       return '/teacher'
 
@@ -674,36 +752,33 @@ router.beforeEach(async (to) => {
 
   // =======================================================
   // 档案部汇总导出
-  //
-  // 管理员：
-  //     可以
-  //
-  // 学生：
-  //     页面进入后继续判断部门身份
-  //
-  // 辅导员：
-  //     不允许
   // =======================================================
 
   if (
     to.meta.requiresArchiveExportPermission
   ) {
 
-    if (role === '管理员') {
+    if (
+      role === '管理员'
+    ) {
 
       return true
 
     }
 
 
-    if (role === '学生') {
+    if (
+      role === '学生'
+    ) {
 
       return true
 
     }
 
 
-    if (role === '辅导员') {
+    if (
+      role === '辅导员'
+    ) {
 
       return '/teacher'
 
@@ -716,22 +791,16 @@ router.beforeEach(async (to) => {
 
 
   // =======================================================
-  // 部门负责人 / 副负责人审核
-  //
-  // 注意：
-  //
-  // 部门负责人本质上还是学生。
-  //
-  // 所以路由不能只看 role。
-  //
-  // 具体部门身份交给页面 + 后端权限接口。
+  // 部门负责人审核
   // =======================================================
 
   if (
     to.meta.requiresDepartmentLeader
   ) {
 
-    if (role === '学生') {
+    if (
+      role === '学生'
+    ) {
 
       return true
 
@@ -744,14 +813,16 @@ router.beforeEach(async (to) => {
 
 
   // =======================================================
-  // 档案部负责人 / 副负责人证书审核
+  // 档案部负责人审核
   // =======================================================
 
   if (
     to.meta.requiresArchiveLeader
   ) {
 
-    if (role === '学生') {
+    if (
+      role === '学生'
+    ) {
 
       return true
 
@@ -767,10 +838,14 @@ router.beforeEach(async (to) => {
   // 管理员
   // =======================================================
 
-  if (role === '管理员') {
+  if (
+    role === '管理员'
+  ) {
 
     if (
-      !to.path.startsWith('/admin')
+      !to.path.startsWith(
+        '/admin'
+      )
     ) {
 
       return '/admin/adminHome'
@@ -787,10 +862,14 @@ router.beforeEach(async (to) => {
   // 学生
   // =======================================================
 
-  if (role === '学生') {
+  if (
+    role === '学生'
+  ) {
 
     if (
-      !to.path.startsWith('/home')
+      !to.path.startsWith(
+        '/home'
+      )
     ) {
 
       return '/home'
@@ -807,10 +886,14 @@ router.beforeEach(async (to) => {
   // 辅导员
   // =======================================================
 
-  if (role === '辅导员') {
+  if (
+    role === '辅导员'
+  ) {
 
     if (
-      !to.path.startsWith('/teacher')
+      !to.path.startsWith(
+        '/teacher'
+      )
     ) {
 
       return '/teacher'

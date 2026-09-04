@@ -1,0 +1,95 @@
+/* ============================================================
+   学生综合测评系统 - 全局响应式基础样式
+   第一阶段：布局 / 手机基础适配
+============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 1024px) {
+  .el-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .el-card {
+    border-radius: 10px;
+  }
+
+  .el-button {
+    min-height: 40px;
+  }
+
+  .el-input__wrapper,
+  .el-select__wrapper,
+  .el-textarea__inner {
+    min-height: 40px;
+  }
+
+  .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .el-message-box {
+    width: 90% !important;
+  }
+
+  .el-dialog {
+    width: 92% !important;
+    max-width: 92% !important;
+    margin: 5vh auto 0 !important;
+  }
+
+  .el-dialog__body {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .el-table {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .el-button {
+    min-height: 38px;
+  }
+
+  .el-dialog {
+    width: 94% !important;
+    max-width: 94% !important;
+  }
+}

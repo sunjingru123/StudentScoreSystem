@@ -10,6 +10,7 @@ import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.StudentVO;
 import org.springframework.web.bind.annotation.*;
 
@@ -121,10 +122,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 2. 查询所有有效的“学生”岗位
-         *
-         * 不能使用 selectOne()
-         *
-         * 因为数据库中可能存在多个“学生”岗位。
          * =====================================================
          */
 
@@ -199,9 +196,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 4. 查询学生岗位关系
-         *
-         * 一个学生可能存在多个岗位关系，
-         * 所以最后需要去重。
          * =====================================================
          */
 
@@ -232,8 +226,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 5. 获取学生 userId
-         *
-         * 去重
          * =====================================================
          */
 
@@ -281,7 +273,7 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 6. 创建 MyBatis-Plus 分页对象
+         * 6. 创建分页对象
          * =====================================================
          */
 
@@ -317,28 +309,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 9. 关键字搜索
-         *
-         * keyword：
-         *
-         * 姓名
-         * 学号
-         * 用户名
-         * 班级
-         *
-         * 四个字段使用 OR。
-         *
-         * 外层仍然和“学生 userId”使用 AND。
-         *
-         * 最终 SQL 类似：
-         *
-         * WHERE id IN (...)
-         * AND (
-         *      student_no LIKE '%xxx%'
-         *      OR real_name LIKE '%xxx%'
-         *      OR username LIKE '%xxx%'
-         *      OR class_name LIKE '%xxx%'
-         * )
-         *
          * =====================================================
          */
 
@@ -380,9 +350,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 10. 单独的学号搜索
-         *
-         * 如果前端以后使用 studentNo，
-         * 仍然可以正常工作。
          * =====================================================
          */
 
@@ -552,13 +519,6 @@ public class SysUserController {
     @GetMapping("/student/all")
     public Result<List<StudentVO>> allStudents() {
 
-
-        /*
-         * =====================================================
-         * 1. 查询所有有效“学生”岗位
-         * =====================================================
-         */
-
         List<SysPosition> studentPositions =
                 positionMapper.selectList(
                         new LambdaQueryWrapper<SysPosition>()
@@ -583,12 +543,6 @@ public class SysUserController {
             );
         }
 
-
-        /*
-         * =====================================================
-         * 2. 获取岗位 ID
-         * =====================================================
-         */
 
         List<Long> positionIds =
                 new ArrayList<>();
@@ -621,12 +575,6 @@ public class SysUserController {
         }
 
 
-        /*
-         * =====================================================
-         * 3. 查询岗位关系
-         * =====================================================
-         */
-
         List<SysUserPosition> relations =
                 userPositionMapper.selectList(
                         new LambdaQueryWrapper<SysUserPosition>()
@@ -647,12 +595,6 @@ public class SysUserController {
             );
         }
 
-
-        /*
-         * =====================================================
-         * 4. 获取 userId 并去重
-         * =====================================================
-         */
 
         List<Long> userIds =
                 new ArrayList<>();
@@ -694,12 +636,6 @@ public class SysUserController {
         }
 
 
-        /*
-         * =====================================================
-         * 5. 查询学生
-         * =====================================================
-         */
-
         List<SysUser> users =
                 sysUserMapper.selectList(
                         new LambdaQueryWrapper<SysUser>()
@@ -727,12 +663,6 @@ public class SysUserController {
             );
         }
 
-
-        /*
-         * =====================================================
-         * 6. 转 VO
-         * =====================================================
-         */
 
         for (
                 SysUser user
@@ -763,15 +693,6 @@ public class SysUserController {
      *
      * GET /user/student/search?keyword=xxx
      *
-     * 这个接口保留。
-     *
-     * 支持：
-     *
-     * 学号
-     * 姓名
-     * 用户名
-     * 班级
-     *
      * =========================================================
      */
     @GetMapping("/student/search")
@@ -793,12 +714,6 @@ public class SysUserController {
         String key =
                 keyword.trim();
 
-
-        /*
-         * =====================================================
-         * 只搜索真正的学生
-         * =====================================================
-         */
 
         List<SysPosition> studentPositions =
                 positionMapper.selectList(
@@ -855,10 +770,6 @@ public class SysUserController {
             );
         }
 
-
-        /*
-         * 查询学生岗位关系
-         */
 
         List<SysUserPosition> relations =
                 userPositionMapper.selectList(
@@ -920,12 +831,6 @@ public class SysUserController {
             );
         }
 
-
-        /*
-         * =====================================================
-         * 按关键字搜索
-         * =====================================================
-         */
 
         SysUser user =
                 sysUserMapper.selectOne(
@@ -986,7 +891,6 @@ public class SysUserController {
      * =========================================================
      *
      * PUT /user/student/disable/{id}
-     *
      * =========================================================
      */
     @PutMapping("/student/disable/{id}")
@@ -1028,7 +932,6 @@ public class SysUserController {
      * =========================================================
      *
      * PUT /user/student/enable/{id}
-     *
      * =========================================================
      */
     @PutMapping("/student/enable/{id}")
@@ -1104,9 +1007,35 @@ public class SysUserController {
                 dto.getUsername()
         );
 
+
+        /*
+         * =====================================================
+         * 密码处理
+         *
+         * 1. 前端没有填写密码 -> 默认 123456
+         * 2. 数据库保存 BCrypt 密文
+         * 3. 第一次登录必须修改密码
+         * =====================================================
+         */
+
+        String rawPassword =
+                dto.getPassword();
+
+        if (
+                rawPassword == null
+                        || rawPassword.trim().isEmpty()
+        ) {
+
+            rawPassword = "123456";
+        }
+
+
         user.setPassword(
-                dto.getPassword()
+                PasswordUtil.encode(
+                        rawPassword
+                )
         );
+
 
         user.setRealName(
                 dto.getRealName()
@@ -1133,6 +1062,14 @@ public class SysUserController {
         );
 
 
+        /*
+         * 新建学生第一次登录必须修改密码
+         */
+        user.setFirstLogin(
+                (short) 1
+        );
+
+
         int insert =
                 sysUserMapper.insert(
                         user
@@ -1150,9 +1087,6 @@ public class SysUserController {
         /*
          * =====================================================
          * 2. 查询默认“学生”岗位
-         *
-         * 如果存在多个学生岗位，
-         * 取 ID 最小的启用岗位。
          * =====================================================
          */
 

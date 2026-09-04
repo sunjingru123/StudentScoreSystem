@@ -5,16 +5,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.dto.DepartmentMemberExcelRow;
 import com.student.studentscoresystem.dto.StudentExcelRow;
 import com.student.studentscoresystem.entity.Department;
+import com.student.studentscoresystem.entity.SysDepartment;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
+import com.student.studentscoresystem.mapper.SysDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.ExcelImportService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,33 +30,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Excel 批量导入服务
- *
- * 学生 Excel：
- * 学号 | 姓名 | 班级
- *
- * 部门成员 Excel：
- * 部门 | 学号 | 姓名 | 职位
- */
 @Service
 public class ExcelImportServiceImpl implements ExcelImportService {
 
     private final SysUserMapper sysUserMapper;
     private final DepartmentMapper departmentMapper;
+    private final SysDepartmentMapper sysDepartmentMapper;
     private final SysUserDepartmentMapper userDepartmentMapper;
     private final SysUserPositionMapper sysUserPositionMapper;
     private final SysPositionMapper sysPositionMapper;
 
+    private final BCryptPasswordEncoder passwordEncoder =
+            new BCryptPasswordEncoder();
+
     public ExcelImportServiceImpl(
             SysUserMapper sysUserMapper,
             DepartmentMapper departmentMapper,
+            SysDepartmentMapper sysDepartmentMapper,
             SysUserDepartmentMapper userDepartmentMapper,
             SysUserPositionMapper sysUserPositionMapper,
             SysPositionMapper sysPositionMapper
     ) {
         this.sysUserMapper = sysUserMapper;
         this.departmentMapper = departmentMapper;
+        this.sysDepartmentMapper = sysDepartmentMapper;
         this.userDepartmentMapper = userDepartmentMapper;
         this.sysUserPositionMapper = sysUserPositionMapper;
         this.sysPositionMapper = sysPositionMapper;
@@ -63,37 +63,21 @@ public class ExcelImportServiceImpl implements ExcelImportService {
      * =========================================================
      * 导入学生名单
      * =========================================================
-     *
-     * 重要：
-     *
-     * 一个 Excel 里面可以有多个 Sheet：
-     *
-     * 2025级1班
-     * 2025级2班
-     * 2025级3班
-     * 2025级4班
-     * ...
-     *
-     * 使用 doReadAllSync()
-     * 而不是 sheet().doReadSync()
-     *
-     * 否则只会读取第一张 Sheet。
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> importStudents(MultipartFile file) {
+    public Map<String, Object> importStudents(
+            MultipartFile file
+    ) {
 
         List<StudentExcelRow> rows;
 
         try {
-
             rows = EasyExcel
                     .read(file.getInputStream())
                     .head(StudentExcelRow.class)
                     .doReadAllSync();
-
         } catch (Exception e) {
-
             throw new RuntimeException(
                     "学生 Excel 读取失败：" + e.getMessage(),
                     e
@@ -107,7 +91,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 new ArrayList<>();
 
         if (rows == null || rows.isEmpty()) {
-
             return buildResult(
                     0,
                     0,
@@ -118,16 +101,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         /*
          * =========================================================
-         * 1. 查找“学生”岗位
+         * 查找学生岗位
          * =========================================================
-         *
-         * Excel 导入的所有学生，
-         * 都自动绑定这个岗位。
-         *
-         * 注意：
-         * 这里使用 LIMIT 1，
-         * 防止数据库里暂时存在多个“学生”岗位导致
-         * selectOne() 报错。
          */
         SysPosition studentPosition =
                 sysPositionMapper.selectOne(
@@ -143,13 +118,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                 .orderByAsc(
                                         SysPosition::getId
                                 )
-                                .last(
-                                        "LIMIT 1"
-                                )
+                                .last("LIMIT 1")
                 );
 
         if (studentPosition == null) {
-
             throw new RuntimeException(
                     "系统中不存在有效的“学生”岗位，请先创建学生岗位"
             );
@@ -157,19 +129,67 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         /*
          * =========================================================
-         * 2. 防止 Excel 内部重复学号
+         * 找一个系统部门
+         *
+         * 因为 sys_user_position.department_id
+         * 不能为 NULL。
+         *
+         * 学生普通岗位不属于具体学生组织部门，
+         * 所以这里使用一个系统默认部门。
          * =========================================================
          */
+        SysDepartment defaultSysDepartment =
+                sysDepartmentMapper.selectOne(
+                        new LambdaQueryWrapper<SysDepartment>()
+                                .eq(
+                                        SysDepartment::getStatus,
+                                        (short) 1
+                                )
+                                .orderByAsc(
+                                        SysDepartment::getId
+                                )
+                                .last("LIMIT 1")
+                );
+
+        /*
+         * 如果系统里连一个 sys_department 都没有，
+         * 自动创建“学生组织”系统部门。
+         */
+        if (defaultSysDepartment == null) {
+
+            defaultSysDepartment =
+                    new SysDepartment();
+
+            defaultSysDepartment.setName(
+                    "学生组织"
+            );
+
+            defaultSysDepartment.setDescription(
+                    "系统默认学生组织部门"
+            );
+
+            defaultSysDepartment.setStatus(
+                    (short) 1
+            );
+
+            defaultSysDepartment.setCreateTime(
+                    LocalDateTime.now()
+            );
+
+            defaultSysDepartment.setUpdateTime(
+                    LocalDateTime.now()
+            );
+
+            sysDepartmentMapper.insert(
+                    defaultSysDepartment
+            );
+        }
+
         Set<String> excelStudentNos =
                 new HashSet<>();
 
         int rowNumber = 1;
 
-        /*
-         * =========================================================
-         * 3. 遍历 Excel
-         * =========================================================
-         */
         for (StudentExcelRow row : rows) {
 
             rowNumber++;
@@ -197,11 +217,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String className =
                     trim(row.getClassName());
 
-            /*
-             * =====================================================
-             * 4. 学号校验
-             * =====================================================
-             */
             if (isEmpty(studentNo)) {
 
                 failCount++;
@@ -216,11 +231,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /*
-             * =====================================================
-             * 5. 姓名校验
-             * =====================================================
-             */
             if (isEmpty(realName)) {
 
                 failCount++;
@@ -235,11 +245,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /*
-             * =====================================================
-             * 6. 班级校验
-             * =====================================================
-             */
             if (isEmpty(className)) {
 
                 failCount++;
@@ -254,11 +259,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /*
-             * =====================================================
-             * 7. Excel 内部重复学号
-             * =====================================================
-             */
             if (!excelStudentNos.add(studentNo)) {
 
                 failCount++;
@@ -274,11 +274,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /*
-             * =====================================================
-             * 8. 查询系统用户
-             * =====================================================
-             */
+            LocalDateTime now =
+                    LocalDateTime.now();
+
             SysUser user =
                     sysUserMapper.selectOne(
                             new LambdaQueryWrapper<SysUser>()
@@ -286,68 +284,48 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                             SysUser::getStudentNo,
                                             studentNo
                                     )
-                                    .last(
-                                            "LIMIT 1"
-                                    )
+                                    .last("LIMIT 1")
                     );
-
-            LocalDateTime now =
-                    LocalDateTime.now();
 
             /*
              * =====================================================
-             * 9. 学生不存在 → 新增
+             * 学生不存在 → 新增
              * =====================================================
              */
             if (user == null) {
 
                 user = new SysUser();
 
-                /*
-                 * 学号
-                 */
                 user.setStudentNo(
                         studentNo
                 );
 
-                /*
-                 * 登录账号 = 学号
-                 */
                 user.setUsername(
                         studentNo
                 );
 
-                /*
-                 * 默认密码 = 学号
-                 */
                 user.setPassword(
-                        studentNo
+                        passwordEncoder.encode(
+                                "123456"
+                        )
                 );
 
-                /*
-                 * 姓名
-                 */
+                user.setFirstLogin(
+                        (short) 1
+                );
+
                 user.setRealName(
                         realName
                 );
 
-                /*
-                 * 班级
-                 */
                 user.setClassName(
                         className
                 );
 
-                /*
-                 * 默认启用
-                 */
                 user.setStatus(
                         (short) 1
                 );
 
-                /*
-                 * 时间
-                 */
                 user.setCreateTime(
                         now
                 );
@@ -356,9 +334,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         now
                 );
 
-                /*
-                 * 插入用户
-                 */
                 int insert =
                         sysUserMapper.insert(
                                 user
@@ -383,47 +358,36 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
                 /*
                  * =================================================
-                 * 10. 学生已经存在 → 更新
+                 * 学生已经存在 → 更新
                  * =================================================
                  */
 
-                /*
-                 * 用户名保证为学号
-                 */
                 user.setUsername(
                         studentNo
                 );
 
-                /*
-                 * 如果密码为空，
-                 * 默认使用学号。
-                 */
                 if (isEmpty(user.getPassword())) {
 
                     user.setPassword(
-                            studentNo
+                            passwordEncoder.encode(
+                                    "123456"
+                            )
+                    );
+
+                    user.setFirstLogin(
+                            (short) 1
                     );
                 }
 
-                /*
-                 * 更新姓名
-                 */
                 user.setRealName(
                         realName
                 );
 
-                /*
-                 * 更新班级
-                 */
                 user.setClassName(
                         className
                 );
 
-                /*
-                 * 状态为空 → 启用
-                 */
                 if (user.getStatus() == null) {
-
                     user.setStatus(
                             (short) 1
                     );
@@ -440,18 +404,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             /*
              * =====================================================
-             * 11. 自动绑定“学生”岗位
+             * 自动绑定学生岗位
              * =====================================================
-             *
-             * 这是这次最重要的修改。
-             *
-             * Excel 中导入的每一个学生，
-             * 都必须在 sys_user_position 中存在：
-             *
-             * user_id     = 当前学生ID
-             * position_id = 学生岗位ID
-             *
-             * 如果已经绑定，就不重复插入。
              */
             SysUserPosition userPosition =
                     sysUserPositionMapper.selectOne(
@@ -464,63 +418,35 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                             SysUserPosition::getPositionId,
                                             studentPosition.getId()
                                     )
-                                    .last(
-                                            "LIMIT 1"
-                                    )
+                                    .last("LIMIT 1")
                     );
 
-            /*
-             * =====================================================
-             * 12. 没有学生岗位关系 → 创建
-             * =====================================================
-             */
             if (userPosition == null) {
 
-                userPosition = new SysUserPosition();
+                userPosition =
+                        new SysUserPosition();
 
                 userPosition.setUserId(
                         user.getId()
+                );
+
+                userPosition.setDepartmentId(
+                        defaultSysDepartment.getId()
                 );
 
                 userPosition.setPositionId(
                         studentPosition.getId()
                 );
 
-                // 学生默认所属部门
-                userPosition.setDepartmentId(
-                        1L
-                );
-
                 userPosition.setCreateTime(
                         now
                 );
 
-                int positionInsert =
-                        sysUserPositionMapper.insert(
-                                userPosition
-                        );
-
-                if (positionInsert <= 0) {
-
-                    failCount++;
-
-                    errors.add(
-                            error(
-                                    rowNumber,
-                                    "学生岗位绑定失败：" +
-                                            studentNo
-                            )
-                    );
-
-                    continue;
-                }
+                sysUserPositionMapper.insert(
+                        userPosition
+                );
             }
 
-            /*
-             * =====================================================
-             * 13. 当前学生处理成功
-             * =====================================================
-             */
             successCount++;
         }
 
@@ -536,17 +462,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
      * =========================================================
      * 导入部门成员
      * =========================================================
-     *
-     * Excel：
-     *
-     * 部门 | 学号 | 姓名 | 职位
-     *
-     *
-     * 职位：
-     *
-     * 干事
-     * 副部长
-     * 部长
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -558,11 +473,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         try {
 
-            /**
-             * 同样使用 doReadAllSync()
-             *
-             * 防止部门成员 Excel 有多个 Sheet
-             */
             rows = EasyExcel
                     .read(file.getInputStream())
                     .head(DepartmentMemberExcelRow.class)
@@ -593,17 +503,23 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             );
         }
 
-        /**
-         * Excel 内部防重复：
-         *
-         * 一个学生
-         * +
-         * 一个部门
-         *
-         * 只能出现一次。
-         */
         Set<String> excelRelations =
                 new HashSet<>();
+
+        /*
+         * =========================================================
+         * 当前部门
+         *
+         * 用于支持：
+         *
+         * 档案部  孙靖茹
+         *        姜昊月
+         *        朱宪阔
+         *
+         * 自动继承档案部
+         * =========================================================
+         */
+        String currentDepartmentName = null;
 
         int rowNumber = 1;
 
@@ -628,20 +544,31 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String departmentName =
                     trim(row.getDepartmentName());
 
-            String studentNo =
-                    trim(row.getStudentNo());
-
             String realName =
                     trim(row.getRealName());
+
+            String studentNo =
+                    trim(row.getStudentNo());
 
             String position =
                     trim(row.getPosition());
 
-            /**
-             * =================================================
-             * 1. 部门
-             * =================================================
+            /*
+             * =====================================================
+             * 1. 部门自动继承
+             * =====================================================
              */
+            if (!isEmpty(departmentName)) {
+
+                currentDepartmentName =
+                        departmentName;
+
+            } else {
+
+                departmentName =
+                        currentDepartmentName;
+            }
+
             if (isEmpty(departmentName)) {
 
                 failCount++;
@@ -649,17 +576,17 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 errors.add(
                         error(
                                 rowNumber,
-                                "部门不能为空"
+                                "部门不能为空，且没有可以继承的上一部门"
                         )
                 );
 
                 continue;
             }
 
-            /**
-             * =================================================
+            /*
+             * =====================================================
              * 2. 学号
-             * =================================================
+             * =====================================================
              */
             if (isEmpty(studentNo)) {
 
@@ -675,10 +602,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
+            /*
+             * =====================================================
              * 3. 姓名
-             * =================================================
+             * =====================================================
              */
             if (isEmpty(realName)) {
 
@@ -694,10 +621,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
+            /*
+             * =====================================================
              * 4. 职位
-             * =================================================
+             * =====================================================
              */
             if (isEmpty(position)) {
 
@@ -713,11 +640,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 5. 职位合法性
-             * =================================================
-             */
             if (!isValidPosition(position)) {
 
                 failCount++;
@@ -732,10 +654,58 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 6. 查询部门
-             * =================================================
+            /*
+             * =====================================================
+             * 5. 查询岗位
+             *
+             * 必须在任何 INSERT 前执行。
+             * =====================================================
+             */
+            SysPosition sysPosition =
+                    sysPositionMapper.selectOne(
+                            new LambdaQueryWrapper<SysPosition>()
+                                    .eq(
+                                            SysPosition::getName,
+                                            position
+                                    )
+                                    .eq(
+                                            SysPosition::getStatus,
+                                            (short) 1
+                                    )
+                                    .orderByAsc(
+                                            SysPosition::getId
+                                    )
+                                    .last("LIMIT 1")
+                    );
+
+            if (sysPosition == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "系统中不存在有效岗位：" +
+                                        position +
+                                        "，请先创建该岗位"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =====================================================
+             * 6. 查询 / 创建业务部门 department
+             *
+             * 这是这次非常重要的修改。
+             *
+             * Excel 里写了：
+             *
+             * 档案部
+             *
+             * 数据库没有 → 自动创建。
+             * =====================================================
              */
             Department department =
                     departmentMapper.selectOne(
@@ -744,32 +714,152 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                             Department::getName,
                                             departmentName
                                     )
-                                    .eq(
-                                            Department::getStatus,
-                                            (short) 1
-                                    )
                                     .last("LIMIT 1")
                     );
 
             if (department == null) {
 
-                failCount++;
+                department =
+                        new Department();
 
-                errors.add(
-                        error(
-                                rowNumber,
-                                "部门不存在或已停用：" +
-                                        departmentName
-                        )
+                department.setName(
+                        departmentName
                 );
 
-                continue;
+                department.setTeacherId(
+                        null
+                );
+
+                department.setStatus(
+                        (short) 1
+                );
+
+                department.setCreateTime(
+                        LocalDateTime.now()
+                );
+
+                int departmentInsert =
+                        departmentMapper.insert(
+                                department
+                        );
+
+                if (departmentInsert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "部门创建失败：" +
+                                            departmentName
+                            )
+                    );
+
+                    continue;
+                }
+            } else {
+
+                /*
+                 * 已存在但停用 → 自动启用
+                 */
+                if (!Short.valueOf((short) 1)
+                        .equals(department.getStatus())) {
+
+                    department.setStatus(
+                            (short) 1
+                    );
+
+                    departmentMapper.updateById(
+                            department
+                    );
+                }
             }
 
-            /**
-             * =================================================
-             * 7. 查询学生
-             * =================================================
+            /*
+             * =====================================================
+             * 7. 查询 / 创建 sys_department
+             *
+             * sys_user_position.department_id
+             * 指向的不是 department.id，
+             * 而是 sys_department.id。
+             *
+             * 所以这里必须单独处理。
+             * =====================================================
+             */
+            SysDepartment sysDepartment =
+                    sysDepartmentMapper.selectOne(
+                            new LambdaQueryWrapper<SysDepartment>()
+                                    .eq(
+                                            SysDepartment::getName,
+                                            departmentName
+                                    )
+                                    .last("LIMIT 1")
+                    );
+
+            if (sysDepartment == null) {
+
+                sysDepartment =
+                        new SysDepartment();
+
+                sysDepartment.setName(
+                        departmentName
+                );
+
+                sysDepartment.setDescription(
+                        "由部门成员 Excel 自动创建"
+                );
+
+                sysDepartment.setStatus(
+                        (short) 1
+                );
+
+                sysDepartment.setCreateTime(
+                        LocalDateTime.now()
+                );
+
+                sysDepartment.setUpdateTime(
+                        LocalDateTime.now()
+                );
+
+                int sysDepartmentInsert =
+                        sysDepartmentMapper.insert(
+                                sysDepartment
+                        );
+
+                if (sysDepartmentInsert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "系统部门创建失败：" +
+                                            departmentName)
+                            );
+
+                    continue;
+                }
+
+            } else if (!Short.valueOf((short) 1)
+                    .equals(sysDepartment.getStatus())) {
+
+                sysDepartment.setStatus(
+                        (short) 1
+                );
+
+                sysDepartment.setUpdateTime(
+                        LocalDateTime.now()
+                );
+
+                sysDepartmentMapper.updateById(
+                        sysDepartment
+                );
+            }
+
+            /*
+             * =====================================================
+             * 8. 查询学生
+             * =====================================================
              */
             SysUser user =
                     sysUserMapper.selectOne(
@@ -788,7 +878,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 errors.add(
                         error(
                                 rowNumber,
-                                "学生不存在，无法建立部门关系，学号：" +
+                                "系统中不存在该学生：" +
                                         studentNo
                         )
                 );
@@ -796,12 +886,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 continue;
             }
 
-            /**
-             * =================================================
-             * 8. 姓名校验
-             * =================================================
+            /*
+             * =====================================================
+             * 9. 姓名校验
+             * =====================================================
              */
-            if (!realName.equals(user.getRealName())) {
+            if (!realName.equals(
+                    user.getRealName()
+            )) {
 
                 failCount++;
 
@@ -810,42 +902,52 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                 rowNumber,
                                 "姓名与系统不一致：学号 " +
                                         studentNo +
-                                        "，系统姓名为：" +
-                                        user.getRealName()
+                                        "，系统姓名：" +
+                                        user.getRealName() +
+                                        "，Excel 姓名：" +
+                                        realName
                         )
                 );
 
                 continue;
             }
 
-            /**
-             * =================================================
-             * 9. Excel 内部重复
-             * =================================================
+            /*
+             * =====================================================
+             * 10. Excel 内部重复
+             * =====================================================
              */
             String relationKey =
                     department.getId() +
                             "_" +
                             user.getId();
 
-            if (!excelRelations.add(relationKey)) {
+            if (!excelRelations.add(
+                    relationKey
+            )) {
 
                 failCount++;
 
                 errors.add(
                         error(
                                 rowNumber,
-                                "Excel 中重复导入该部门成员"
+                                "Excel 中重复出现该学生的部门关系"
                         )
                 );
 
                 continue;
             }
 
-            /**
-             * =================================================
-             * 10. 创建 / 更新 sys_user_department
-             * =================================================
+            /*
+             * =====================================================
+             * 11. sys_user_department
+             *
+             * department_id = department.id
+             *
+             * 注意：
+             * join_time 数据库 NOT NULL，
+             * 绝对不能 setJoinTime(null)。
+             * =====================================================
              */
             SysUserDepartment relation =
                     userDepartmentMapper.selectOne(
@@ -860,6 +962,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                     )
                                     .last("LIMIT 1")
                     );
+
+            LocalDateTime now =
+                    LocalDateTime.now();
 
             if (relation == null) {
 
@@ -882,15 +987,31 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         (short) 1
                 );
 
-                /**
-                 * 按你的要求：
-                 * 不设置加入部门时间
+                /*
+                 * 数据库 NOT NULL
                  */
-                relation.setJoinTime(null);
-
-                userDepartmentMapper.insert(
-                        relation
+                relation.setJoinTime(
+                        now
                 );
+
+                int insert =
+                        userDepartmentMapper.insert(
+                                relation
+                        );
+
+                if (insert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "部门成员关系创建失败"
+                            )
+                    );
+
+                    continue;
+                }
 
             } else {
 
@@ -902,63 +1023,39 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         (short) 1
                 );
 
-                relation.setJoinTime(null);
+                /*
+                 * 不修改原来的 join_time
+                 */
 
-                userDepartmentMapper.updateById(
-                        relation
-                );
-            }
+                int update =
+                        userDepartmentMapper.updateById(
+                                relation
+                        );
 
-            /**
-             * =================================================
-             * 11. 查询系统岗位
-             * =================================================
-             */
-            SysPosition sysPosition =
-                    sysPositionMapper.selectOne(
-                            new LambdaQueryWrapper<SysPosition>()
-                                    .eq(
-                                            SysPosition::getName,
-                                            position
-                                    )
-                                    .eq(
-                                            SysPosition::getStatus,
-                                            (short) 1
-                                    )
-                                    .last("LIMIT 1")
+                if (update <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "部门成员关系更新失败"
+                            )
                     );
 
-            if (sysPosition == null) {
-
-                failCount++;
-
-                errors.add(
-                        error(
-                                rowNumber,
-                                "系统岗位不存在或已停用：" +
-                                        position
-                        )
-                );
-
-                continue;
+                    continue;
+                }
             }
 
-            /**
-             * =================================================
-             * 12. 创建 / 更新 sys_user_position
-             * =================================================
+            /*
+             * =====================================================
+             * 12. sys_user_position
              *
-             * 重点：
+             * department_id =
+             * sys_department.id
              *
-             * department_id
-             * 必须明确设置。
-             *
-             * 这里绝对不能：
-             *
-             * new SysUserPosition()
-             * 然后直接 insert
-             *
-             * 否则 department_id 就是 null。
+             * 不能使用 department.id！
+             * =====================================================
              */
             SysUserPosition userPosition =
                     sysUserPositionMapper.selectOne(
@@ -969,16 +1066,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                     )
                                     .eq(
                                             SysUserPosition::getDepartmentId,
-                                            department.getId()
+                                            sysDepartment.getId()
                                     )
                                     .last("LIMIT 1")
                     );
 
-            /**
-             * =================================================
-             * 13. 不存在 → 新增
-             * =================================================
-             */
             if (userPosition == null) {
 
                 userPosition =
@@ -988,45 +1080,38 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         user.getId()
                 );
 
-                /**
-                 * 重点！
-                 *
-                 * 这里必须设置 departmentId
-                 */
                 userPosition.setDepartmentId(
-                        department.getId()
+                        sysDepartment.getId()
                 );
 
-                /**
-                 * 设置岗位
-                 */
                 userPosition.setPositionId(
                         sysPosition.getId()
                 );
 
                 userPosition.setCreateTime(
-                        LocalDateTime.now()
+                        now
                 );
 
-                sysUserPositionMapper.insert(
-                        userPosition
-                );
+                int insert =
+                        sysUserPositionMapper.insert(
+                                userPosition
+                        );
+
+                if (insert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "用户岗位关系创建失败"
+                            )
+                    );
+
+                    continue;
+                }
 
             } else {
-
-                /**
-                 * =================================================
-                 * 14. 已存在 → 更新岗位
-                 * =================================================
-                 */
-
-                /**
-                 * 即使数据库已有记录，
-                 * 这里也再次确保 departmentId 不为空。
-                 */
-                userPosition.setDepartmentId(
-                        department.getId()
-                );
 
                 userPosition.setPositionId(
                         sysPosition.getId()
@@ -1037,6 +1122,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 );
             }
 
+            /*
+             * =====================================================
+             * 13. 成功
+             * =====================================================
+             */
             successCount++;
         }
 
@@ -1050,7 +1140,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     /**
      * =========================================================
-     * 判断职位是否合法
+     * 判断职位
      * =========================================================
      */
     private boolean isValidPosition(
@@ -1064,7 +1154,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     /**
      * =========================================================
-     * 构造错误信息
+     * 构造错误
      * =========================================================
      */
     private Map<String, Object> error(
@@ -1133,7 +1223,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     /**
      * =========================================================
-     * 去除字符串两端空格
+     * 去除空格
      * =========================================================
      */
     private String trim(
@@ -1149,7 +1239,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     /**
      * =========================================================
-     * 判断字符串为空
+     * 判断空字符串
      * =========================================================
      */
     private boolean isEmpty(
