@@ -45,3 +45,11 @@ export function addStudent(data) {
     data: data,
   })
 }
+
+// 管理员重置学生密码
+export function resetStudentPassword(id) {
+  return request({
+    url: `/user/student/reset-password/${id}`,
+    method: 'PUT',
+  })
+}

@@ -240,6 +240,22 @@
           </div>
 
 
+          <!-- 修改密码 -->
+          <el-button
+            type="primary"
+            plain
+            @click="goChangePassword"
+          >
+
+            <el-icon>
+              <Lock />
+            </el-icon>
+
+            修改密码
+
+          </el-button>
+
+
           <!-- 退出登录 -->
           <el-button
             type="danger"
@@ -293,6 +309,7 @@ import {
   Trophy,
   Bell,
   SwitchButton,
+  Lock,
   Menu
 } from '@element-plus/icons-vue'
 
@@ -366,6 +383,19 @@ const mobileMenuVisible = ref(false)
 function closeMobileMenu() {
   mobileMenuVisible.value = false
 }
+
+function goChangePassword() {
+
+  router.push(
+    '/change-password'
+  )
+
+}
+
+
+// ============================================================
+// 退出登录
+// ============================================================
 
 function logout() {
 

@@ -187,7 +187,11 @@ const user =
 const isFirstLogin =
   computed(() => {
 
-    return user.value?.firstLogin === true
+    return (
+      user.value?.firstLogin === true
+      ||
+      user.value?.firstLogin === 1
+    )
 
   })
 
