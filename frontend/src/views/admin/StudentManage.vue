@@ -186,8 +186,9 @@
 
         <el-table-column
           label="操作"
-          width="150"
+          width="250"
           fixed="right"
+          align="center"
         >
 
           <template #default="{ row }">
@@ -198,6 +199,14 @@
               @click="openDetail(row)"
             >
               查看成绩
+            </el-button>
+
+            <el-button
+              type="warning"
+              link
+              @click="handleResetPassword(row)"
+            >
+              重置密码
             </el-button>
 
           </template>
@@ -534,6 +543,9 @@ import {
 
 
 import request from '@/api/request'
+import {
+  resetStudentPassword,
+} from '@/api/student'
 
 
 /* =========================================================
@@ -1381,6 +1393,55 @@ async function handleShow(row) {
         '恢复成绩失败',
       )
 
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+ * 管理员重置学生密码
+ * ========================================================= */
+
+async function handleResetPassword(row) {
+
+  try {
+
+    await ElMessageBox.confirm(
+      `确定将「${row.realName || row.studentNo || '该学生'}」的密码重置为 123456 吗？\n\n重置后，该学生下次登录时必须重新修改密码。`,
+      '重置学生密码',
+      {
+        type: 'warning',
+        confirmButtonText: '确定重置',
+        cancelButtonText: '取消',
+      },
+    )
+
+    const res = await resetStudentPassword(row.id)
+
+    const result = unwrapResult(res)
+
+    if (res?.code === 200 || res?.data?.code === 200) {
+      ElMessage.success('密码已重置为 123456，学生下次登录需重新修改密码')
+    } else {
+      ElMessage.error(
+        res?.message
+        || res?.data?.message
+        || result?.message
+        || '重置密码失败',
+      )
+    }
+
+  } catch (error) {
+
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('重置学生密码失败：', error)
+      ElMessage.error(
+        error?.response?.data?.message
+        || error?.message
+        || '重置密码失败',
+      )
     }
 
   }

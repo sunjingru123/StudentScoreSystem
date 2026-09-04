@@ -287,6 +287,21 @@
 
 
           <el-button
+            type="primary"
+            plain
+            @click="goChangePassword"
+          >
+
+            <el-icon>
+              <Lock />
+            </el-icon>
+
+            修改密码
+
+          </el-button>
+
+
+          <el-button
             type="danger"
             plain
             @click="logout"
@@ -356,6 +371,7 @@ import {
   Download,
   Bell,
   SwitchButton,
+  Lock,
   Menu
 } from '@element-plus/icons-vue'
 
@@ -556,6 +572,19 @@ const mobileMenuVisible = ref(false)
 function closeMobileMenu() {
   mobileMenuVisible.value = false
 }
+
+function goChangePassword() {
+
+  router.push(
+    '/change-password'
+  )
+
+}
+
+
+// =========================================================
+// 退出登录
+// =========================================================
 
 function logout() {
 

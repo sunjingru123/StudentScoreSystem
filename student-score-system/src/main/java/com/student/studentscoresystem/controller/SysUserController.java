@@ -1193,6 +1193,105 @@ public class SysUserController {
 
     /**
      * =========================================================
+     * 管理员重置学生密码
+     *
+     * PUT /user/student/reset-password/{id}
+     *
+     * 重置后：
+     * 1. 密码恢复为 123456（BCrypt 加密保存）
+     * 2. first_login = 1
+     * 3. 学生下次登录必须重新修改密码
+     * =========================================================
+     */
+    @PutMapping("/student/reset-password/{id}")
+    public Result<Void> resetStudentPassword(
+            @PathVariable Long id,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+
+        // 当前接口只允许管理员使用。
+        Object currentUserId = request.getAttribute("userId");
+
+        if (currentUserId == null) {
+            return Result.fail("请先登录");
+        }
+
+        Long adminUserId;
+        try {
+            adminUserId = Long.valueOf(currentUserId.toString());
+        } catch (Exception e) {
+            return Result.fail("当前登录信息无效");
+        }
+
+        SysPosition adminPosition =
+                positionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(SysPosition::getName, "管理员")
+                                .eq(SysPosition::getStatus, (short) 1)
+                                .last("LIMIT 1")
+                );
+
+        if (adminPosition == null) {
+            return Result.fail("管理员岗位不存在");
+        }
+
+        Long adminCount =
+                userPositionMapper.selectCount(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(SysUserPosition::getUserId, adminUserId)
+                                .eq(SysUserPosition::getPositionId, adminPosition.getId())
+                );
+
+        if (adminCount == null || adminCount <= 0) {
+            return Result.fail("没有管理员权限");
+        }
+
+        SysUser user = sysUserMapper.selectById(id);
+
+        if (user == null) {
+            return Result.fail("学生不存在");
+        }
+
+        // 再确认目标账号确实是“学生”岗位，避免管理员误操作教师/管理员账号。
+        SysPosition studentPosition =
+                positionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(SysPosition::getName, "学生")
+                                .eq(SysPosition::getStatus, (short) 1)
+                                .orderByAsc(SysPosition::getId)
+                                .last("LIMIT 1")
+                );
+
+        if (studentPosition == null) {
+            return Result.fail("学生岗位不存在");
+        }
+
+        Long studentCount =
+                userPositionMapper.selectCount(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(SysUserPosition::getUserId, id)
+                                .eq(SysUserPosition::getPositionId, studentPosition.getId())
+                );
+
+        if (studentCount == null || studentCount <= 0) {
+            return Result.fail("该账号不是学生账号，无法使用学生密码重置功能");
+        }
+
+        user.setPassword(PasswordUtil.encode("123456"));
+        user.setFirstLogin((short) 1);
+
+        int updated = sysUserMapper.updateById(user);
+
+        if (updated <= 0) {
+            return Result.fail("密码重置失败");
+        }
+
+        return Result.success(null);
+    }
+
+
+    /**
+     * =========================================================
      * 测试接口
      * =========================================================
      */
