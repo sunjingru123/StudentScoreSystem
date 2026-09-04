@@ -4,6 +4,7 @@ import App from './App.vue'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
+import './assets/responsive.css'
 
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
@@ -47,27 +48,3 @@ app.use(router)
 // =========================================================
 
 app.mount('#app')
-
-
-// =========================================================
-// 开发环境注入移动端调试工具
-//
-// 页面右下角出现齿轮 ⚙
-// =========================================================
-
-if (import.meta.env.DEV) {
-
-  const script = document.createElement('script')
-
-  script.src =
-    'https://cdn.bootcdn.net/ajax/libs/eruda/2.3.3/eruda.js'
-
-  script.onload = () => {
-
-    window.eruda.init()
-
-  }
-
-  document.body.appendChild(script)
-
-}

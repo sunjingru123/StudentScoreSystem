@@ -162,6 +162,68 @@
 
 
     <!-- =====================================================
+         移动端抽屉菜单
+    ====================================================== -->
+
+    <el-drawer
+      v-model="mobileMenuVisible"
+      direction="ltr"
+      size="280px"
+      :with-header="false"
+      class="mobile-drawer"
+    >
+
+      <div class="mobile-drawer-logo">
+        <div class="mobile-drawer-logo-icon">🎓</div>
+        <div class="mobile-drawer-logo-title">学生综合测评系统</div>
+        <div class="mobile-drawer-logo-subtitle">学生端</div>
+      </div>
+
+      <el-menu
+        :default-active="route.path"
+        router
+        class="menu mobile-drawer-menu"
+        @select="closeMobileMenu"
+      >
+
+        <el-menu-item index="/home">
+          <el-icon><House /></el-icon>
+          <span>首页</span>
+        </el-menu-item>
+
+        <el-menu-item index="/home/score">
+          <el-icon><Trophy /></el-icon>
+          <span>我的成绩</span>
+        </el-menu-item>
+
+        <el-menu-item index="/home/apply">
+          <el-icon><DocumentAdd /></el-icon>
+          <span>个人加分申报</span>
+        </el-menu-item>
+
+        <el-menu-item index="/home/record">
+          <el-icon><Document /></el-icon>
+          <span>我的申请记录</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="archiveLeader"
+          index="/home/certificate-audit"
+        >
+          <el-icon><FolderChecked /></el-icon>
+          <span>个人证书审核</span>
+        </el-menu-item>
+
+        <el-menu-item index="/home/message">
+          <el-icon><Bell /></el-icon>
+          <span>消息通知</span>
+        </el-menu-item>
+
+      </el-menu>
+
+    </el-drawer>
+
+    <!-- =====================================================
          右侧
     ====================================================== -->
 
@@ -174,6 +236,15 @@
 
 
         <div class="header-left">
+
+          <el-button
+            class="mobile-menu-button"
+            circle
+            @click="mobileMenuVisible = true"
+            aria-label="打开菜单"
+          >
+            <el-icon><Menu /></el-icon>
+          </el-button>
 
           <span class="system-name">
             学生综合测评系统
@@ -284,7 +355,8 @@ import {
   FolderChecked,
   Download,
   Bell,
-  SwitchButton
+  SwitchButton,
+  Menu
 } from '@element-plus/icons-vue'
 
 
@@ -478,6 +550,12 @@ async function loadPermission() {
 // =========================================================
 // 退出登录
 // =========================================================
+
+const mobileMenuVisible = ref(false)
+
+function closeMobileMenu() {
+  mobileMenuVisible.value = false
+}
 
 function logout() {
 
@@ -838,6 +916,172 @@ onMounted(async () => {
   overflow-y:
     auto;
 
+}
+
+
+
+
+.mobile-drawer-logo {
+  height: 120px;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #304156;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.mobile-drawer-logo-icon {
+  font-size: 28px;
+  margin-bottom: 5px;
+}
+
+.mobile-drawer-logo-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: .5px;
+}
+
+.mobile-drawer-logo-subtitle {
+  margin-top: 5px;
+  font-size: 13px;
+  color: #aeb8c4;
+}
+
+:deep(.mobile-drawer .el-drawer__body) {
+  padding: 0;
+  background: #304156;
+}
+
+:deep(.mobile-drawer .el-menu-item) {
+  margin: 4px 10px;
+  border-radius: 6px;
+}
+
+/* =========================================================
+   移动端响应式
+========================================================= */
+
+.mobile-menu-button {
+
+  display: none;
+
+  margin-right: 8px;
+
+}
+
+.mobile-drawer-menu {
+
+  border-right: none;
+
+}
+
+@media (max-width: 768px) {
+
+  .layout {
+    min-height: 100vh;
+    height: 100dvh;
+    width: 100%;
+  }
+
+  .aside {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    flex: 0 0 auto;
+  }
+
+  .header {
+    height: 56px !important;
+    min-height: 56px !important;
+    padding: 0 12px !important;
+    gap: 8px;
+  }
+
+  .header-left {
+    min-width: 0;
+    flex: 1;
+    gap: 6px !important;
+    overflow: hidden;
+  }
+
+  .system-name,
+  .system-title {
+    font-size: 16px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .system-role {
+    flex: 0 0 auto;
+    padding: 3px 7px !important;
+    font-size: 11px !important;
+  }
+
+  .divider,
+  .current-page {
+    display: none;
+  }
+
+  .header-right {
+    flex: 0 0 auto;
+    gap: 6px !important;
+  }
+
+  .user-text,
+  .teacher-name,
+  .admin-text {
+    display: none !important;
+  }
+
+  .user-info,
+  .admin-info {
+    gap: 0 !important;
+  }
+
+  .header-right .el-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .header-right .el-button .el-icon {
+    margin: 0;
+  }
+
+  .main {
+    padding: 12px !important;
+    min-height: calc(100dvh - 56px) !important;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .header {
+    padding: 0 8px !important;
+  }
+
+  .system-name,
+  .system-title {
+    font-size: 15px !important;
+  }
+
+  .main {
+    padding: 10px !important;
+  }
 }
 
 </style>

@@ -16,6 +16,7 @@ import com.student.studentscoresystem.service.ISysUserService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.DepartmentMemberVO;
 import com.student.studentscoresystem.vo.LoginVO;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -35,6 +36,12 @@ public class LoginController {
 
     private final DepartmentMapper departmentMapper;
 
+    /**
+     * BCrypt 密码编码器
+     */
+    private final BCryptPasswordEncoder passwordEncoder =
+            new BCryptPasswordEncoder();
+
     public LoginController(
             ISysUserService sysUserService,
             SysUserPositionMapper sysUserPositionMapper,
@@ -42,45 +49,69 @@ public class LoginController {
             SysUserDepartmentMapper sysUserDepartmentMapper,
             DepartmentMapper departmentMapper
     ) {
-        this.sysUserService = sysUserService;
-        this.sysUserPositionMapper = sysUserPositionMapper;
-        this.sysPositionMapper = sysPositionMapper;
-        this.sysUserDepartmentMapper = sysUserDepartmentMapper;
-        this.departmentMapper = departmentMapper;
+
+        this.sysUserService =
+                sysUserService;
+
+        this.sysUserPositionMapper =
+                sysUserPositionMapper;
+
+        this.sysPositionMapper =
+                sysPositionMapper;
+
+        this.sysUserDepartmentMapper =
+                sysUserDepartmentMapper;
+
+        this.departmentMapper =
+                departmentMapper;
     }
 
+    /**
+     * 登录
+     */
     @PostMapping
     public Result<LoginVO> login(
             @RequestBody LoginDTO loginDTO
     ) {
 
         // =====================================================
-        // 1. 查询用户
+        // 1. 参数检查
         // =====================================================
 
-        LambdaQueryWrapper<SysUser> userWrapper =
-                new LambdaQueryWrapper<>();
+        if (loginDTO == null
+                || loginDTO.getUsername() == null
+                || loginDTO.getUsername().trim().isEmpty()) {
 
-        userWrapper.eq(
-                SysUser::getUsername,
-                loginDTO.getUsername()
-        );
+            throw new RuntimeException("请输入用户名");
+        }
+
+        if (loginDTO.getPassword() == null
+                || loginDTO.getPassword().isEmpty()) {
+
+            throw new RuntimeException("请输入密码");
+        }
+
+        String username =
+                loginDTO.getUsername().trim();
+
+        String inputPassword =
+                loginDTO.getPassword();
+
+        // =====================================================
+        // 2. 查询用户
+        // =====================================================
 
         SysUser user =
-                sysUserService.getOne(userWrapper);
+                sysUserService.getOne(
+                        new LambdaQueryWrapper<SysUser>()
+                                .eq(
+                                        SysUser::getUsername,
+                                        username
+                                )
+                );
 
         if (user == null) {
             throw new RuntimeException("用户不存在");
-        }
-
-        // =====================================================
-        // 2. 校验密码
-        // =====================================================
-
-        if (user.getPassword() == null
-                || !user.getPassword().equals(loginDTO.getPassword())) {
-
-            throw new RuntimeException("密码错误");
         }
 
         // =====================================================
@@ -94,42 +125,123 @@ public class LoginController {
         }
 
         // =====================================================
-        // 4. 构造登录返回对象
+        // 4. 校验密码
+        //
+        // 新密码：
+        //     BCrypt
+        //
+        // 老账号：
+        //     可能还是明文
+        //
+        // 为了避免你数据库清空之前创建的账号全部不能登录，
+        // 这里暂时兼容两种密码。
         // =====================================================
 
-        LoginVO vo = new LoginVO();
+        String databasePassword =
+                user.getPassword();
 
-        vo.setId(user.getId());
+        boolean passwordCorrect =
+                false;
 
-        vo.setUsername(user.getUsername());
+        boolean oldPlainPassword =
+                false;
 
-        vo.setRealName(user.getRealName());
+        if (databasePassword != null
+                && !databasePassword.isEmpty()) {
+
+            /*
+             * BCrypt 密码一般以这些前缀开头
+             */
+            if (databasePassword.startsWith("$2a$")
+                    || databasePassword.startsWith("$2b$")
+                    || databasePassword.startsWith("$2y$")) {
+
+                try {
+
+                    passwordCorrect =
+                            passwordEncoder.matches(
+                                    inputPassword,
+                                    databasePassword
+                            );
+
+                } catch (Exception ignored) {
+
+                    passwordCorrect = false;
+                }
+
+            } else {
+
+                /*
+                 * 兼容旧版明文密码
+                 */
+                passwordCorrect =
+                        databasePassword.equals(
+                                inputPassword
+                        );
+
+                oldPlainPassword =
+                        passwordCorrect;
+            }
+        }
+
+        if (!passwordCorrect) {
+
+            throw new RuntimeException("密码错误");
+        }
 
         // =====================================================
-        // 5. 默认角色
-        //
-        // 所有通过学生 Excel 导入的学生，
-        // 默认就是“学生”。
-        //
-        // 注意：
-        // 这里不需要在 sys_user 里面增加角色字段。
-        //
-        // 因为普通学生没有 SysUserPosition，
-        // 所以直接默认“学生”。
+        // 5. 老账号登录成功后自动升级成 BCrypt
+        // =====================================================
+
+        if (oldPlainPassword) {
+
+            user.setPassword(
+                    passwordEncoder.encode(
+                            inputPassword
+                    )
+            );
+
+            /*
+             * 如果数据库中没有 first_login，
+             * 默认不强制老账号改密码。
+             */
+            if (user.getFirstLogin() == null) {
+
+                user.setFirstLogin(
+                        (short) 0
+                );
+            }
+
+            sysUserService.updateById(user);
+        }
+
+        // =====================================================
+        // 6. 构造登录返回对象
+        // =====================================================
+
+        LoginVO vo =
+                new LoginVO();
+
+        vo.setId(
+                user.getId()
+        );
+
+        vo.setUsername(
+                user.getUsername()
+        );
+
+        vo.setRealName(
+                user.getRealName()
+        );
+
+        // =====================================================
+        // 7. 默认角色：学生
         // =====================================================
 
         vo.setRole("学生");
 
         // =====================================================
-        // 6. 查询用户岗位
-        //
-        // 部门成员导入以后：
-        //
-        // 学生会 + 部长
-        // 学生会 + 副部长
-        // 学生会 + 干事
-        //
-        // 才会存在 SysUserPosition。
+        // 8. 查询岗位
         // =====================================================
 
         List<SysUserPosition> userPositions =
@@ -141,29 +253,13 @@ public class LoginController {
                                 )
                 );
 
-        // =====================================================
-        // 7. 如果存在岗位，则使用岗位作为角色
-        //
-        // 没有岗位：
-        //     学生
-        //
-        // 有岗位：
-        //     部长 / 副部长 / 干事 / 管理员
-        // =====================================================
-
         if (userPositions != null
                 && !userPositions.isEmpty()) {
 
-            /*
-             * 先取第一条有效岗位。
-             *
-             * 后面如果你需要：
-             *
-             * 一个学生在不同部门拥有不同职位，
-             *
-             * 可以再进一步做角色优先级。
-             */
-            for (SysUserPosition userPosition : userPositions) {
+            for (
+                    SysUserPosition userPosition
+                    : userPositions
+            ) {
 
                 if (userPosition == null) {
                     continue;
@@ -184,13 +280,18 @@ public class LoginController {
 
                 if (position.getStatus() != null
                         && position.getStatus() != 1) {
+
                     continue;
                 }
 
                 if (position.getName() != null
-                        && !position.getName().trim().isEmpty()) {
+                        && !position.getName()
+                        .trim()
+                        .isEmpty()) {
 
-                    vo.setRole(position.getName());
+                    vo.setRole(
+                            position.getName()
+                    );
 
                     break;
                 }
@@ -198,7 +299,7 @@ public class LoginController {
         }
 
         // =====================================================
-        // 8. 查询学生所属部门
+        // 9. 查询部门
         // =====================================================
 
         List<SysUserDepartment> relations =
@@ -219,7 +320,10 @@ public class LoginController {
 
         if (relations != null) {
 
-            for (SysUserDepartment relation : relations) {
+            for (
+                    SysUserDepartment relation
+                    : relations
+            ) {
 
                 if (relation == null) {
                     continue;
@@ -253,18 +357,27 @@ public class LoginController {
                         relation.getPosition()
                 );
 
-                departments.add(departmentVO);
+                departments.add(
+                        departmentVO
+                );
             }
         }
 
-        // =====================================================
-        // 9. 设置部门
-        // =====================================================
-
-        vo.setDepartments(departments);
+        vo.setDepartments(
+                departments
+        );
 
         // =====================================================
-        // 10. 生成 Token
+        // 10. 首次登录状态
+        // =====================================================
+
+        vo.setFirstLogin(
+                user.getFirstLogin() != null
+                        && user.getFirstLogin() == 1
+        );
+
+        // =====================================================
+        // 11. 创建 Token
         // =====================================================
 
         String token =
@@ -276,7 +389,7 @@ public class LoginController {
         vo.setToken(token);
 
         // =====================================================
-        // 11. 返回
+        // 12. 返回
         // =====================================================
 
         return Result.success(vo);
