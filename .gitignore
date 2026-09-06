@@ -23,3 +23,4 @@ Thumbs.db
 # Deployment data / backups
 uploads/
 *.7z
+*.sql
