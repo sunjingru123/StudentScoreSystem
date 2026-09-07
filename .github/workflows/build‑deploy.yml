@@ -1,0 +1,89 @@
+name: Build & Push GHCR & Deploy to Server
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository_owner }}/student-score-app
+      APP_CONTAINER: student-score-app
+      APP_PORT: 8080
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Maven打包跳过测试
+        run: |
+          cd student-score-system
+          mvn clean package -DskipTests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push镜像到ghcr.io
+        uses: docker/build-push-action@v5
+        with:
+          context: ./student-score-system
+          file: ./student-score-system/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy via SSH to deng@45.76.112.220
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            APP_CONTAINER=${{ env.APP_CONTAINER }}
+            APP_PORT=${{ env.APP_PORT }}
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker pull "$IMAGE"
+
+            docker stop "$APP_CONTAINER" 2>/dev/null || true
+            docker rm "$APP_CONTAINER" 2>/dev/null || true
+
+            docker run -d \
+              --name "$APP_CONTAINER" \
+              --restart unless-stopped \
+              --add-host=host.docker.internal:host-gateway \
+              -p ${APP_PORT}:8080 \
+              -e DB_HOST=host.docker.internal \
+              -e DB_PORT=65432 \
+              -e DB_NAME=mydb \
+              -e DB_USER=${{ secrets.DB_USER }} \
+              -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+              -e TZ=Asia/Shanghai \
+              "$IMAGE"
+
+            REPO=$(echo "$IMAGE" | cut -d: -f1)
+            docker images "$REPO" --format '{{.Repository}}:{{.Tag}} {{.CreatedAt}}' \
+              | sort -k2 -r | tail -n +4 | awk '{print $1}' \
+              | xargs -r docker rmi || true
+
+            echo "==== deploy finished: $IMAGE ===="
+            docker ps --filter "name=${APP_CONTAINER}"
