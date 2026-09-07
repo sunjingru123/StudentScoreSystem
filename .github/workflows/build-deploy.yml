@@ -33,7 +33,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ shturl.cc/tK }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push镜像到ghcr.io
@@ -58,7 +58,7 @@ jobs:
             set -e
             IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             APP_CONTAINER=${{ env.APP_CONTAINER }}
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ shturl.cc/tK }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             docker pull "$IMAGE"
             docker stop "$APP_CONTAINER" 2>/dev/null || true
             docker rm "$APP_CONTAINER" 2>/dev/null || true
