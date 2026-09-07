@@ -33,7 +33,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ shturl.cc/tK }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push镜像到ghcr.io
@@ -48,7 +48,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy via SSH to deng@45.76.xxx.xxx
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -58,15 +58,14 @@ jobs:
             set -e
             IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             APP_CONTAINER=${{ env.APP_CONTAINER }}
-            APP_PORT=${{ env.APP_PORT }}
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ shturl.cc/tK }} --password-stdin
             docker pull "$IMAGE"
             docker stop "$APP_CONTAINER" 2>/dev/null || true
             docker rm "$APP_CONTAINER" 2>/dev/null || true
             docker run -d \
               --name "$APP_CONTAINER" \
               --restart unless-stopped \
-              -p ${APP_PORT}:8080 \
+              -p ${{ env.APP_PORT }}:8080 \
               -e DB_HOST=host.docker.internal \
               -e DB_PORT=65432 \
               -e DB_NAME=mydb \
