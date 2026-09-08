@@ -97,10 +97,6 @@ jobs:
             mkdir -p /opt/student-score-system/uploads
             cd /opt/student-score-system
 
-            # 停止并清理可能遗留的旧单体容器（如果之前旧脚本跑过的话）
-            docker stop student-score-app 2>/dev/null || true
-            docker rm student-score-app 2>/dev/null || true
-
             # 写入环境变量
             cat <<EOF > .env
             IMAGE_REPO=${IMAGE_REPO}
@@ -112,8 +108,14 @@ jobs:
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             docker compose -f docker-compose.prod.yml pull
 
-            # 启动前后端容器
+            # 启动前后端服务
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # 关键：将现有的 PG18 容器动态加入到项目的 score-network 网络中
+            docker network connect score-network student-score-postgres 2>/dev/null || true
+
+            # 重启一下后端以立即连接网络
+            docker restart student-score-backend
 
             # 清理无用镜像
             docker image prune -f
