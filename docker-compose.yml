@@ -10,7 +10,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       # 同时保留标准变量名作为双保险
       SPRING_DATASOURCE_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
-      SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-deng}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./uploads:/app/uploads
