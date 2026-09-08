@@ -1,58 +1,33 @@
 services:
-  postgres:
-    image: postgres:18
-    container_name: student-score-postgres
-    restart: unless-stopped
-
-    environment:
-      POSTGRES_DB: student_score_system
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
-    volumes:
-      - postgres_data:/var/lib/postgresql
-      - ./student_score_system_backup.sql:/docker-entrypoint-initdb.d/01_backup.sql:ro
-
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d student_score_system"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   backend:
-    build:
-      context: ./student-score-system
-      dockerfile: Dockerfile
-
+    image: ghcr.io/${IMAGE_REPO}/student-score-backend:latest
     container_name: student-score-backend
     restart: unless-stopped
-
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/student_score_system
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-
+      # 精准对应 application.yml 中的变量名
+      DB_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
+      DB_USERNAME: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # 同时保留标准变量名作为双保险
+      SPRING_DATASOURCE_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./uploads:/app/uploads
-
-    depends_on:
-      postgres:
-        condition: service_healthy
+    networks:
+      - score-network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-
+    image: ghcr.io/${IMAGE_REPO}/student-score-frontend:latest
     container_name: student-score-frontend
     restart: unless-stopped
-
     ports:
-      - "80:80"
-
+      - "127.0.0.1:3080:80"  # 本机 3080，由 Caddy 反代
     depends_on:
       - backend
+    networks:
+      - score-network
 
-
-volumes:
-  postgres_data:
+networks:
+  score-network:
+    name: score-network
