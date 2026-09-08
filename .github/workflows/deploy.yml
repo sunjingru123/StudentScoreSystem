@@ -1,0 +1,119 @@
+name: Build and Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lowercase Repository Name
+        run: |
+          echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 1. 编译并推送 Spring Boot 后端
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./student-score-system
+          file: ./student-score-system/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 2. 编译并推送 Vue3 前端
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lowercase Repository Name
+        run: |
+          echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
+          source: "docker-compose.prod.yml"
+          target: "/opt/student-score-system"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE_REPO: ${{ env.IMAGE_REPO }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
+          envs: IMAGE_REPO,DB_USER,DB_PASSWORD,GHCR_USER,GHCR_TOKEN
+          script: |
+            mkdir -p /opt/student-score-system/uploads
+            cd /opt/student-score-system
+
+            # 停止并清理可能遗留的旧单体容器（如果之前旧脚本跑过的话）
+            docker stop student-score-app 2>/dev/null || true
+            docker rm student-score-app 2>/dev/null || true
+
+            # 写入环境变量
+            cat <<EOF > .env
+            IMAGE_REPO=${IMAGE_REPO}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            EOF
+
+            # 登录 GHCR 并拉取
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            docker compose -f docker-compose.prod.yml pull
+
+            # 启动前后端容器
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # 清理无用镜像
+            docker image prune -f

@@ -1,0 +1,23 @@
+services:
+  backend:
+    image: ghcr.io/${IMAGE_REPO}/student-score-backend:latest
+    container_name: student-score-backend
+    restart: unless-stopped
+    environment:
+      # 连接宿主机 65432 端口的已有 PG18，库名为 student_score_system
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:65432/student_score_system
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./uploads:/app/uploads
+
+  frontend:
+    image: ghcr.io/${IMAGE_REPO}/student-score-frontend:latest
+    container_name: student-score-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3080:80"  # 仅限宿主机访问，由 Caddy 反代
+    depends_on:
+      - backend
