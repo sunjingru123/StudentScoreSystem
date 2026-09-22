@@ -553,14 +553,17 @@
 
         <el-form-item
           label="被加减分学生"
-          prop="studentId"
+          prop="studentIds"
         >
 
           <el-select
-            v-model="departmentForm.studentId"
+            v-model="departmentForm.studentIds"
+            multiple
             filterable
             clearable
-            placeholder="请选择需要加分或扣分的学生"
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="可多选：同一个活动的多名学生一次提交"
             style="width: 100%"
           >
 
@@ -574,6 +577,11 @@
             />
 
           </el-select>
+
+
+          <div class="form-tip">
+            支持多选：同一次提交会给每个学生各生成一条申报。
+          </div>
 
         </el-form-item>
 
@@ -592,9 +600,11 @@
             v-model="departmentForm.templateId"
             filterable
             clearable
+            allow-create
+            default-first-option
             :disabled="!departmentForm.departmentId"
             :loading="templateLoading"
-            placeholder="请先选择部门，再选择加减分项目"
+            placeholder="选择已有活动，或直接输入新活动名称"
             style="width: 100%"
           >
 
@@ -649,10 +659,81 @@
 
 
           <div class="form-tip">
-            这里只显示当前申报部门自己的加减分模板。
+            这里只显示当前申报部门自己的活动。
+            直接输入新活动名称后回车，提交时会保存到本部门，下次直接选择。
           </div>
 
+
+          <el-button
+            link
+            type="primary"
+            :disabled="!departmentForm.departmentId"
+            @click="openManageDialog"
+          >
+            管理本部门活动（停用不用的活动）
+          </el-button>
+
         </el-form-item>
+
+
+
+        <!-- ================================================== -->
+        <!-- 新活动：手动填写类型与分值 -->
+        <!-- ================================================== -->
+
+        <template v-if="isNewActivity">
+
+          <el-form-item label="活动类型">
+
+            <el-radio-group
+              v-model="departmentForm.newScoreType"
+            >
+
+              <el-radio :value="1">
+                加分
+              </el-radio>
+
+              <el-radio :value="-1">
+                减分
+              </el-radio>
+
+            </el-radio-group>
+
+          </el-form-item>
+
+
+          <el-form-item label="活动分值">
+
+            <el-input-number
+              v-model="departmentForm.newScore"
+              :min="0.01"
+              :step="0.5"
+              :precision="2"
+              controls-position="right"
+              style="width: 200px"
+            />
+
+            <span class="form-tip">
+              新活动第一次提交时填写，之后直接选择即可
+            </span>
+
+          </el-form-item>
+
+
+          <el-form-item label="活动说明">
+
+            <el-input
+              v-model="departmentForm.newDescription"
+              type="textarea"
+              :rows="3"
+              maxlength="1000"
+              show-word-limit
+              placeholder="选填，例如活动时间、评选范围"
+            />
+
+          </el-form-item>
+
+        </template>
 
 
 
@@ -660,7 +741,10 @@
         <!-- 模板详情 -->
         <!-- ================================================== -->
 
-        <el-form-item label="项目类型">
+        <el-form-item
+          v-if="!isNewActivity"
+          label="项目类型"
+        >
 
           <template v-if="selectedTemplate">
 
@@ -742,6 +826,7 @@
         <!-- ================================================== -->
 
         <el-form-item
+          v-if="!isNewActivity"
           label="项目说明"
         >
 
@@ -1192,6 +1277,218 @@
 
     </el-card>
 
+
+
+    <!-- ====================================================== -->
+    <!-- 批量提交结果 -->
+    <!-- ====================================================== -->
+
+    <el-dialog
+      v-model="departmentResultVisible"
+      title="提交结果"
+      width="560px"
+    >
+
+      <el-alert
+        v-if="departmentSubmitSuccessCount > 0"
+        type="success"
+        :closable="false"
+        show-icon
+        :title="`成功提交 ${departmentSubmitSuccessCount} 名学生`"
+        style="margin-bottom: 14px"
+      />
+
+
+      <div style="margin-bottom: 10px; color: #f56c6c">
+        以下 {{ departmentSubmitErrors.length }} 名学生提交失败：
+      </div>
+
+
+      <el-table
+        :data="departmentSubmitErrors"
+        border
+        size="small"
+        max-height="320"
+      >
+
+        <el-table-column
+          prop="student"
+          label="学生"
+          width="120"
+        />
+
+        <el-table-column
+          prop="message"
+          label="失败原因"
+          min-width="260"
+        />
+
+      </el-table>
+
+
+      <template #footer>
+
+        <el-button
+          type="primary"
+          @click="departmentResultVisible = false"
+        >
+          知道了
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
+
+
+    <!-- ====================================================== -->
+    <!-- 管理部门活动 -->
+    <!-- ====================================================== -->
+
+    <el-dialog
+      v-model="manageVisible"
+      title="管理本部门活动"
+      width="680px"
+    >
+
+      <div class="form-tip" style="margin-bottom: 12px">
+        停用后该活动不会再出现在提交页面的下拉框里；
+        已经提交的申报不受影响。
+      </div>
+
+
+      <el-table
+        v-loading="manageLoading"
+        :data="manageList"
+        border
+        size="small"
+        max-height="380"
+      >
+
+        <el-table-column
+          prop="name"
+          label="活动名称"
+          min-width="160"
+          show-overflow-tooltip
+        />
+
+
+        <el-table-column
+          label="类型"
+          width="80"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-tag
+              v-if="row.scoreType === 1"
+              type="success"
+            >
+              加分
+            </el-tag>
+
+            <el-tag
+              v-else-if="row.scoreType === -1"
+              type="danger"
+            >
+              减分
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              未知
+            </el-tag>
+
+          </template>
+
+        </el-table-column>
+
+
+        <el-table-column
+          prop="score"
+          label="分值"
+          width="90"
+          align="center"
+        />
+
+
+        <el-table-column
+          label="状态"
+          width="90"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-tag
+              v-if="row.status === 1"
+              type="success"
+            >
+              启用
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="info"
+            >
+              已停用
+            </el-tag>
+
+          </template>
+
+        </el-table-column>
+
+
+        <el-table-column
+          label="操作"
+          width="100"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-button
+              v-if="row.status === 1"
+              link
+              type="danger"
+              :loading="manageUpdatingId === row.id"
+              @click="updateActivityStatus(row, 0)"
+            >
+              停用
+            </el-button>
+
+            <el-button
+              v-else
+              link
+              type="success"
+              :loading="manageUpdatingId === row.id"
+              @click="updateActivityStatus(row, 1)"
+            >
+              启用
+            </el-button>
+
+          </template>
+
+        </el-table-column>
+
+      </el-table>
+
+
+      <template #footer>
+
+        <el-button
+          @click="manageVisible = false"
+        >
+          关闭
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -1257,6 +1554,26 @@ const departmentTemplateList = ref([])
 const templateLoading = ref(false)
 
 
+/* 批量提交结果 */
+
+const departmentResultVisible = ref(false)
+
+const departmentSubmitErrors = ref([])
+
+const departmentSubmitSuccessCount = ref(0)
+
+
+/* 部门活动管理（停用 / 启用） */
+
+const manageVisible = ref(false)
+
+const manageLoading = ref(false)
+
+const manageList = ref([])
+
+const manageUpdatingId = ref(null)
+
+
 
 const departmentForm = reactive({
 
@@ -1264,9 +1581,22 @@ const departmentForm = reactive({
 
   templateId: null,
 
-  studentId: null,
+  studentIds: [],
 
   evidenceUrl: '',
+
+
+  /*
+   * 下面是「新活动（非固定活动）」专用：
+   *
+   * 活动名称直接用 templateId 接收（选择框支持输入新名称）
+   */
+
+  newScoreType: 1,
+
+  newScore: null,
+
+  newDescription: '',
 
 })
 
@@ -1292,12 +1622,17 @@ const departmentRules = {
   ],
 
 
-  studentId: [
+  studentIds: [
 
     {
+
       required: true,
 
-      message: '请选择需要加减分的学生',
+      type: 'array',
+
+      min: 1,
+
+      message: '请选择需要加减分的学生（可多选）',
 
       trigger: 'change',
 
@@ -1469,6 +1804,233 @@ const selectedTemplate = computed(() => {
   )
 
 })
+
+
+
+/* ====================================================== */
+/* 是否为「新活动」 */
+/* ====================================================== */
+
+/*
+ * 加减分项目选择框允许直接输入新名称（allow-create）。
+ *
+ * 输入的名称不在已有活动列表里，
+ * 就是一个新的非固定活动：
+ *
+ * 提交时先保存成本部门的活动，
+ * 之后同部门再提交就能直接选择，不用重复输入。
+ */
+
+const isNewActivity = computed(() => {
+
+  const value =
+    departmentForm.templateId
+
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+
+    return false
+
+  }
+
+
+  /*
+   * 能在列表里找到，就是已有活动
+   */
+
+  return !departmentTemplateList.value.some(
+
+    (item) =>
+      String(item.id) === String(value),
+
+  )
+
+})
+
+
+
+/* ====================================================== */
+/* 保存新活动 */
+/* ====================================================== */
+
+/*
+ * 把新输入的活动保存到本部门，
+ * 返回是否保存成功。
+ *
+ * 成功后会刷新活动列表，并选中这个活动，
+ * 后续流程与选择已有活动完全一致。
+ */
+
+async function saveNewActivity() {
+
+  const name =
+    String(
+      departmentForm.templateId || '',
+    ).trim()
+
+
+  if (!name) {
+
+    ElMessage.warning('请输入活动名称')
+
+    return false
+
+  }
+
+
+  const score =
+    Number(departmentForm.newScore)
+
+
+  if (!score || score <= 0) {
+
+    ElMessage.warning('请输入大于 0 的分值')
+
+    return false
+
+  }
+
+
+  if (
+    departmentForm.newScoreType !== 1 &&
+    departmentForm.newScoreType !== -1
+  ) {
+
+    ElMessage.warning('请选择加分或减分')
+
+    return false
+
+  }
+
+
+  try {
+
+    const res =
+      await request.post(
+
+        '/departmentScoreTemplate/add',
+
+        {
+
+          departmentId:
+          departmentForm.departmentId,
+
+          name,
+
+          scoreType:
+          departmentForm.newScoreType,
+
+          score,
+
+          description:
+            String(
+              departmentForm.newDescription || '',
+            ).trim() || null,
+
+        },
+
+      )
+
+
+    const result =
+      res || {}
+
+
+    if (Number(result.code) !== 200) {
+
+      ElMessage.error(
+        result.message || '活动保存失败'
+      )
+
+      return false
+
+    }
+
+
+    const created =
+      result.data || {}
+
+
+    /*
+     * 刷新活动列表
+     */
+
+    await loadDepartmentTemplates(
+      departmentForm.departmentId
+    )
+
+
+    /*
+     * 选中刚保存的活动
+     */
+
+    departmentForm.templateId =
+      created.id ?? null
+
+
+    if (!departmentForm.templateId) {
+
+      /*
+       * 没有返回 id 时，按名称从列表里再找一次
+       */
+
+      const matched =
+        departmentTemplateList.value.find(
+
+          (item) => item.name === name,
+
+        )
+
+      departmentForm.templateId =
+        matched ? matched.id : null
+
+    }
+
+
+    if (!departmentForm.templateId) {
+
+      ElMessage.error(
+        '活动已保存，但没取到活动ID，请刷新页面后重新选择'
+      )
+
+      return false
+
+    }
+
+
+    ElMessage.success(
+      `活动「${name}」已保存，下次可直接选择`
+    )
+
+
+    return true
+
+  } catch (error) {
+
+    console.error(
+      '保存部门活动失败：',
+      error
+    )
+
+
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      '活动保存失败'
+
+
+    ElMessage.error(message)
+
+
+    return false
+
+  }
+
+}
 
 
 
@@ -2945,14 +3507,20 @@ function removeDepartmentFile() {
 
 
 /* ====================================================== */
-/* 提交部门加减分申报 */
+/* 批量提交部门加减分申报 */
 /* ====================================================== */
 
-async function submitDepartment() {
+/*
+ * 一次可以选择多名学生：
+ *
+ * 同一个活动里有很多人时，
+ * 选好活动 + 多名学生一次全部提交。
+ *
+ * 每个学生单独调用一次申报接口，
+ * 单个失败不影响其他学生。
+ */
 
-  /*
-   * 表单不存在
-   */
+async function submitDepartment() {
 
   if (!departmentFormRef.value) {
 
@@ -2960,10 +3528,6 @@ async function submitDepartment() {
 
   }
 
-
-  /*
-   * 表单验证
-   */
 
   const valid =
     await departmentFormRef.value.validate()
@@ -2976,8 +3540,22 @@ async function submitDepartment() {
 
 
   /*
-   * 确保模板存在
+   * 新活动：先保存到本部门
    */
+
+  if (isNewActivity.value) {
+
+    const saved =
+      await saveNewActivity()
+
+    if (!saved) {
+
+      return
+
+    }
+
+  }
+
 
   if (!selectedTemplate.value) {
 
@@ -2990,22 +3568,11 @@ async function submitDepartment() {
   }
 
 
-  /*
-   * 获取模板类型
-   */
-
   const scoreType =
     getScoreType(
       selectedTemplate.value
     )
 
-
-  /*
-   * 只允许：
-   *
-   * 1  = 加分
-   * -1 = 减分
-   */
 
   if (
     scoreType !== 1 &&
@@ -3021,7 +3588,150 @@ async function submitDepartment() {
   }
 
 
+  const studentIds = [
+    ...departmentForm.studentIds,
+  ]
+
+
+  if (studentIds.length === 0) {
+
+    ElMessage.warning('请选择需要加减分的学生')
+
+    return
+
+  }
+
+
   departmentSubmitting.value = true
+
+  departmentSubmitErrors.value = []
+
+  departmentSubmitSuccessCount.value = 0
+
+
+  const errors = []
+
+  let successCount = 0
+
+
+  try {
+
+    for (const studentId of studentIds) {
+
+      const submitted =
+        await submitOneStudent(studentId)
+
+
+      if (submitted.ok) {
+
+        successCount++
+
+      } else {
+
+        errors.push({
+
+          student: getStudentLabel(studentId),
+
+          message: submitted.message,
+
+        })
+
+      }
+
+    }
+
+
+    departmentSubmitSuccessCount.value = successCount
+
+    departmentSubmitErrors.value = errors
+
+
+    if (errors.length === 0) {
+
+      ElMessage.success(
+        `已提交 ${successCount} 名学生的申报，等待本部门副部长或部长审核`
+      )
+
+
+      /*
+       * 保留已选部门与活动，
+       * 方便同一个活动继续录其他学生
+       */
+
+      resetDepartmentAfterSubmit()
+
+    } else {
+
+      departmentResultVisible.value = true
+
+
+      if (successCount > 0) {
+
+        ElMessage.warning(
+          `提交完成：成功 ${successCount} 人，失败 ${errors.length} 人`
+        )
+
+      }
+
+    }
+
+
+    await loadMyApply()
+
+
+    if (
+      permission.canDepartmentAudit
+    ) {
+
+      await loadAuditList()
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      '批量提交部门加减分申报失败：',
+      error
+    )
+
+    ElMessage.error(
+      error?.message ||
+      '提交失败，请检查后端服务'
+    )
+
+  } finally {
+
+    departmentSubmitting.value = false
+
+  }
+
+}
+
+
+
+/* ====================================================== */
+/* 提交单个学生的部门加减分申报 */
+/* ====================================================== */
+
+/*
+ * 只负责一个学生的提交：
+ *
+ * 返回 { ok: true } 或 { ok: false, message }
+ */
+
+async function submitOneStudent(studentId) {
+
+  if (!studentId) {
+
+    return {
+
+      ok: false,
+
+      message: '学生不能为空',
+
+    }
+
+  }
 
 
   try {
@@ -3031,8 +3741,7 @@ async function submitDepartment() {
       departmentId:
       departmentForm.departmentId,
 
-      studentId:
-      departmentForm.studentId,
+      studentId,
 
       templateId:
       departmentForm.templateId,
@@ -3068,21 +3777,6 @@ async function submitDepartment() {
     )
 
 
-    /*
-     * 关键：
-     *
-     * request 是 @/utils/request
-     *
-     * 所以 res 本身就是 Result。
-     *
-     * 正确：
-     * res.code
-     * res.message
-     *
-     * 错误：
-     * res.data.code
-     */
-
     const responseData =
       res || {}
 
@@ -3101,54 +3795,24 @@ async function submitDepartment() {
         responseData
       )
 
-      ElMessage.error(
+      return {
 
-        responseData.message ||
-        responseData.msg ||
-        '部门加减分申报提交失败'
+        ok: false,
 
-      )
+        message:
 
-      return
+          responseData.message ||
 
-    }
+          responseData.msg ||
 
+          '部门加减分申报提交失败',
 
-    /*
-     * 真正成功
-     */
-
-    ElMessage.success(
-      '部门加减分申报提交成功，等待本部门副部长或部长审核'
-    )
-
-
-    /*
-     * 重置表单
-     */
-
-    resetDepartment()
-
-
-    /*
-     * 刷新我的申报记录
-     */
-
-    await loadMyApply()
-
-
-    /*
-     * 如果当前用户有审核权限，
-     * 同时刷新待审核列表
-     */
-
-    if (
-      permission.canDepartmentAudit
-    ) {
-
-      await loadAuditList()
+      }
 
     }
+
+
+    return { ok: true }
 
   }
   catch (error) {
@@ -3158,25 +3822,21 @@ async function submitDepartment() {
       error
     )
 
-    const message =
+    return {
 
-      error?.response?.data?.message ||
+      ok: false,
 
-      error?.response?.data?.msg ||
+      message:
 
-      error?.message ||
+        error?.response?.data?.message ||
 
-      '提交失败，请检查后端服务'
+        error?.response?.data?.msg ||
 
+        error?.message ||
 
-    ElMessage.error(
-      message
-    )
+        '提交失败，请检查后端服务',
 
-  }
-  finally {
-
-    departmentSubmitting.value = false
+    }
 
   }
 
@@ -3194,11 +3854,22 @@ function resetDepartment() {
 
   departmentForm.departmentId = null
 
-  departmentForm.studentId = null
+  departmentForm.studentIds = []
 
   departmentForm.templateId = null
 
   departmentForm.evidenceUrl = ''
+
+
+  /*
+   * 清空新活动填写内容
+   */
+
+  departmentForm.newScoreType = 1
+
+  departmentForm.newScore = null
+
+  departmentForm.newDescription = ''
 
 
   /*
@@ -3220,6 +3891,277 @@ function resetDepartment() {
    */
 
   departmentFormRef.value?.resetFields()
+
+}
+
+
+
+/* ====================================================== */
+/* 提交成功后的部分重置 */
+/* ====================================================== */
+
+/*
+ * 保留已选部门与活动
+ * （一个活动通常要给多名学生录入），
+ * 只清空学生、凭证和新活动填写内容。
+ */
+
+function resetDepartmentAfterSubmit() {
+
+  departmentForm.studentIds = []
+
+  departmentForm.evidenceUrl = ''
+
+  departmentFile.value = null
+
+  departmentForm.newScoreType = 1
+
+  departmentForm.newScore = null
+
+  departmentForm.newDescription = ''
+
+  departmentFormRef.value?.clearValidate()
+
+}
+
+
+
+/* ====================================================== */
+/* 学生显示名称 */
+/* ====================================================== */
+
+function getStudentLabel(studentId) {
+
+  const student =
+    studentList.value.find(
+
+      (item) =>
+        String(item.id) === String(studentId),
+
+    )
+
+
+  if (!student) {
+
+    return `学生${studentId}`
+
+  }
+
+
+  return (
+    student.realName ||
+    student.username ||
+    `学生${studentId}`
+  )
+
+}
+
+
+
+/* ====================================================== */
+/* 管理部门活动（停用 / 启用） */
+/* ====================================================== */
+
+function openManageDialog() {
+
+  if (!departmentForm.departmentId) {
+
+    ElMessage.warning('请先选择部门')
+
+    return
+
+  }
+
+
+  manageVisible.value = true
+
+
+  loadManageList()
+
+}
+
+
+
+async function loadManageList() {
+
+  manageLoading.value = true
+
+
+  try {
+
+    const res =
+      await request.get(
+        '/departmentScoreTemplate/manage',
+        {
+
+          params: {
+
+            departmentId:
+            departmentForm.departmentId,
+
+          },
+
+        },
+      )
+
+
+    if (Number(res?.code) !== 200) {
+
+      manageList.value = []
+
+      ElMessage.error(
+        res?.message || '加载本部门活动失败'
+      )
+
+      return
+
+    }
+
+
+    const list =
+      Array.isArray(res?.data)
+        ? res.data
+        : []
+
+
+    manageList.value =
+      list.map(
+
+        (item) => ({
+
+          ...item,
+
+          scoreType:
+            Number(item.scoreType),
+
+          status:
+            Number(item.status),
+
+        }),
+
+      )
+
+  } catch (error) {
+
+    console.error(
+      '加载本部门活动失败：',
+      error
+    )
+
+
+    manageList.value = []
+
+
+    ElMessage.error('加载本部门活动失败')
+
+  } finally {
+
+    manageLoading.value = false
+
+  }
+
+}
+
+
+
+async function updateActivityStatus(row, status) {
+
+  manageUpdatingId.value = row.id
+
+
+  /*
+   * 记录当前选择，刷新后尽量恢复
+   */
+
+  const keepTemplateId =
+    departmentForm.templateId
+
+
+  try {
+
+    const res =
+      await request.put(
+
+        `/departmentScoreTemplate/status/${row.id}`,
+
+        null,
+
+        {
+
+          params: {
+            status,
+          },
+
+        },
+
+      )
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message || '操作失败'
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      status === 1
+        ? '活动已启用'
+        : '活动已停用'
+    )
+
+
+    await loadManageList()
+
+
+    await loadDepartmentTemplates(
+      departmentForm.departmentId
+    )
+
+
+    /*
+     * 被停用的正是当前选中的活动：清空选择
+     */
+
+    if (
+      status === 0 &&
+      String(keepTemplateId) === String(row.id)
+    ) {
+
+      departmentForm.templateId = null
+
+    } else if (
+      keepTemplateId &&
+      departmentTemplateList.value.some(
+        (item) =>
+          String(item.id) === String(keepTemplateId),
+      )
+    ) {
+
+      departmentForm.templateId =
+        keepTemplateId
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      '修改活动状态失败：',
+      error
+    )
+
+
+    ElMessage.error('修改活动状态失败')
+
+  } finally {
+
+    manageUpdatingId.value = null
+
+  }
 
 }
 

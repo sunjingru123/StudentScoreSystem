@@ -2455,58 +2455,57 @@ public class DepartmentScoreApplyController {
                     );
 
 
-            if (scoreRule == null) {
-
-                throw new IllegalArgumentException(
-
-                        "未找到对应的正式加减分规则：" +
-
-                                "部门ID=" +
-
-                                apply.getDepartmentId() +
-
-                                "，规则名称=" +
-
-                                apply.getTitle()
-                );
-            }
-
-
             /*
-             * 正式规则分值
+             * =================================================
+             * 有正式规则（固定加减分项目）：
+             *
+             * 要求申报分值与规则分值一致，
+             * 避免部门随意改动固定项目的分值。
+             *
+             * 没有正式规则：
+             *
+             * 说明这是部门自己的非固定活动，
+             * 分值以申报单上填写的为准，直接生成成绩。
+             * =================================================
              */
-            if (scoreRule.getScore() == null
-                    || scoreRule.getScore()
-                    .compareTo(BigDecimal.ZERO) <= 0) {
+            if (scoreRule != null) {
 
-                throw new IllegalArgumentException(
-                        "正式加减分规则分值配置错误：" +
-                                scoreRule.getName()
-                );
-            }
+                /*
+                 * 正式规则分值
+                 */
+                if (scoreRule.getScore() == null
+                        || scoreRule.getScore()
+                        .compareTo(BigDecimal.ZERO) <= 0) {
+
+                    throw new IllegalArgumentException(
+                            "正式加减分规则分值配置错误：" +
+                                    scoreRule.getName()
+                    );
+                }
 
 
-            /*
-             * 申报分值必须与正式规则一致
-             */
-            if (apply.getScore() == null
-                    || scoreRule.getScore()
-                    .compareTo(
-                            apply.getScore()
-                    ) != 0) {
+                /*
+                 * 申报分值必须与正式规则一致
+                 */
+                if (apply.getScore() == null
+                        || scoreRule.getScore()
+                        .compareTo(
+                                apply.getScore()
+                        ) != 0) {
 
-                throw new IllegalArgumentException(
+                    throw new IllegalArgumentException(
 
-                        "部门申报分值与正式加减分规则分值不一致：" +
+                            "部门申报分值与正式加减分规则分值不一致：" +
 
-                                "申报分值=" +
+                                    "申报分值=" +
 
-                                apply.getScore() +
+                                    apply.getScore() +
 
-                                "，正式规则分值=" +
+                                    "，正式规则分值=" +
 
-                                scoreRule.getScore()
-                );
+                                    scoreRule.getScore()
+                    );
+                }
             }
 
 
@@ -2522,8 +2521,15 @@ public class DepartmentScoreApplyController {
             );
 
 
+            /*
+             * 非固定活动没有正式规则，
+             *
+             * score_record.rule_id 允许为空。
+             */
             record.setRuleId(
-                    scoreRule.getId()
+                    scoreRule == null
+                            ? null
+                            : scoreRule.getId()
             );
 
 
@@ -2615,12 +2621,16 @@ public class DepartmentScoreApplyController {
 
             System.out.println(
                     "ruleName = "
-                            + scoreRule.getName()
+                            + (scoreRule == null
+                            ? "（非固定活动，无正式规则）"
+                            : scoreRule.getName())
             );
 
             System.out.println(
                     "ruleScore = "
-                            + scoreRule.getScore()
+                            + (scoreRule == null
+                            ? "-"
+                            : scoreRule.getScore())
             );
 
             System.out.println(
