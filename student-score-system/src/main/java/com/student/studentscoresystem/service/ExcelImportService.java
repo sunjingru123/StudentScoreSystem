@@ -19,4 +19,13 @@ public interface ExcelImportService {
     Map<String, Object> importDepartmentMembers(
             MultipartFile file
     );
+
+    /**
+     * 导入评分项目（规则）
+     *
+     * 部门 + 规则名称 已存在则更新，不存在则新增
+     */
+    Map<String, Object> importScoreRules(
+            MultipartFile file
+    );
 }

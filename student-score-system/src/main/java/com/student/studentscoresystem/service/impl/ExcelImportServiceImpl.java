@@ -3,14 +3,17 @@ package com.student.studentscoresystem.service.impl;
 import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.dto.DepartmentMemberExcelRow;
+import com.student.studentscoresystem.dto.ScoreRuleExcelRow;
 import com.student.studentscoresystem.dto.StudentExcelRow;
 import com.student.studentscoresystem.entity.Department;
+import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysDepartment;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
+import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
@@ -22,8 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +45,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final SysUserDepartmentMapper userDepartmentMapper;
     private final SysUserPositionMapper sysUserPositionMapper;
     private final SysPositionMapper sysPositionMapper;
+    private final ScoreRuleMapper scoreRuleMapper;
 
     private final BCryptPasswordEncoder passwordEncoder =
             new BCryptPasswordEncoder();
@@ -49,7 +56,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             SysDepartmentMapper sysDepartmentMapper,
             SysUserDepartmentMapper userDepartmentMapper,
             SysUserPositionMapper sysUserPositionMapper,
-            SysPositionMapper sysPositionMapper
+            SysPositionMapper sysPositionMapper,
+            ScoreRuleMapper scoreRuleMapper
     ) {
         this.sysUserMapper = sysUserMapper;
         this.departmentMapper = departmentMapper;
@@ -57,6 +65,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         this.userDepartmentMapper = userDepartmentMapper;
         this.sysUserPositionMapper = sysUserPositionMapper;
         this.sysPositionMapper = sysPositionMapper;
+        this.scoreRuleMapper = scoreRuleMapper;
     }
 
     /**
@@ -1136,6 +1145,500 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 errors,
                 "部门成员导入完成"
         );
+    }
+
+    /**
+     * =========================================================
+     * 导入评分项目（规则）
+     *
+     * 部门 + 规则名称 已存在则更新，否则新增
+     * =========================================================
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> importScoreRules(
+            MultipartFile file
+    ) {
+
+        List<ScoreRuleExcelRow> rows;
+
+        try {
+
+            rows = EasyExcel
+                    .read(file.getInputStream())
+                    .head(ScoreRuleExcelRow.class)
+                    .doReadAllSync();
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "规则 Excel 读取失败：" +
+                            e.getMessage(),
+                    e
+            );
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        List<Map<String, Object>> errors =
+                new ArrayList<>();
+
+        if (rows == null || rows.isEmpty()) {
+
+            return buildResult(
+                    0,
+                    0,
+                    errors,
+                    "Excel 中没有数据"
+            );
+        }
+
+        /*
+         * 部门名称缓存，避免每行都查一次数据库
+         */
+        Map<String, Department> departmentCache =
+                new HashMap<>();
+
+        int rowNumber = 1;
+
+        for (ScoreRuleExcelRow row : rows) {
+
+            rowNumber++;
+
+            if (row == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "Excel 当前行数据为空"
+                        )
+                );
+
+                continue;
+            }
+
+            String departmentName =
+                    trim(row.getDepartmentName());
+
+            String ruleName =
+                    trim(row.getName());
+
+            String category =
+                    trim(row.getCategory());
+
+            String scoreText =
+                    trim(row.getScore());
+
+            String description =
+                    trim(row.getDescription());
+
+            String statusText =
+                    trim(row.getStatus());
+
+            /*
+             * =================================================
+             * 1. 部门
+             * =================================================
+             */
+            if (isEmpty(departmentName)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "部门不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            Department department =
+                    getImportDepartment(
+                            departmentName,
+                            departmentCache
+                    );
+
+            /*
+             * 规则必须挂在系统已有的部门上，
+             * 这里不做自动创建，避免写错部门名称时产生脏数据。
+             */
+            if (department == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "系统中不存在有效部门：" +
+                                        departmentName
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =================================================
+             * 2. 规则名称
+             * =================================================
+             */
+            if (isEmpty(ruleName)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "规则名称不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            if (ruleName.length() > 100) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "规则名称不能超过 100 个字符"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =================================================
+             * 3. 分值
+             * =================================================
+             */
+            if (isEmpty(scoreText)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "分值不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            BigDecimal score =
+                    parseScore(
+                            scoreText
+                    );
+
+            if (score == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "分值格式不正确：" +
+                                        scoreText
+                        )
+                );
+
+                continue;
+            }
+
+            if (score.compareTo(
+                    BigDecimal.ZERO
+            ) <= 0) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "分值必须大于 0"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =================================================
+             * 4. 状态
+             * =================================================
+             */
+            Short status =
+                    parseRuleStatus(
+                            statusText
+                    );
+
+            if (status == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "状态只能填写：启用、停用"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =================================================
+             * 5. 新增 / 更新
+             * =================================================
+             */
+            ScoreRule exist =
+                    scoreRuleMapper.selectOne(
+                            new LambdaQueryWrapper<ScoreRule>()
+                                    .eq(
+                                            ScoreRule::getDepartmentId,
+                                            department.getId()
+                                    )
+                                    .eq(
+                                            ScoreRule::getName,
+                                            ruleName
+                                    )
+                                    .last("LIMIT 1")
+                    );
+
+            LocalDateTime now =
+                    LocalDateTime.now();
+
+            if (exist == null) {
+
+                ScoreRule scoreRule =
+                        new ScoreRule();
+
+                scoreRule.setDepartmentId(
+                        department.getId()
+                );
+
+                scoreRule.setName(
+                        ruleName
+                );
+
+                scoreRule.setCategory(
+                        emptyToNull(category)
+                );
+
+                scoreRule.setScore(
+                        score
+                );
+
+                scoreRule.setDescription(
+                        emptyToNull(description)
+                );
+
+                scoreRule.setStatus(
+                        status
+                );
+
+                scoreRule.setCreateTime(
+                        now
+                );
+
+                scoreRule.setUpdateTime(
+                        now
+                );
+
+                int insert =
+                        scoreRuleMapper.insert(
+                                scoreRule
+                        );
+
+                if (insert <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "规则新增失败：" +
+                                            ruleName
+                            )
+                    );
+
+                    continue;
+                }
+
+            } else {
+
+                exist.setCategory(
+                        emptyToNull(category)
+                );
+
+                exist.setScore(
+                        score
+                );
+
+                exist.setDescription(
+                        emptyToNull(description)
+                );
+
+                exist.setStatus(
+                        status
+                );
+
+                exist.setUpdateTime(
+                        now
+                );
+
+                int update =
+                        scoreRuleMapper.updateById(
+                                exist
+                        );
+
+                if (update <= 0) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    "规则更新失败：" +
+                                            ruleName
+                            )
+                    );
+
+                    continue;
+                }
+            }
+
+            successCount++;
+        }
+
+        return buildResult(
+                successCount,
+                failCount,
+                errors,
+                "规则导入完成"
+        );
+    }
+
+    /**
+     * =========================================================
+     * 带缓存的部门查询
+     * =========================================================
+     */
+    private Department getImportDepartment(
+            String departmentName,
+            Map<String, Department> departmentCache
+    ) {
+
+        if (departmentCache.containsKey(
+                departmentName
+        )) {
+
+            return departmentCache.get(
+                    departmentName
+            );
+        }
+
+        Department department =
+                departmentMapper.selectOne(
+                        new LambdaQueryWrapper<Department>()
+                                .eq(
+                                        Department::getName,
+                                        departmentName
+                                )
+                                .eq(
+                                        Department::getStatus,
+                                        (short) 1
+                                )
+                                .last("LIMIT 1")
+                );
+
+        departmentCache.put(
+                departmentName,
+                department
+        );
+
+        return department;
+    }
+
+    /**
+     * =========================================================
+     * 解析分值
+     *
+     * 解析失败返回 null
+     * =========================================================
+     */
+    private BigDecimal parseScore(
+            String scoreText
+    ) {
+
+        try {
+
+            return new BigDecimal(
+                    scoreText
+            ).setScale(
+                    2,
+                    RoundingMode.HALF_UP
+            );
+
+        } catch (Exception e) {
+
+            return null;
+        }
+    }
+
+    /**
+     * =========================================================
+     * 解析规则状态
+     *
+     * 留空默认启用，无法识别返回 null
+     * =========================================================
+     */
+    private Short parseRuleStatus(
+            String statusText
+    ) {
+
+        if (isEmpty(statusText)) {
+
+            return (short) 1;
+        }
+
+        if ("启用".equals(statusText)
+                || "1".equals(statusText)
+                || "是".equals(statusText)) {
+
+            return (short) 1;
+        }
+
+        if ("停用".equals(statusText)
+                || "0".equals(statusText)
+                || "否".equals(statusText)) {
+
+            return (short) 0;
+        }
+
+        return null;
+    }
+
+    /**
+     * =========================================================
+     * 空字符串转 null
+     * =========================================================
+     */
+    private String emptyToNull(
+            String value
+    ) {
+
+        return isEmpty(value)
+                ? null
+                : value;
     }
 
     /**
