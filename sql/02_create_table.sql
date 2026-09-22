@@ -562,3 +562,30 @@ CREATE TABLE IF NOT EXISTS department_score_template (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- =========================================================
+-- 5. 测评规则表 score_rule 补齐 department_id 字段
+--
+-- 旧脚本建库的 score_rule 没有 department_id，
+-- CREATE TABLE IF NOT EXISTS 不会给已存在的表追加字段，
+-- 所以这里单独兼容一次，重复执行安全。
+--
+-- 不补这一列会出现：
+-- ERROR: column "department_id" does not exist
+-- =========================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'score_rule'
+          AND column_name = 'department_id'
+    ) THEN
+        ALTER TABLE public.score_rule
+            ADD COLUMN department_id BIGINT NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_score_rule_department_id
+    ON public.score_rule(department_id);
