@@ -69,14 +69,14 @@ jobs:
         run: |
           echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
-      - name: Copy compose file to server
+      - name: Copy compose & sql to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT || 22 }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,sql"
           target: "/opt/student-score-system"
 
       - name: Deploy via SSH
@@ -107,6 +107,22 @@ jobs:
             # 登录 GHCR 并拉取
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             docker compose -f docker-compose.prod.yml pull
+
+            # 应用数据库表结构
+            #
+            # 后端镜像里没有 Flyway / Liquibase，
+            # 只换镜像不会改变表结构，所以每次部署都幂等地跑一遍建表脚本：
+            # CREATE TABLE / INDEX IF NOT EXISTS + ADD COLUMN IF NOT EXISTS，
+            # 可重复执行，会给已存在的表补上缺失字段
+            # （例如 score_rule.department_id、score_apply.final_status）。
+            if ! docker exec -i -e PGPASSWORD="${DB_PASSWORD}" student-score-postgres \
+                 psql -U "${DB_USER}" -d student_score_system -v ON_ERROR_STOP=1 \
+                 < sql/02_create_table.sql; then
+
+              echo "数据库表结构脚本执行失败，已中止部署"
+
+              exit 1
+            fi
 
             # 启动前后端服务
             docker compose -f docker-compose.prod.yml up -d --remove-orphans

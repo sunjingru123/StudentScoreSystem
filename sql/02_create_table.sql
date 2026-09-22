@@ -564,28 +564,77 @@ CREATE TABLE IF NOT EXISTS department_score_template (
 );
 
 -- =========================================================
--- 5. 测评规则表 score_rule 补齐 department_id 字段
+-- 5. 历史库 / 旧脚本字段补齐（幂等，可重复执行）
 --
--- 旧脚本建库的 score_rule 没有 department_id，
--- CREATE TABLE IF NOT EXISTS 不会给已存在的表追加字段，
--- 所以这里单独兼容一次，重复执行安全。
+-- CREATE TABLE IF NOT EXISTS 不会给「已存在」的表补字段，
+-- 而 Java 实体里的字段比本脚本更全，所以旧库（早期 init.sql 建的库）
+-- 会缺列，缺列时报：
 --
--- 不补这一列会出现：
--- ERROR: column "department_id" does not exist
+--   ERROR: column "xxx" of relation "yyy" does not exist
+--
+-- 下面统一补齐，字段已存在则自动跳过，
+-- 不会删除、不会覆盖任何数据。
 -- =========================================================
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'score_rule'
-          AND column_name = 'department_id'
-    ) THEN
-        ALTER TABLE public.score_rule
-            ADD COLUMN department_id BIGINT NULL;
-    END IF;
-END $$;
+
+-- 5.1 测评规则 score_rule
+ALTER TABLE public.score_rule
+    ADD COLUMN IF NOT EXISTS department_id BIGINT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_score_rule_department_id
     ON public.score_rule(department_id);
+
+-- 5.2 个人加分申报 score_apply（申报 -> 初审 -> 终审）
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS apply_type VARCHAR(30);
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS preliminary_status SMALLINT;
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS preliminary_reviewer_id BIGINT;
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS preliminary_review_time TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS final_status SMALLINT;
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS final_reviewer_id BIGINT;
+
+ALTER TABLE public.score_apply
+    ADD COLUMN IF NOT EXISTS final_review_time TIMESTAMP WITHOUT TIME ZONE;
+
+-- 个人证书申报不选择规则，rule_id 必须允许为空
+ALTER TABLE public.score_apply
+    ALTER COLUMN rule_id DROP NOT NULL;
+
+-- 5.3 成绩记录 score_record（1 = 有效，0 = 作废）
+ALTER TABLE public.score_record
+    ADD COLUMN IF NOT EXISTS status SMALLINT DEFAULT 1;
+
+-- 5.4 用户 sys_user（1 = 首次登录需要改密）
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS first_login SMALLINT DEFAULT 0;
+
+-- 5.5 部门申报 department_score_apply（部门初审 -> 辅导员终审）
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS applicant_id BIGINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS template_id BIGINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS review_remark VARCHAR(1000);
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS final_status SMALLINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS final_reviewer_id BIGINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS final_review_remark VARCHAR(1000);
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS final_review_time TIMESTAMP WITHOUT TIME ZONE;
