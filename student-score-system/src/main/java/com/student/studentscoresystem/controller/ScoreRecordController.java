@@ -4,16 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRecordOperationLog;
-import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.ScoreRecordOperationLogMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.IScoreRecordService;
+import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ScoreDetailVO;
 import io.jsonwebtoken.Claims;
@@ -29,7 +28,7 @@ public class ScoreRecordController {
 
     private final IScoreRecordService scoreRecordService;
 
-    private final ScoreRuleMapper scoreRuleMapper;
+    private final ScoreProjectNameResolver scoreProjectNameResolver;
 
     private final SysUserMapper sysUserMapper;
 
@@ -42,7 +41,7 @@ public class ScoreRecordController {
 
     public ScoreRecordController(
             IScoreRecordService scoreRecordService,
-            ScoreRuleMapper scoreRuleMapper,
+            ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper,
             SysPositionMapper positionMapper,
             SysUserPositionMapper userPositionMapper,
@@ -51,7 +50,7 @@ public class ScoreRecordController {
 
         this.scoreRecordService = scoreRecordService;
 
-        this.scoreRuleMapper = scoreRuleMapper;
+        this.scoreProjectNameResolver = scoreProjectNameResolver;
 
         this.sysUserMapper = sysUserMapper;
 
@@ -505,24 +504,16 @@ public class ScoreRecordController {
 
 
                     /*
-                     * 查询加分规则
+                     * 评分项目名称
+                     *
+                     * 规则 / 个人证书 / 部门申报 / 管理员调整
                      */
-                    if (
-                            record.getRuleId() != null
-                    ) {
+                    vo.setRuleName(
+                            scoreProjectNameResolver.resolve(
+                                    record
+                            )
+                    );
 
-                        ScoreRule rule =
-                                scoreRuleMapper.selectById(
-                                        record.getRuleId()
-                                );
-
-                        if (rule != null) {
-
-                            vo.setRuleName(
-                                    rule.getName()
-                            );
-                        }
-                    }
 
                     return vo;
 

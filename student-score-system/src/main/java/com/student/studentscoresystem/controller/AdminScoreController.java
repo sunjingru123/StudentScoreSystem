@@ -5,12 +5,11 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.ScoreRecordOperationDTO;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRecordOperationLog;
-import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordOperationLogMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.vo.AdminScoreDetailVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -25,19 +24,19 @@ import java.util.List;
 public class AdminScoreController {
 
     private final ScoreRecordMapper scoreRecordMapper;
-    private final ScoreRuleMapper scoreRuleMapper;
+    private final ScoreProjectNameResolver scoreProjectNameResolver;
     private final SysUserMapper sysUserMapper;
     private final ScoreRecordOperationLogMapper operationLogMapper;
 
 
     public AdminScoreController(
             ScoreRecordMapper scoreRecordMapper,
-            ScoreRuleMapper scoreRuleMapper,
+            ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper,
             ScoreRecordOperationLogMapper operationLogMapper
     ) {
         this.scoreRecordMapper = scoreRecordMapper;
-        this.scoreRuleMapper = scoreRuleMapper;
+        this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
         this.operationLogMapper = operationLogMapper;
     }
@@ -75,10 +74,7 @@ public class AdminScoreController {
             vo.setStudentNo(student.getStudentNo());
             vo.setClassName(student.getClassName());
 
-            ScoreRule rule = scoreRuleMapper.selectById(record.getRuleId());
-            if (rule != null) {
-                vo.setRuleName(rule.getName());
-            }
+            vo.setRuleName(scoreProjectNameResolver.resolve(record));
 
             vo.setScore(record.getScore());
             vo.setSourceType(record.getSourceType());

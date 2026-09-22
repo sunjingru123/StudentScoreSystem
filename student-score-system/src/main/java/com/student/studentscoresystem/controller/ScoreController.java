@@ -12,6 +12,7 @@ import com.student.studentscoresystem.mapper.CourseMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.IScoreService;
+import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ScoreDetailVO;
 import com.student.studentscoresystem.vo.ScoreRankVO;
@@ -37,17 +38,20 @@ public class ScoreController {
     private final SysUserMapper sysUserMapper;
     private final CourseMapper courseMapper;
     private final ScoreRecordMapper scoreRecordMapper;
+    private final ScoreProjectNameResolver scoreProjectNameResolver;
 
     public ScoreController(
             IScoreService scoreService,
             SysUserMapper sysUserMapper,
             CourseMapper courseMapper,
-            ScoreRecordMapper scoreRecordMapper
+            ScoreRecordMapper scoreRecordMapper,
+            ScoreProjectNameResolver scoreProjectNameResolver
     ) {
         this.scoreService = scoreService;
         this.sysUserMapper = sysUserMapper;
         this.courseMapper = courseMapper;
         this.scoreRecordMapper = scoreRecordMapper;
+        this.scoreProjectNameResolver = scoreProjectNameResolver;
     }
 
 
@@ -394,13 +398,14 @@ public class ScoreController {
 
 
             /*
-             * ScoreRecord 目前没有直接保存 ruleName，
-             * 所以暂时使用 sourceType。
+             * ScoreRecord 只保存 rule_id + source_type + source_id，
+             * 名称统一由 ScoreProjectNameResolver 解析。
              */
 
             vo.setRuleName(
-                    "计分项: "
-                            + record.getSourceType()
+                    scoreProjectNameResolver.resolve(
+                            record
+                    )
             );
 
 
@@ -659,8 +664,9 @@ public class ScoreController {
                             );
 
                             d.setRuleName(
-                                    "计分项: "
-                                            + r.getSourceType()
+                                    scoreProjectNameResolver.resolve(
+                                            r
+                                    )
                             );
 
                             return d;

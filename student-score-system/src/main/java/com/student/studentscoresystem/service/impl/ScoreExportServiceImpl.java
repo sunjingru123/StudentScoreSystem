@@ -1,15 +1,14 @@
 package com.student.studentscoresystem.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.student.studentscoresystem.entity.DepartmentScoreApply;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
-import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IScoreExportService;
+import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -32,16 +31,16 @@ public class ScoreExportServiceImpl
 
     private final SysSemesterMapper sysSemesterMapper;
 
-    private final IDepartmentScoreApplyService
-            departmentScoreApplyService;
+    private final ScoreProjectNameResolver
+            scoreProjectNameResolver;
 
 
     public ScoreExportServiceImpl(
             SysUserMapper sysUserMapper,
             ScoreRecordMapper scoreRecordMapper,
             SysSemesterMapper sysSemesterMapper,
-            IDepartmentScoreApplyService
-                    departmentScoreApplyService) {
+            ScoreProjectNameResolver
+                    scoreProjectNameResolver) {
 
         this.sysUserMapper =
                 sysUserMapper;
@@ -52,8 +51,8 @@ public class ScoreExportServiceImpl
         this.sysSemesterMapper =
                 sysSemesterMapper;
 
-        this.departmentScoreApplyService =
-                departmentScoreApplyService;
+        this.scoreProjectNameResolver =
+                scoreProjectNameResolver;
     }
 
 
@@ -423,88 +422,30 @@ public class ScoreExportServiceImpl
 
             /*
              * =================================================
-             * 10. 获取部门申报ID
+             * 10. 批量预取项目名称
              *
-             * 只有 DEPARTMENT 类型的成绩需要查询
-             * department_score_apply。
+             * 一次查库取出本次导出用到的：
+             *
+             * 规则名称
+             * 个人证书（获奖名称 + 获奖级别）
+             * 部门申报标题
+             * 管理员调整原因
+             *
+             * 避免逐条记录查询（N+1），
+             * 解析规则与页面明细完全一致。
              * =================================================
              */
 
-            Set<Long> applyIds =
-                    recordMap.values()
-                            .stream()
-                            .flatMap(
-                                    Collection::stream
-                            )
-                            .filter(
-                                    Objects::nonNull
-                            )
-                            .filter(
-                                    record ->
-                                            "DEPARTMENT".equals(
-                                                    record.getSourceType()
-                                            )
-                            )
-                            .map(
-                                    ScoreRecord::getSourceId
-                            )
-                            .filter(
-                                    Objects::nonNull
-                            )
-                            .collect(
-                                    Collectors.toSet()
-                            );
-
-
-            /*
-             * =================================================
-             * 11. 查询部门申报
-             * =================================================
-             */
-
-            Map<Long, DepartmentScoreApply>
-                    applyMap =
-                    new HashMap<>();
-
-
-            if (!applyIds.isEmpty()) {
-
-                List<DepartmentScoreApply>
-                        applies =
-                        departmentScoreApplyService.list(
-
-                                new LambdaQueryWrapper<DepartmentScoreApply>()
-
-                                        .in(
-                                                DepartmentScoreApply::getId,
-                                                applyIds
-                                        )
-                        );
-
-
-                if (
-                        applies != null
-                                && !applies.isEmpty()
-                ) {
-
-                    applyMap =
-                            applies.stream()
-                                    .filter(
-                                            Objects::nonNull
+            ScoreProjectNameResolver.PreloadedNames
+                    preloadedNames =
+                    scoreProjectNameResolver.preload(
+                            recordMap.values()
+                                    .stream()
+                                    .flatMap(
+                                            Collection::stream
                                     )
-                                    .filter(
-                                            item ->
-                                                    item.getId() != null
-                                    )
-                                    .collect(
-                                            Collectors.toMap(
-                                                    DepartmentScoreApply::getId,
-                                                    item -> item,
-                                                    (a, b) -> a
-                                            )
-                                    );
-                }
-            }
+                                    .toList()
+                    );
 
 
             /*
@@ -701,81 +642,20 @@ public class ScoreExportServiceImpl
                     /*
                      * =================================================
                      * 19. 生成具体情况
+                     *
+                     * 名称来自第 10 步的批量预取，
+                     * 与页面明细使用同一套解析规则：
+                     *
+                     * 规则名称 -> 个人证书获奖名称（含获奖级别）
+                     * -> 部门申报标题 -> 管理员调整原因 -> 综合测评项目
                      * =================================================
                      */
 
-                    String title = "";
-
-
-                    /*
-                     * -------------------------------------------------
-                     * 部门加减分
-                     * -------------------------------------------------
-                     */
-
-                    if (
-                            "DEPARTMENT".equals(
-                                    record.getSourceType()
-                            )
-                    ) {
-
-                        DepartmentScoreApply apply =
-                                applyMap.get(
-                                        record.getSourceId()
-                                );
-
-
-                        if (apply != null) {
-
-                            title =
-                                    safeString(
-                                            apply.getTitle()
-                                    );
-                        }
-                    }
-
-
-                    /*
-                     * -------------------------------------------------
-                     * 个人证书加分
-                     * -------------------------------------------------
-                     *
-                     * 这里暂时显示：
-                     *
-                     * 个人证书加分+2
-                     *
-                     * 后面如果你需要，我还可以把证书名称、
-                     * 获奖级别等具体内容也解析出来。
-                     *
-                     * -------------------------------------------------
-                     */
-
-                    else if (
-                            "CERTIFICATE".equals(
-                                    record.getSourceType()
-                            )
-                    ) {
-
-                        title =
-                                "个人证书加分";
-                    }
-
-
-                    /*
-                     * -------------------------------------------------
-                     * 其他类型
-                     * -------------------------------------------------
-                     */
-
-                    else if (
-                            record.getSourceType() != null
-                    ) {
-
-                        title =
-                                safeString(
-                                        record.getSourceType()
-                                );
-                    }
+                    String title =
+                            preloadedNames.resolve(
+                                    record,
+                                    true
+                            );
 
 
                     /*

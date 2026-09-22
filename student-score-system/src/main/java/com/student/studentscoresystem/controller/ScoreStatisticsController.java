@@ -4,11 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.common.ScoreConstants;
 import com.student.studentscoresystem.entity.ScoreRecord;
-import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysUser;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.IScoreRecordService;
+import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.vo.ScoreDetailVO;
 import com.student.studentscoresystem.vo.ScoreStatisticsVO;
 import org.springframework.web.bind.annotation.*;
@@ -22,17 +21,17 @@ public class ScoreStatisticsController {
 
     private final IScoreRecordService scoreRecordService;
 
-    private final ScoreRuleMapper scoreRuleMapper;
+    private final ScoreProjectNameResolver scoreProjectNameResolver;
 
     private final SysUserMapper sysUserMapper;
 
     public ScoreStatisticsController(
             IScoreRecordService scoreRecordService,
-            ScoreRuleMapper scoreRuleMapper,
+            ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper
     ) {
         this.scoreRecordService = scoreRecordService;
-        this.scoreRuleMapper = scoreRuleMapper;
+        this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
     }
 
@@ -228,20 +227,15 @@ public class ScoreStatisticsController {
 
 
                             /*
-                             * 查询评分项目名称
+                             * 评分项目名称
+                             *
+                             * 规则 / 个人证书 / 部门申报 / 管理员调整
                              */
-                            ScoreRule rule =
-                                    scoreRuleMapper.selectById(
-                                            record.getRuleId()
-                                    );
-
-                            if (rule != null) {
-
-                                d.setRuleName(
-                                        rule.getName()
-                                );
-
-                            }
+                            d.setRuleName(
+                                    scoreProjectNameResolver.resolve(
+                                            record
+                                    )
+                            );
 
 
                             /*
@@ -586,19 +580,14 @@ public class ScoreStatisticsController {
 
                             /*
                              * 评分项目名称
+                             *
+                             * 规则 / 个人证书 / 部门申报 / 管理员调整
                              */
-                            ScoreRule rule =
-                                    scoreRuleMapper.selectById(
-                                            record.getRuleId()
-                                    );
-
-                            if (rule != null) {
-
-                                d.setRuleName(
-                                        rule.getName()
-                                );
-
-                            }
+                            d.setRuleName(
+                                    scoreProjectNameResolver.resolve(
+                                            record
+                                    )
+                            );
 
 
                             /*
