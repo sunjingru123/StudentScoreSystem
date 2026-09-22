@@ -613,6 +613,11 @@ ALTER TABLE public.score_apply
 ALTER TABLE public.score_record
     ADD COLUMN IF NOT EXISTS status SMALLINT DEFAULT 1;
 
+-- 个人证书生成正式成绩时不绑定规则（ruleId 为空），
+-- rule_id 必须允许为空，否则终审通过时写入会失败
+ALTER TABLE public.score_record
+    ALTER COLUMN rule_id DROP NOT NULL;
+
 -- 5.4 用户 sys_user（1 = 首次登录需要改密）
 ALTER TABLE public.sys_user
     ADD COLUMN IF NOT EXISTS first_login SMALLINT DEFAULT 0;
