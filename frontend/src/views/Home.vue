@@ -317,9 +317,12 @@
         />
 
         <el-table-column
-          prop="sourceType"
           label="来源"
-        />
+        >
+          <template #default="scope">
+            {{ scope.row.sourceName || scope.row.sourceType || '其他' }}
+          </template>
+        </el-table-column>
 
         <el-table-column
           prop="createTime"

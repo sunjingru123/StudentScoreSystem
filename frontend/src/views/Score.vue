@@ -142,7 +142,7 @@
 
             <div class="detail-meta">
               <span>
-                {{ getSourceName(item.sourceType) }}
+                {{ item.sourceName || getSourceName(item.sourceType) }}
               </span>
 
               <span class="dot"> · </span>

@@ -3,11 +3,13 @@ package com.student.studentscoresystem.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.student.studentscoresystem.entity.DepartmentScoreApply;
+import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.ScoreAdminAdjustment;
 import com.student.studentscoresystem.entity.ScoreApply;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.mapper.DepartmentScoreApplyMapper;
+import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.ScoreAdminAdjustmentMapper;
 import com.student.studentscoresystem.mapper.ScoreApplyMapper;
 import com.student.studentscoresystem.mapper.ScoreRuleMapper;
@@ -79,6 +81,8 @@ public class ScoreProjectNameResolver {
 
     private final DepartmentScoreApplyMapper departmentScoreApplyMapper;
 
+    private final DepartmentMapper departmentMapper;
+
     private final ScoreAdminAdjustmentMapper scoreAdminAdjustmentMapper;
 
     private final ObjectMapper objectMapper;
@@ -87,12 +91,14 @@ public class ScoreProjectNameResolver {
             ScoreRuleMapper scoreRuleMapper,
             ScoreApplyMapper scoreApplyMapper,
             DepartmentScoreApplyMapper departmentScoreApplyMapper,
+            DepartmentMapper departmentMapper,
             ScoreAdminAdjustmentMapper scoreAdminAdjustmentMapper,
             ObjectMapper objectMapper
     ) {
         this.scoreRuleMapper = scoreRuleMapper;
         this.scoreApplyMapper = scoreApplyMapper;
         this.departmentScoreApplyMapper = departmentScoreApplyMapper;
+        this.departmentMapper = departmentMapper;
         this.scoreAdminAdjustmentMapper = scoreAdminAdjustmentMapper;
         this.objectMapper = objectMapper;
     }
@@ -147,6 +153,32 @@ public class ScoreProjectNameResolver {
                 record.getSourceId(),
                 withAwardLevel
         );
+    }
+
+    /** 成绩明细中展示的中文来源名称。 */
+    public String resolveSourceLabel(ScoreRecord record) {
+        if (record == null || record.getSourceType() == null) {
+            return "其他";
+        }
+        if (TYPE_CERTIFICATE.equals(record.getSourceType())
+                || TYPE_APPLY.equals(record.getSourceType())) {
+            return "证书";
+        }
+        if (TYPE_DEPARTMENT.equals(record.getSourceType())) {
+            DepartmentScoreApply apply = record.getSourceId() == null
+                    ? null : departmentScoreApplyMapper.selectById(record.getSourceId());
+            if (apply != null && apply.getDepartmentId() != null) {
+                Department department = departmentMapper.selectById(apply.getDepartmentId());
+                if (department != null && blankToNull(department.getName()) != null) {
+                    return department.getName().trim();
+                }
+            }
+            return "部门申报";
+        }
+        if (TYPE_ADMIN_ADJUSTMENT.equals(record.getSourceType())) {
+            return "管理员调整";
+        }
+        return "其他";
     }
 
     /**
@@ -352,6 +384,15 @@ public class ScoreProjectNameResolver {
          */
         if (!departmentIds.isEmpty()) {
 
+            Map<Long, String> departmentNames =
+                    new HashMap<>();
+
+            for (var department : departmentMapper.selectBatchIds(departmentIds)) {
+                if (department != null && blankToNull(department.getName()) != null) {
+                    departmentNames.put(department.getId(), department.getName().trim());
+                }
+            }
+
             for (
                     DepartmentScoreApply apply
                     : departmentScoreApplyMapper.selectBatchIds(
@@ -381,6 +422,17 @@ public class ScoreProjectNameResolver {
                     shortNames.put(
                             key,
                             title
+                    );
+
+                    String departmentName = departmentNameFor(
+                            apply.getDepartmentId(),
+                            departmentNames
+                    );
+                    detailNames.put(
+                            key,
+                            departmentName == null
+                                    ? title
+                                    : departmentName + "-" + title
                     );
                 }
             }
@@ -583,6 +635,15 @@ public class ScoreProjectNameResolver {
         return title != null
                 ? title
                 : "部门加减分申报";
+    }
+
+    private String departmentNameFor(
+            Long departmentId,
+            Map<Long, String> departmentNames) {
+        if (departmentId == null) {
+            return null;
+        }
+        return blankToNull(departmentNames.get(departmentId));
     }
 
     /**
@@ -789,6 +850,18 @@ public class ScoreProjectNameResolver {
             if (record == null) {
 
                 return FALLBACK_NAME;
+            }
+
+            /* 导出部门申报时优先使用“部门-活动”完整名称，
+             * 避免只显示规则名而丢失申报部门和活动等级。 */
+            if (withAwardLevel
+                    && TYPE_DEPARTMENT.equals(record.getSourceType())) {
+                String departmentDetail = detailNames.get(
+                        sourceKey(record.getSourceType(), record.getSourceId())
+                );
+                if (departmentDetail != null) {
+                    return departmentDetail;
+                }
             }
 
             if (record.getRuleId() != null) {

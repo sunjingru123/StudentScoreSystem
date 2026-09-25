@@ -338,7 +338,7 @@
 
           <template #default="{ row }">
 
-            {{ formatSource(row.sourceType) }}
+            {{ row.sourceName || formatSource(row.sourceType) }}
 
           </template>
 

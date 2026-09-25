@@ -253,6 +253,10 @@ public class ScoreStatisticsController {
                                     record.getSourceType()
                             );
 
+                            d.setSourceName(
+                                    scoreProjectNameResolver.resolveSourceLabel(record)
+                            );
+
 
                             /*
                              * 创建时间
@@ -603,6 +607,10 @@ public class ScoreStatisticsController {
                              */
                             d.setSourceType(
                                     record.getSourceType()
+                            );
+
+                            d.setSourceName(
+                                    scoreProjectNameResolver.resolveSourceLabel(record)
                             );
 
 

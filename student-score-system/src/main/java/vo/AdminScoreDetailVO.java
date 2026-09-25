@@ -48,6 +48,8 @@ public class AdminScoreDetailVO {
      */
     private String sourceType;
 
+    private String sourceName;
+
     /**
      * 来源ID
      */

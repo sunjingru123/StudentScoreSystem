@@ -295,7 +295,11 @@
 
           <el-table-column prop="score" label="分数" width="100" align="center" />
 
-          <el-table-column prop="sourceType" label="来源" width="120" align="center" />
+          <el-table-column label="来源" width="120" align="center">
+            <template #default="scope">
+              {{ scope.row.sourceName || scope.row.sourceType || '其他' }}
+            </template>
+          </el-table-column>
 
           <el-table-column prop="createTime" label="时间" min-width="170" />
         </el-table>

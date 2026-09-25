@@ -78,6 +78,7 @@ public class AdminScoreController {
 
             vo.setScore(record.getScore());
             vo.setSourceType(record.getSourceType());
+            vo.setSourceName(scoreProjectNameResolver.resolveSourceLabel(record));
             vo.setSourceId(record.getSourceId());
             vo.setAdminHidden(record.getAdminHidden());
             vo.setCreateTime(record.getCreateTime());

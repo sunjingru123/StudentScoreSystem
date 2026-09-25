@@ -406,9 +406,7 @@
               >
 
                 {{
-                  formatSourceType(
-                    scope.row.sourceType
-                  )
+                  scope.row.sourceName || formatSourceType(scope.row.sourceType)
                 }}
 
               </el-tag>

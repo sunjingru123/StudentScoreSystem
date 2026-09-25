@@ -703,7 +703,6 @@
               placeholder="没有等级就选‘无等级’"
             >
               <el-option label="无等级（活动参与）" value="无等级" />
-              <el-option label="参与" value="参与" />
               <el-option label="一等奖" value="一等奖" />
               <el-option label="二等奖" value="二等奖" />
               <el-option label="三等奖" value="三等奖" />
@@ -1904,7 +1903,7 @@ async function saveNewActivity() {
   const baseName = String(departmentForm.newActivityName || '').trim()
   const grade = String(departmentForm.newAwardGrade || '').trim()
   const name = baseName
-    ? (grade && grade !== '参与' && grade !== '无等级'
+    ? (grade && grade !== '无等级'
       ? `${baseName}（${grade}）`
       : baseName)
     : ''

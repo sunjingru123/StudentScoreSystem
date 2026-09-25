@@ -38,6 +38,9 @@ public class ScoreDetailVO {
      */
     private String sourceType;
 
+    /** 来源中文名称：证书或具体申报部门 */
+    private String sourceName;
+
     /**
      * 创建时间
      */
@@ -114,6 +117,14 @@ public class ScoreDetailVO {
 
     public void setSourceType(String sourceType) {
         this.sourceType = sourceType;
+    }
+
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
     }
 
 

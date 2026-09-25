@@ -365,6 +365,10 @@ public class ScoreController {
                     record.getSourceType()
             );
 
+            vo.setSourceName(
+                    scoreProjectNameResolver.resolveSourceLabel(record)
+            );
+
 
             /*
              * 来源 ID
