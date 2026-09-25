@@ -600,13 +600,17 @@
             v-model="departmentForm.templateId"
             filterable
             clearable
-            allow-create
-            default-first-option
             :disabled="!departmentForm.departmentId"
             :loading="templateLoading"
-            placeholder="选择已有活动，或直接输入新活动名称"
+            placeholder="选择已有活动，或选择‘新建自定义活动’"
             style="width: 100%"
           >
+
+            <el-option
+              v-if="departmentForm.departmentId"
+              :value="NEW_ACTIVITY_VALUE"
+              label="＋ 新建自定义活动"
+            />
 
             <el-option
               v-for="item in departmentTemplateList"
@@ -660,7 +664,7 @@
 
           <div class="form-tip">
             这里只显示当前申报部门自己的活动。
-            直接输入新活动名称后回车，提交时会保存到本部门，下次直接选择。
+            手机端请选择“新建自定义活动”填写，不需要回车确认。
           </div>
 
 
@@ -682,6 +686,30 @@
         <!-- ================================================== -->
 
         <template v-if="isNewActivity">
+
+          <el-form-item label="活动名称" required>
+            <el-input
+              v-model="departmentForm.newActivityName"
+              maxlength="200"
+              clearable
+              placeholder="例如：春季运动会"
+            />
+          </el-form-item>
+
+          <el-form-item label="活动等级">
+            <el-select
+              v-model="departmentForm.newAwardGrade"
+              style="width: 100%"
+              placeholder="没有等级就选‘无等级’"
+            >
+              <el-option label="无等级（活动参与）" value="无等级" />
+              <el-option label="参与" value="参与" />
+              <el-option label="一等奖" value="一等奖" />
+              <el-option label="二等奖" value="二等奖" />
+              <el-option label="三等奖" value="三等奖" />
+              <el-option label="优秀奖" value="优秀奖" />
+            </el-select>
+          </el-form-item>
 
           <el-form-item label="活动类型">
 
@@ -1594,6 +1622,10 @@ const departmentForm = reactive({
 
   newScoreType: 1,
 
+  newActivityName: '',
+
+  newAwardGrade: '无等级',
+
   newScore: null,
 
   newDescription: '',
@@ -1842,7 +1874,7 @@ const isNewActivity = computed(() => {
    * 能在列表里找到，就是已有活动
    */
 
-  return !departmentTemplateList.value.some(
+  return value === NEW_ACTIVITY_VALUE || !departmentTemplateList.value.some(
 
     (item) =>
       String(item.id) === String(value),
@@ -1850,6 +1882,8 @@ const isNewActivity = computed(() => {
   )
 
 })
+
+const NEW_ACTIVITY_VALUE = '__NEW_ACTIVITY__'
 
 
 
@@ -1867,10 +1901,13 @@ const isNewActivity = computed(() => {
 
 async function saveNewActivity() {
 
-  const name =
-    String(
-      departmentForm.templateId || '',
-    ).trim()
+  const baseName = String(departmentForm.newActivityName || '').trim()
+  const grade = String(departmentForm.newAwardGrade || '').trim()
+  const name = baseName
+    ? (grade && grade !== '参与' && grade !== '无等级'
+      ? `${baseName}（${grade}）`
+      : baseName)
+    : ''
 
 
   if (!name) {
@@ -3867,6 +3904,10 @@ function resetDepartment() {
 
   departmentForm.newScoreType = 1
 
+  departmentForm.newActivityName = ''
+
+  departmentForm.newAwardGrade = '无等级'
+
   departmentForm.newScore = null
 
   departmentForm.newDescription = ''
@@ -3915,6 +3956,10 @@ function resetDepartmentAfterSubmit() {
   departmentFile.value = null
 
   departmentForm.newScoreType = 1
+
+  departmentForm.newActivityName = ''
+
+  departmentForm.newAwardGrade = '无等级'
 
   departmentForm.newScore = null
 

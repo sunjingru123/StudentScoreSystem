@@ -76,7 +76,10 @@
       <!-- =========================
            今日申请
       ========================== -->
-      <el-card class="stat-card">
+      <el-card
+        class="stat-card clickable"
+        @click="openApplyDetails('today')"
+      >
 
         <div class="stat-content">
 
@@ -110,7 +113,10 @@
       <!-- =========================
            已审核
       ========================== -->
-      <el-card class="stat-card">
+      <el-card
+        class="stat-card clickable"
+        @click="openApplyDetails('audited')"
+      >
 
         <div class="stat-content">
 
@@ -417,6 +423,26 @@
     </div>
 
   </div>
+
+  <el-dialog
+    v-model="detailVisible"
+    :title="detailTitle"
+    width="900px"
+  >
+    <el-table :data="detailList" border stripe>
+      <el-table-column prop="studentName" label="学生" min-width="100" />
+      <el-table-column prop="departmentName" label="部门" min-width="120" />
+      <el-table-column prop="title" label="申报项目" min-width="180" />
+      <el-table-column label="分值" width="90">
+        <template #default="scope">
+          {{ scope.row.scoreType === -1 ? '-' : '+' }}{{ scope.row.score }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createTime" label="申请时间" min-width="170" />
+      <el-table-column prop="finalReviewTime" label="终审时间" min-width="170" />
+    </el-table>
+    <el-empty v-if="detailList.length === 0" description="暂无明细" />
+  </el-dialog>
 </template>
 
 
@@ -432,6 +458,7 @@ import {
 } from 'vue-router'
 
 import request from '@/utils/request'
+import { ElMessage } from 'element-plus'
 
 import {
   Clock,
@@ -470,6 +497,26 @@ const auditedCount =
 
 const studentCount =
   ref(0)
+
+const detailVisible = ref(false)
+const detailTitle = ref('申请明细')
+const detailList = ref([])
+
+async function openApplyDetails(type) {
+  detailTitle.value = type === 'today' ? '今日申请明细' : '已审核申请明细'
+  detailVisible.value = true
+  detailList.value = []
+  try {
+    const endpoint = type === 'today'
+      ? '/departmentScoreApply/final-audit/today'
+      : '/departmentScoreApply/final-audit/processed'
+    const res = await request.get(endpoint)
+    detailList.value = Array.isArray(res?.data) ? res.data : []
+  } catch (error) {
+    console.error('获取申请明细失败：', error)
+    ElMessage.error('获取申请明细失败')
+  }
+}
 
 
 /* =========================
