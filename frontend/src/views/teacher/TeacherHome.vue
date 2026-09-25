@@ -616,77 +616,12 @@ async function loadTodayCount() {
 
   try {
 
-    const res =
-      await request.get(
-        '/departmentScoreApply/final-audit/list'
-      )
-
-
-    const data =
-      res?.data?.data
-
-
-    if (
-      !Array.isArray(data)
-    ) {
-
-      todayCount.value = 0
-
-      return
-
-    }
-
-
-    const today =
-      new Date()
-
-
-    const year =
-      today.getFullYear()
-
-
-    const month =
-      String(
-        today.getMonth() + 1
-      ).padStart(
-        2,
-        '0'
-      )
-
-
-    const day =
-      String(
-        today.getDate()
-      ).padStart(
-        2,
-        '0'
-      )
-
-
-    const todayStr =
-      `${year}-${month}-${day}`
-
-
-    todayCount.value =
-      data.filter(
-        item => {
-
-          if (
-            !item.createTime
-          ) {
-
-            return false
-
-          }
-
-
-          return item.createTime
-            .startsWith(
-              todayStr
-            )
-
-        }
-      ).length
+    const res = await request.get(
+      '/departmentScoreApply/final-audit/today'
+    )
+    todayCount.value = Array.isArray(res?.data)
+      ? res.data.length
+      : 0
 
 
   } catch (error) {
@@ -710,12 +645,17 @@ async function loadTodayCount() {
 
 function loadAuditedCount() {
 
-  /*
-   * 当前没有专门的历史接口，
-   * 所以暂时保持 0。
-   */
-
-  auditedCount.value = 0
+  request
+    .get('/departmentScoreApply/final-audit/processed')
+    .then((res) => {
+      auditedCount.value = Array.isArray(res?.data)
+        ? res.data.length
+        : 0
+    })
+    .catch((error) => {
+      console.error('获取已审核数量失败：', error)
+      auditedCount.value = 0
+    })
 
 }
 

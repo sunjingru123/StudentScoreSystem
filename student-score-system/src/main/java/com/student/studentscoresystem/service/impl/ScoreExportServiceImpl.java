@@ -360,19 +360,34 @@ public class ScoreExportServiceImpl
                                         )
 
                                         /*
-                                         * 正式有效成绩
+                                         * 正式有效成绩。
+                                         *
+                                         * status/admin_hidden 是后续补充到历史表的字段，
+                                         * 早期生成的个人证书成绩记录可能为 NULL。
+                                         * NULL 与默认值 1/0 一样按有效、未隐藏处理，
+                                         * 否则证书加分会在导出时被整条过滤掉。
                                          */
-                                        .eq(
-                                                ScoreRecord::getStatus,
-                                                (short) 1
+                                        .and(wrapper -> wrapper
+                                                .eq(
+                                                        ScoreRecord::getStatus,
+                                                        (short) 1
+                                                )
+                                                .or()
+                                                .isNull(
+                                                        ScoreRecord::getStatus
+                                                )
                                         )
 
-                                        /*
-                                         * 管理员没有隐藏
-                                         */
-                                        .eq(
-                                                ScoreRecord::getAdminHidden,
-                                                (short) 0
+                                        /* 管理员没有隐藏（兼容历史 NULL） */
+                                        .and(wrapper -> wrapper
+                                                .eq(
+                                                        ScoreRecord::getAdminHidden,
+                                                        (short) 0
+                                                )
+                                                .or()
+                                                .isNull(
+                                                        ScoreRecord::getAdminHidden
+                                                )
                                         )
 
                                         /*

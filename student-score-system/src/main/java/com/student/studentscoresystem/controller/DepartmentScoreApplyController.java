@@ -2121,6 +2121,45 @@ public class DepartmentScoreApplyController {
         );
     }
 
+    /**
+     * 辅导员首页：今日提交的全部部门申报（不受审核状态限制）。
+     */
+    @GetMapping("/final-audit/today")
+    public Result<List<DepartmentScoreApply>> finalAuditToday(
+            HttpServletRequest request) {
+        Long currentUserId;
+        try {
+            currentUserId = getCurrentUserId(request);
+        } catch (Exception e) {
+            return Result.fail(e.getMessage());
+        }
+
+        List<Long> departmentIds = departmentMapper.selectList(
+                        new LambdaQueryWrapper<Department>()
+                                .eq(Department::getTeacherId, currentUserId)
+                                .eq(Department::getStatus, (short) 1)
+                ).stream()
+                .map(Department::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (departmentIds.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+
+        LocalDate today = LocalDate.now();
+        List<DepartmentScoreApply> list = applyService.list(
+                new LambdaQueryWrapper<DepartmentScoreApply>()
+                        .in(DepartmentScoreApply::getDepartmentId, departmentIds)
+                        .ge(DepartmentScoreApply::getCreateTime, today.atStartOfDay())
+                        .lt(DepartmentScoreApply::getCreateTime, today.plusDays(1).atStartOfDay())
+                        .orderByDesc(DepartmentScoreApply::getCreateTime)
+        );
+        fillNames(list);
+        return Result.success(list);
+    }
+
 
     /*
      * =========================================================

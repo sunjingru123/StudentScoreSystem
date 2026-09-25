@@ -3,6 +3,8 @@ package com.student.studentscoresystem.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.DepartmentScoreTemplate;
+import com.student.studentscoresystem.entity.Department;
+import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
@@ -23,12 +25,52 @@ public class DepartmentScoreTemplateController {
     private final IDepartmentScoreTemplateService templateService;
     private final SysUserDepartmentMapper userDepartmentMapper;
 
+    private final DepartmentMapper departmentMapper;
+
     public DepartmentScoreTemplateController(
             IDepartmentScoreTemplateService templateService,
-            SysUserDepartmentMapper userDepartmentMapper) {
+            SysUserDepartmentMapper userDepartmentMapper,
+            DepartmentMapper departmentMapper) {
 
         this.templateService = templateService;
         this.userDepartmentMapper = userDepartmentMapper;
+        this.departmentMapper = departmentMapper;
+    }
+
+    /**
+     * 获取当前辅导员所负责部门维护的自定义活动。
+     * 活动管理页面使用部门端保存的 department_score_template，
+     * 不再读取旧的 activity 表。
+     */
+    @GetMapping("/teacher-list")
+    public Result<List<DepartmentScoreTemplate>> teacherList(
+            HttpServletRequest request) {
+        Long teacherId;
+        try {
+            teacherId = getCurrentUserId(request);
+        } catch (Exception e) {
+            return Result.fail(e.getMessage());
+        }
+
+        List<Long> departmentIds = departmentMapper.selectList(
+                        new LambdaQueryWrapper<Department>()
+                                .eq(Department::getTeacherId, teacherId)
+                                .eq(Department::getStatus, (short) 1)
+                ).stream()
+                .map(Department::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (departmentIds.isEmpty()) {
+            return Result.success(List.of());
+        }
+
+        return Result.success(templateService.list(
+                new LambdaQueryWrapper<DepartmentScoreTemplate>()
+                        .in(DepartmentScoreTemplate::getDepartmentId, departmentIds)
+                        .orderByDesc(DepartmentScoreTemplate::getCreateTime)
+        ));
     }
 
     /**

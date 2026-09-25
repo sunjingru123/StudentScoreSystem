@@ -27,10 +27,10 @@ const list = ref([])
 
 function load() {
   request
-    .get('/activity/list')
+    .get('/departmentScoreTemplate/teacher-list')
     .then((res) => {
-      if (res.data.code === 200) {
-        list.value = res.data.data || []
+      if (res?.code === 200) {
+        list.value = res.data || []
       }
     })
     .catch(() => {
