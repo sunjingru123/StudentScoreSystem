@@ -708,5 +708,18 @@ onMounted(() => {
   .search-card :deep(.el-select) {
     width: 100% !important;
   }
+
+  .table-card {
+    overflow-x: auto;
+  }
+
+  .table-card :deep(.el-table) {
+    min-width: 900px;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100% - 24px) !important;
+    margin: 12px auto !important;
+  }
 }
 </style>

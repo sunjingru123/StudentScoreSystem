@@ -1318,8 +1318,9 @@ function logout() {
     min-height:
       calc(100dvh - 56px) !important;
 
+    /* 管理页多列表格在手机端可横向滑动，不能直接裁掉右侧内容。 */
     overflow-x:
-      hidden;
+      auto;
 
   }
 

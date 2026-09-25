@@ -963,5 +963,19 @@ onMounted(() => {
 
 }
 
+@media (max-width: 768px) {
+  .semester-page { padding: 12px; }
+  .page-header { align-items: flex-start; gap: 12px; }
+  .page-header h2 { font-size: 20px; }
+  .page-header .el-button { flex: 0 0 auto; }
+  .current-date { display: block; margin: 6px 0 0; }
+  .table-card { overflow-x: auto; }
+  .table-card :deep(.el-table) { min-width: 820px; }
+  :deep(.el-dialog) {
+    width: calc(100% - 24px) !important;
+    margin: 12px auto !important;
+  }
+}
+
 
 </style>

@@ -1581,4 +1581,17 @@ onMounted(() => {
   justify-content: center;
 }
 
+@media (max-width: 768px) {
+  .score-page { padding: 12px; }
+  .page-header h2 { font-size: 20px; }
+  .search-card :deep(.el-form-item) { width: 100%; margin-right: 0; }
+  .search-card :deep(.el-input) { width: 100% !important; }
+  .table-card { overflow-x: auto; }
+  .table-card :deep(.el-table) { min-width: 950px; }
+  .pagination-wrapper { justify-content: flex-start; min-width: 560px; }
+  :deep(.el-drawer) { width: 100% !important; }
+  .student-info { grid-template-columns: 1fr; }
+  .total-score { grid-column: auto; }
+}
+
 </style>
