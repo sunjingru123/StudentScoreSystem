@@ -2,17 +2,21 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.dto.ScoreRecordOperationDTO;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRecordOperationLog;
 import com.student.studentscoresystem.entity.SysUser;
+import com.student.studentscoresystem.entity.ScoreModifyLog;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordOperationLogMapper;
+import com.student.studentscoresystem.mapper.ScoreModifyLogMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.vo.AdminScoreDetailVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,18 +31,26 @@ public class AdminScoreController {
     private final ScoreProjectNameResolver scoreProjectNameResolver;
     private final SysUserMapper sysUserMapper;
     private final ScoreRecordOperationLogMapper operationLogMapper;
+    private final ScoreModifyLogMapper scoreModifyLogMapper;
 
 
     public AdminScoreController(
             ScoreRecordMapper scoreRecordMapper,
             ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper,
-            ScoreRecordOperationLogMapper operationLogMapper
+            ScoreRecordOperationLogMapper operationLogMapper,
+            ScoreModifyLogMapper scoreModifyLogMapper
     ) {
         this.scoreRecordMapper = scoreRecordMapper;
         this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
         this.operationLogMapper = operationLogMapper;
+        this.scoreModifyLogMapper = scoreModifyLogMapper;
+    }
+
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Object userId = request.getAttribute("userId");
+        return userId == null ? null : Long.valueOf(userId.toString());
     }
 
 
@@ -48,6 +60,7 @@ public class AdminScoreController {
      * 注意：这里不过滤adminHidden，管理员需要看到已经隐藏的记录
      */
     @GetMapping("/student/{studentId}")
+    @RequireRole("管理员")
     public Result<List<AdminScoreDetailVO>> studentScore(
             @PathVariable Long studentId
     ) {
@@ -94,6 +107,7 @@ public class AdminScoreController {
      * 管理员专用，同时写入操作日志
      */
     @PutMapping("/hide/{id}")
+    @RequireRole("管理员")
     public Result<Void> hide(
             @PathVariable Long id,
             @RequestBody(required = false) ScoreRecordOperationDTO dto,
@@ -107,19 +121,20 @@ public class AdminScoreController {
             return Result.error("该成绩已经隐藏");
         }
 
-        record.setAdminHidden((short) 1);
-        scoreRecordMapper.updateById(record);
-
-        // 写入操作日志
+        Long operatorId = getCurrentUserId(request);
+        if (operatorId == null) {
+            return Result.error("请先登录");
+        }
         ScoreRecordOperationLog log = new ScoreRecordOperationLog();
         log.setScoreRecordId(id);
-        // 后续替换为token解析出来的真实管理员ID，当前占位1L
-        log.setOperatorId(1L);
+        log.setOperatorId(operatorId);
         log.setOperation("HIDE");
         if (dto != null) {
             log.setReason(dto.getReason());
         }
         log.setCreateTime(LocalDateTime.now());
+        record.setAdminHidden((short) 1);
+        scoreRecordMapper.updateById(record);
         operationLogMapper.insert(log);
 
         return Result.success(null);
@@ -131,6 +146,7 @@ public class AdminScoreController {
      * 管理员专用，同时写入操作日志
      */
     @PutMapping("/show/{id}")
+    @RequireRole("管理员")
     public Result<Void> show(
             @PathVariable Long id,
             @RequestBody(required = false) ScoreRecordOperationDTO dto,
@@ -144,19 +160,20 @@ public class AdminScoreController {
             return Result.error("该成绩已经是正常状态");
         }
 
-        record.setAdminHidden((short) 0);
-        scoreRecordMapper.updateById(record);
-
-        // 写入操作日志
+        Long operatorId = getCurrentUserId(request);
+        if (operatorId == null) {
+            return Result.error("请先登录");
+        }
         ScoreRecordOperationLog log = new ScoreRecordOperationLog();
         log.setScoreRecordId(id);
-        // 后续替换为token解析出来的真实管理员ID，当前占位1L
-        log.setOperatorId(1L);
+        log.setOperatorId(operatorId);
         log.setOperation("RESTORE");
         if (dto != null) {
             log.setReason(dto.getReason());
         }
         log.setCreateTime(LocalDateTime.now());
+        record.setAdminHidden((short) 0);
+        scoreRecordMapper.updateById(record);
         operationLogMapper.insert(log);
 
         return Result.success(null);
@@ -168,6 +185,7 @@ public class AdminScoreController {
      * 管理员看到的是全部记录，包括已经隐藏的记录
      */
     @GetMapping("/student/{studentId}/total")
+    @RequireRole("管理员")
     public Result<BigDecimal> total(
             @PathVariable Long studentId
     ) {
@@ -199,5 +217,60 @@ public class AdminScoreController {
 
         BigDecimal finalScore = bonusScore.min(actualLimit);
         return Result.success(finalScore);
+    }
+
+    @PutMapping("/correction/{recordId}")
+    @RequireRole("管理员")
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> correctScore(
+            @PathVariable Long recordId,
+            @RequestBody ScoreCorrectionRequest correction,
+            HttpServletRequest request
+    ) {
+        if (correction == null || correction.getNewScore() == null) {
+            return Result.error("新成绩不能为空");
+        }
+        if (correction.getReason() == null || correction.getReason().trim().isEmpty()) {
+            return Result.error("更正原因不能为空");
+        }
+        Long operatorId = getCurrentUserId(request);
+        if (operatorId == null) {
+            return Result.error("请先登录");
+        }
+
+        ScoreRecord record = scoreRecordMapper.selectById(recordId);
+        if (record == null) {
+            return Result.error("成绩记录不存在");
+        }
+        if (record.getScore() == null) {
+            return Result.error("原成绩无效，无法更正");
+        }
+
+        ScoreModifyLog log = new ScoreModifyLog();
+        log.setRecordId(recordId);
+        log.setOldScore(record.getScore());
+        log.setNewScore(correction.getNewScore());
+        log.setModifierId(operatorId);
+        log.setReason(correction.getReason().trim());
+        log.setCreateTime(LocalDateTime.now());
+
+        record.setScore(correction.getNewScore());
+        if (scoreRecordMapper.updateById(record) != 1) {
+            throw new IllegalStateException("成绩更正失败");
+        }
+        if (scoreModifyLogMapper.insert(log) != 1) {
+            throw new IllegalStateException("成绩更正审计日志写入失败");
+        }
+        return Result.success(null);
+    }
+
+    public static class ScoreCorrectionRequest {
+        private BigDecimal newScore;
+        private String reason;
+
+        public BigDecimal getNewScore() { return newScore; }
+        public void setNewScore(BigDecimal newScore) { this.newScore = newScore; }
+        public String getReason() { return reason; }
+        public void setReason(String reason) { this.reason = reason; }
     }
 }

@@ -401,6 +401,14 @@
               恢复
             </el-button>
 
+            <el-button
+              type="primary"
+              link
+              @click="openCorrection(row)"
+            >
+              成绩更正
+            </el-button>
+
           </template>
 
         </el-table-column>
@@ -437,6 +445,28 @@
 
     </el-drawer>
 
+    <el-dialog v-model="correctionVisible" title="成绩更正" width="520px">
+      <p>成绩更正会记录操作人、原成绩、新成绩及更正原因。</p>
+      <el-form label-width="90px">
+        <el-form-item label="学生">
+          <el-input :model-value="correctionRow?.studentName || currentStudent?.realName" disabled />
+        </el-form-item>
+        <el-form-item label="原成绩">
+          <el-input :model-value="correctionRow?.score" disabled />
+        </el-form-item>
+        <el-form-item label="新成绩" required>
+          <el-input-number v-model="correctionForm.newScore" :precision="2" :step="0.5" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="更正原因" required>
+          <el-input v-model="correctionForm.reason" type="textarea" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="correctionVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitCorrection">提交成绩更正</el-button>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -457,7 +487,8 @@ import {
   getAdminStudentScores,
   getAdminStudentTotal,
   hideScore,
-  showScore
+  showScore,
+  correctScore
 } from '@/api/adminScore'
 
 import request from '@/utils/request'
@@ -524,6 +555,10 @@ const scorePage = ref(1)
 const scorePageSize = ref(10)
 
 const scoreTotal = ref(0)
+
+const correctionVisible = ref(false)
+const correctionRow = ref(null)
+const correctionForm = ref({ newScore: null, reason: '' })
 
 
 /* =========================================================
@@ -1384,6 +1419,36 @@ async function handleShow(row) {
 
   }
 
+}
+
+function openCorrection(row) {
+  correctionRow.value = row
+  correctionForm.value = { newScore: row.score, reason: '' }
+  correctionVisible.value = true
+}
+
+async function submitCorrection() {
+  if (!correctionRow.value) return
+  if (correctionForm.value.newScore === null || correctionForm.value.newScore === undefined || correctionForm.value.newScore === '') {
+    ElMessage.error('请输入新成绩')
+    return
+  }
+  if (!correctionForm.value.reason.trim()) {
+    ElMessage.error('请输入更正原因')
+    return
+  }
+  try {
+    await correctScore(correctionRow.value.id, {
+      newScore: correctionForm.value.newScore,
+      reason: correctionForm.value.reason.trim()
+    })
+    ElMessage.success('成绩更正成功')
+    correctionVisible.value = false
+    await loadScoreDetail()
+    await refreshCurrentTotal()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.msg || error.response?.data?.message || '成绩更正失败')
+  }
 }
 
 

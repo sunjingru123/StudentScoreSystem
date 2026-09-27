@@ -85,7 +85,9 @@
         </el-form-item>
 
 
-        <el-form-item>
+        <el-form-item
+          :class="{ 'first-login-actions': isFirstLogin }"
+        >
 
           <el-button
             type="primary"
@@ -490,6 +492,16 @@ const goBack =
 .notice {
 
   margin-bottom: 24px;
+
+}
+
+
+/* 首次登录时只有一个操作按钮，让按钮在卡片中居中显示。 */
+.first-login-actions :deep(.el-form-item__content) {
+
+  justify-content: center;
+
+  margin-left: 0 !important;
 
 }
 

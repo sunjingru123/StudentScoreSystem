@@ -2,8 +2,8 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.dto.ScoreAddDTO;
-import com.student.studentscoresystem.dto.ScoreUpdateDTO;
 import com.student.studentscoresystem.entity.Course;
 import com.student.studentscoresystem.entity.Score;
 import com.student.studentscoresystem.entity.ScoreRecord;
@@ -78,6 +78,7 @@ public class ScoreController {
      * =========================================================
      */
     @PostMapping("/add")
+    @RequireRole("管理员")
     public Result<Void> add(
             @RequestBody ScoreAddDTO dto
     ) {
@@ -111,48 +112,11 @@ public class ScoreController {
 
     /**
      * =========================================================
-     * 修改课程成绩
-     * =========================================================
-     */
-    @PutMapping("/update")
-    public Result<Void> update(
-            @RequestBody ScoreUpdateDTO dto
-    ) {
-
-        Score score =
-                scoreService.getById(
-                        dto.getId()
-                );
-
-        if (score == null) {
-
-            return Result.fail(
-                    "成绩不存在"
-            );
-        }
-
-        score.setScore(
-                dto.getScore()
-        );
-
-        score.setSemester(
-                dto.getSemester()
-        );
-
-        scoreService.updateById(
-                score
-        );
-
-        return Result.success(null);
-    }
-
-
-    /**
-     * =========================================================
      * 删除课程成绩
      * =========================================================
      */
     @DeleteMapping("/{id}")
+    @RequireRole("管理员")
     public Result<Void> delete(
             @PathVariable Long id
     ) {

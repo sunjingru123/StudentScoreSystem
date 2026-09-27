@@ -3,6 +3,7 @@ package com.student.studentscoresystem.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.entity.ScoreAdminAdjustment;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.ScoreAdminAdjustmentMapper;
@@ -145,6 +146,7 @@ public class ScoreAdminAdjustmentController {
      * =========================================================
      */
     @GetMapping("/list")
+    @RequireRole("管理员")
     public Result<Page<ScoreAdminAdjustmentVO>> list(
             @RequestParam(
                     defaultValue = "1"
@@ -349,6 +351,7 @@ public class ScoreAdminAdjustmentController {
      * =========================================================
      */
     @PostMapping("/add")
+    @RequireRole("管理员")
     public Result<Void> add(
             @RequestBody ScoreAdminAdjustment adjustment,
             HttpServletRequest request

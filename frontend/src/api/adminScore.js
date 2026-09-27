@@ -104,3 +104,7 @@ export function showScore(id) {
   )
 
 }
+
+export function correctScore(recordId, data) {
+  return request.put(`/admin/score/correction/${recordId}`, data)
+}
