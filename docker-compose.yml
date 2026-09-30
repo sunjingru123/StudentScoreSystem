@@ -12,6 +12,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-deng}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
       - ./uploads:/app/uploads
     networks:
