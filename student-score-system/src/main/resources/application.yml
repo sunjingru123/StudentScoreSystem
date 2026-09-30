@@ -2,7 +2,7 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
     url: ${DB_URL:jdbc:postgresql://localhost:5432/student_score_system}
-    username: ${DB_USERNAME:postgres}
+    username: ${DB_USERNAME:deng}
     password: ${DB_PASSWORD:}
 
   http:

@@ -83,8 +83,9 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           IMAGE_REPO: ${{ env.IMAGE_REPO }}
-          DB_USER: ${{ secrets.DB_USER }}
+          DB_USER: ${{ secrets.DB_USER || 'deng' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -92,7 +93,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT || 22 }}
-          envs: IMAGE_REPO,DB_USER,DB_PASSWORD,GHCR_USER,GHCR_TOKEN
+          envs: IMAGE_REPO,DB_USER,DB_PASSWORD,JWT_SECRET,GHCR_USER,GHCR_TOKEN
           script: |
             mkdir -p /opt/student-score-system/uploads
             cd /opt/student-score-system
@@ -100,8 +101,9 @@ jobs:
             # 写入环境变量
             cat <<EOF > .env
             IMAGE_REPO=${IMAGE_REPO}
-            DB_USER=${DB_USER}
+            DB_USER=${DB_USER:-deng}
             DB_PASSWORD=${DB_PASSWORD}
+            JWT_SECRET=${JWT_SECRET}
             EOF
 
             # 登录 GHCR 并拉取

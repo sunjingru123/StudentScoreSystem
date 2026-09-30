@@ -4,11 +4,13 @@ services:
     container_name: student-score-backend
     restart: unless-stopped
     environment:
+      # 数据库用户名固定为 deng（PG 容器里的实际角色），只有密码通过 DB_PASSWORD 注入
+      DB_USER: ${DB_USER:-deng}
       # 精准对应 application.yml 中的变量名
       DB_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
-      DB_USERNAME: ${DB_USER:-postgres}
+      DB_USERNAME: ${DB_USER:-deng}
       DB_PASSWORD: ${DB_PASSWORD}
-      # 同时保留标准变量名作为双保险
+      # 同时保留标准变量名作为双保险（env 优先级高于 application.yml，两者必须一致）
       SPRING_DATASOURCE_URL: jdbc:postgresql://student-score-postgres:5432/student_score_system
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-deng}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
