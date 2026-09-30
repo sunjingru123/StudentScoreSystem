@@ -219,8 +219,14 @@ public class ScoreController {
      */
     @GetMapping("/student/{studentId}/records")
     public Result<List<ScoreDetailVO>> studentRecords(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Object current = request.getAttribute("userId");
+        if (current == null || !String.valueOf(studentId).equals(String.valueOf(current))) {
+            return Result.error("无权访问该学生成绩流水");
+        }
 
         /*
          * =====================================================

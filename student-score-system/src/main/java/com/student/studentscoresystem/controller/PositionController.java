@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 
 import com.student.studentscoresystem.entity.Position;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.service.PositionService;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +23,7 @@ public class PositionController {
 
 
     @GetMapping("/list")
+    @RequireRole("管理员")
     public List<Position> list(){
 
         return positionService.list();

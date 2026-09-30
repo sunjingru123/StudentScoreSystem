@@ -6,6 +6,9 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.NoticeMessageAddDTO;
 import com.student.studentscoresystem.entity.NoticeMessage;
 import com.student.studentscoresystem.service.INoticeMessageService;
+import com.student.studentscoresystem.annotation.RequireRole;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,7 +42,8 @@ public class NoticeMessageController {
      */
     @PostMapping("/send")
     public Result<Void> send(
-            @RequestBody NoticeMessageAddDTO dto
+            @RequestBody NoticeMessageAddDTO dto,
+            HttpServletRequest request
     ){
 
 
@@ -57,9 +61,7 @@ public class NoticeMessageController {
         );
 
 
-        message.setSenderId(
-                dto.getSenderId()
-        );
+        message.setSenderId(currentUserId(request));
 
 
         message.setReceiverId(
@@ -88,8 +90,16 @@ public class NoticeMessageController {
      */
     @GetMapping("/my/{userId}")
     public Result<List<NoticeMessage>> my(
-            @PathVariable Long userId
+            @PathVariable Long userId,
+            HttpServletRequest request,
+            HttpServletResponse response
     ){
+
+        Long currentUserId = currentUserId(request);
+        if (currentUserId == null || !currentUserId.equals(userId)) {
+            response.setStatus(403);
+            return Result.fail("无权访问该用户消息");
+        }
 
 
 
@@ -127,7 +137,9 @@ public class NoticeMessageController {
      */
     @PutMapping("/read/{id}")
     public Result<Void> read(
-            @PathVariable Long id
+            @PathVariable Long id,
+            HttpServletRequest request,
+            HttpServletResponse response
     ){
 
 
@@ -144,6 +156,11 @@ public class NoticeMessageController {
                     "消息不存在"
             );
 
+        }
+
+        if (!java.util.Objects.equals(message.getReceiverId(), currentUserId(request))) {
+            response.setStatus(403);
+            return Result.fail("无权操作该消息");
         }
 
 
@@ -173,16 +190,22 @@ public class NoticeMessageController {
      */
     @DeleteMapping("/{id}")
     public Result<Void> delete(
-            @PathVariable Long id
+            @PathVariable Long id,
+            HttpServletRequest request,
+            HttpServletResponse response
     ){
 
 
 
-        boolean result =
-
-                noticeMessageService.removeById(
-                        id
-                );
+        NoticeMessage message = noticeMessageService.getById(id);
+        if (message == null) {
+            return Result.fail("消息不存在");
+        }
+        if (!java.util.Objects.equals(message.getReceiverId(), currentUserId(request))) {
+            response.setStatus(403);
+            return Result.fail("无权操作该消息");
+        }
+        boolean result = noticeMessageService.removeById(id);
 
 
 
@@ -205,6 +228,7 @@ public class NoticeMessageController {
      * 查询全部消息
      */
     @GetMapping("/list")
+    @RequireRole("管理员")
     public Result<List<NoticeMessage>> list(){
 
 
@@ -219,5 +243,12 @@ public class NoticeMessageController {
 
         return Result.success(list);
 
+    }
+
+    private Long currentUserId(HttpServletRequest request) {
+        Object value = request.getAttribute("userId");
+        if (value == null) return null;
+        try { return Long.valueOf(value.toString()); }
+        catch (NumberFormatException ex) { return null; }
     }
 }

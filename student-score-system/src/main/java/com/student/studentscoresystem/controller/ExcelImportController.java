@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.controller;
 
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.service.ExcelImportService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ public class ExcelImportController {
      * POST /excel/import/students
      */
     @PostMapping("/students")
+    @RequireRole("管理员")
     public Result<Map<String, Object>> importStudents(
             @RequestParam("file") MultipartFile file
     ) {
@@ -57,6 +59,7 @@ public class ExcelImportController {
      * POST /excel/import/department-members
      */
     @PostMapping("/department-members")
+    @RequireRole("管理员")
     public Result<Map<String, Object>> importDepartmentMembers(
             @RequestParam("file") MultipartFile file
     ) {

@@ -28,3 +28,8 @@ server:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt:
+  # 生产环境必须设置 JWT_SECRET；应用不会再使用固定默认密钥。
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}

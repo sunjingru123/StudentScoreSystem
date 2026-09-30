@@ -21,10 +21,21 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/login")
 public class LoginController {
+
+    private static final int MAX_FAILURES = 5;
+    private static final long LOCK_MILLIS = 5 * 60 * 1000L;
+    private final Map<String, FailureState> failures = new ConcurrentHashMap<>();
+
+    private static final class FailureState {
+        private int count;
+        private long blockedUntil;
+    }
 
     private final ISysUserService sysUserService;
 
@@ -81,14 +92,12 @@ public class LoginController {
         if (loginDTO == null
                 || loginDTO.getUsername() == null
                 || loginDTO.getUsername().trim().isEmpty()) {
-
-            throw new RuntimeException("请输入用户名");
+            return Result.fail("用户名或密码错误");
         }
 
         if (loginDTO.getPassword() == null
                 || loginDTO.getPassword().isEmpty()) {
-
-            throw new RuntimeException("请输入密码");
+            return Result.fail("用户名或密码错误");
         }
 
         String username =
@@ -96,6 +105,11 @@ public class LoginController {
 
         String inputPassword =
                 loginDTO.getPassword();
+
+        FailureState state = failures.get(username);
+        if (state != null && state.blockedUntil > System.currentTimeMillis()) {
+            return Result.fail("登录失败次数过多，请稍后再试");
+        }
 
         // =====================================================
         // 2. 查询用户
@@ -111,7 +125,8 @@ public class LoginController {
                 );
 
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            recordFailure(username);
+            return Result.fail("用户名或密码错误");
         }
 
         // =====================================================
@@ -120,8 +135,8 @@ public class LoginController {
 
         if (user.getStatus() != null
                 && user.getStatus() != 1) {
-
-            throw new RuntimeException("账号已停用");
+            recordFailure(username);
+            return Result.fail("用户名或密码错误");
         }
 
         // =====================================================
@@ -185,9 +200,11 @@ public class LoginController {
         }
 
         if (!passwordCorrect) {
-
-            throw new RuntimeException("密码错误");
+            recordFailure(username);
+            return Result.fail("用户名或密码错误");
         }
+
+        failures.remove(username);
 
         // =====================================================
         // 5. 老账号登录成功后自动升级成 BCrypt
@@ -393,5 +410,14 @@ public class LoginController {
         // =====================================================
 
         return Result.success(vo);
+    }
+
+    private void recordFailure(String username) {
+        FailureState state = failures.computeIfAbsent(username, key -> new FailureState());
+        state.count++;
+        if (state.count >= MAX_FAILURES) {
+            state.blockedUntil = System.currentTimeMillis() + LOCK_MILLIS;
+            state.count = 0;
+        }
     }
 }

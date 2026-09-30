@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.controller;
 
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.service.DepartmentMemberImportService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +25,7 @@ public class DepartmentMemberController {
      * 导入部门成员 Excel
      */
     @PostMapping("/import")
+    @RequireRole("管理员")
     public Result<Map<String, Object>> importExcel(
             @RequestParam("file") MultipartFile file
     ) {

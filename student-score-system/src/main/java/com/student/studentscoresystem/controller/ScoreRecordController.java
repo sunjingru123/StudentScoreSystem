@@ -186,8 +186,23 @@ public class ScoreRecordController {
      */
     @GetMapping("/student/{studentId}")
     public Result<List<ScoreDetailVO>> student(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Long currentUserId = getUserId(request);
+        if (currentUserId == null) return Result.error("请先登录");
+        if (!isAdmin(currentUserId) && currentUserId.equals(studentId) == false) {
+            SysPosition teacher = positionMapper.selectOne(new LambdaQueryWrapper<SysPosition>()
+                    .eq(SysPosition::getName, "教师"));
+            SysPosition counselor = positionMapper.selectOne(new LambdaQueryWrapper<SysPosition>()
+                    .eq(SysPosition::getName, "辅导员"));
+            boolean hasBusinessRole = (teacher != null && userPositionMapper.selectCount(new LambdaQueryWrapper<SysUserPosition>()
+                    .eq(SysUserPosition::getUserId, currentUserId).eq(SysUserPosition::getPositionId, teacher.getId())) > 0)
+                    || (counselor != null && userPositionMapper.selectCount(new LambdaQueryWrapper<SysUserPosition>()
+                    .eq(SysUserPosition::getUserId, currentUserId).eq(SysUserPosition::getPositionId, counselor.getId())) > 0);
+            if (!hasBusinessRole) return Result.error("无权访问该学生成绩");
+        }
 
         SysUser student =
                 sysUserMapper.selectById(studentId);

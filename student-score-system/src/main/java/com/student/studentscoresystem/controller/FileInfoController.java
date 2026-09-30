@@ -3,6 +3,11 @@ package com.student.studentscoresystem.controller;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.FileInfo;
 import com.student.studentscoresystem.mapper.FileInfoMapper;
+import com.student.studentscoresystem.mapper.SysPositionMapper;
+import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.entity.SysPosition;
+import com.student.studentscoresystem.entity.SysUserPosition;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -28,6 +33,8 @@ import java.util.UUID;
 public class FileInfoController {
 
     private final FileInfoMapper fileInfoMapper;
+    private final SysUserPositionMapper userPositionMapper;
+    private final SysPositionMapper positionMapper;
 
     /**
      * 文件上传目录
@@ -37,11 +44,15 @@ public class FileInfoController {
 
 
     public FileInfoController(
-            FileInfoMapper fileInfoMapper
+            FileInfoMapper fileInfoMapper,
+            SysUserPositionMapper userPositionMapper,
+            SysPositionMapper positionMapper
     ) {
 
         this.fileInfoMapper =
                 fileInfoMapper;
+        this.userPositionMapper = userPositionMapper;
+        this.positionMapper = positionMapper;
 
     }
 
@@ -498,8 +509,20 @@ public class FileInfoController {
      */
     @GetMapping("/view/{id}")
     public ResponseEntity<Resource> view(
-            @PathVariable Long id
+            @PathVariable Long id,
+            HttpServletRequest request
     ) {
+
+        Object userIdObj = request.getAttribute("userId");
+        if (userIdObj == null) {
+            return ResponseEntity.status(403).build();
+        }
+        Long currentUserId;
+        try {
+            currentUserId = Long.valueOf(userIdObj.toString());
+        } catch (NumberFormatException ex) {
+            return ResponseEntity.status(403).build();
+        }
 
         /*
          * =====================================================
@@ -521,6 +544,10 @@ public class FileInfoController {
                     .notFound()
                     .build();
 
+        }
+
+        if (!currentUserId.equals(fileInfo.getUploaderId()) && !isAdmin(currentUserId)) {
+            return ResponseEntity.status(403).build();
         }
 
 
@@ -632,6 +659,14 @@ public class FileInfoController {
                         resource
                 );
 
+    }
+
+    private boolean isAdmin(Long userId) {
+        SysPosition admin = positionMapper.selectOne(new LambdaQueryWrapper<SysPosition>()
+                .eq(SysPosition::getName, "管理员"));
+        return admin != null && userPositionMapper.selectCount(new LambdaQueryWrapper<SysUserPosition>()
+                .eq(SysUserPosition::getUserId, userId)
+                .eq(SysUserPosition::getPositionId, admin.getId())) > 0;
     }
 
 }

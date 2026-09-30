@@ -9,6 +9,7 @@ import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -93,8 +94,14 @@ public class StudentDepartmentController {
      */
     @GetMapping("/student/{studentId}")
     public Result<List<SysUserDepartment>> studentDepartments(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Object current = request.getAttribute("userId");
+        if (current == null || !String.valueOf(studentId).equals(String.valueOf(current))) {
+            return Result.error("无权访问该学生部门信息");
+        }
 
         List<SysUserDepartment> list =
                 userDepartmentMapper.selectList(

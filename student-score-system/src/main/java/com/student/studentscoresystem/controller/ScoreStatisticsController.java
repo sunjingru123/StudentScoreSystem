@@ -6,6 +6,11 @@ import com.student.studentscoresystem.common.ScoreConstants;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.mapper.SysPositionMapper;
+import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.entity.SysPosition;
+import com.student.studentscoresystem.entity.SysUserPosition;
+import jakarta.servlet.http.HttpServletRequest;
 import com.student.studentscoresystem.service.IScoreRecordService;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.vo.ScoreDetailVO;
@@ -24,15 +29,21 @@ public class ScoreStatisticsController {
     private final ScoreProjectNameResolver scoreProjectNameResolver;
 
     private final SysUserMapper sysUserMapper;
+    private final SysPositionMapper positionMapper;
+    private final SysUserPositionMapper userPositionMapper;
 
     public ScoreStatisticsController(
             IScoreRecordService scoreRecordService,
             ScoreProjectNameResolver scoreProjectNameResolver,
-            SysUserMapper sysUserMapper
+            SysUserMapper sysUserMapper,
+            SysPositionMapper positionMapper,
+            SysUserPositionMapper userPositionMapper
     ) {
         this.scoreRecordService = scoreRecordService;
         this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
+        this.positionMapper = positionMapper;
+        this.userPositionMapper = userPositionMapper;
     }
 
 
@@ -49,8 +60,15 @@ public class ScoreStatisticsController {
      */
     @GetMapping("/{studentId}")
     public Result<ScoreStatisticsVO> detail(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Long currentUserId = currentUserId(request);
+        if (currentUserId == null) return Result.fail("请先登录");
+        if (isStudent(currentUserId) && !currentUserId.equals(studentId)) {
+            return Result.fail("无权访问该学生成绩");
+        }
 
         SysUser user =
                 sysUserMapper.selectById(studentId);
@@ -86,6 +104,25 @@ public class ScoreStatisticsController {
                 user,
                 records
         );
+    }
+
+    private Long currentUserId(HttpServletRequest request) {
+        Object value = request.getAttribute("userId");
+        if (value == null) return null;
+        try { return Long.valueOf(value.toString()); }
+        catch (NumberFormatException ex) { return null; }
+    }
+
+    private boolean isStudent(Long userId) {
+        return userPositionMapper.selectList(new LambdaQueryWrapper<SysUserPosition>()
+                        .eq(SysUserPosition::getUserId, userId))
+                .stream()
+                .map(item -> positionMapper.selectById(item.getPositionId()))
+                .filter(java.util.Objects::nonNull)
+                .map(SysPosition::getName)
+                .findFirst()
+                .map("学生"::equals)
+                .orElse(true);
     }
 
 

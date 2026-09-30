@@ -6,6 +6,7 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.ScoreFlow;
 import com.student.studentscoresystem.service.IScoreFlowService;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -35,8 +36,14 @@ public class ScoreFlowController {
      */
     @GetMapping("/student/{id}")
     public Result<List<ScoreFlow>> list(
-            @PathVariable Long id
+            @PathVariable Long id,
+            HttpServletRequest request
     ){
+
+        Object current = request.getAttribute("userId");
+        if (current == null || !String.valueOf(id).equals(String.valueOf(current))) {
+            return Result.error("无权访问该学生积分流水");
+        }
 
 
         List<ScoreFlow> list =

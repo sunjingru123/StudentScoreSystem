@@ -2,13 +2,9 @@ package com.student.studentscoresystem.config;
 
 import com.student.studentscoresystem.interceptor.JwtInterceptor;
 import com.student.studentscoresystem.interceptor.RoleInterceptor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import java.nio.file.Paths;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -16,12 +12,6 @@ public class WebConfig implements WebMvcConfigurer {
     private final JwtInterceptor jwtInterceptor;
 
     private final RoleInterceptor roleInterceptor;
-
-    /**
-     * 文件上传目录
-     */
-    @Value("${file.upload-path:uploads}")
-    private String uploadPath;
 
     public WebConfig(
             JwtInterceptor jwtInterceptor,
@@ -51,9 +41,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
 
                 .excludePathPatterns(
-                        "/login",
-                        "/uploads/**",
-                        "/file/view/**"
+                        "/login"
                 );
 
 
@@ -62,10 +50,7 @@ public class WebConfig implements WebMvcConfigurer {
 
                 .addPathPatterns("/**")
 
-                .excludePathPatterns(
-                        "/uploads/**",
-                        "/file/view/**"
-                );
+                ;
 
     }
 
@@ -85,30 +70,4 @@ public class WebConfig implements WebMvcConfigurer {
      *
      * =========================================================
      */
-    @Override
-    public void addResourceHandlers(
-            ResourceHandlerRegistry registry
-    ) {
-
-        String absolutePath =
-                Paths.get(uploadPath)
-                        .toAbsolutePath()
-                        .normalize()
-                        .toString();
-
-        if (!absolutePath.endsWith(
-                java.io.File.separator
-        )) {
-
-            absolutePath +=
-                    java.io.File.separator;
-        }
-
-        registry.addResourceHandler(
-                "/uploads/**"
-        ).addResourceLocations(
-                "file:" + absolutePath
-        );
-    }
-
 }

@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
@@ -51,6 +52,7 @@ public class DepartmentController {
      * 新增部门
      */
     @PostMapping
+    @RequireRole("管理员")
     public Result<Void> add(
             @RequestBody Department department
     ) {
@@ -85,6 +87,7 @@ public class DepartmentController {
      * 修改部门
      */
     @PutMapping("/{id}")
+    @RequireRole("管理员")
     public Result<Void> update(
             @PathVariable Long id,
             @RequestBody Department department
@@ -112,6 +115,7 @@ public class DepartmentController {
      * 停用部门
      */
     @PutMapping("/{id}/disable")
+    @RequireRole("管理员")
     public Result<Void> disable(
             @PathVariable Long id
     ) {
