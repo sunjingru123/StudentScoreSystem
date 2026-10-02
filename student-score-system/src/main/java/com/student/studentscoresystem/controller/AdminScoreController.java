@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.common.ScoreCalculator;
 import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.dto.ScoreRecordOperationDTO;
 import com.student.studentscoresystem.entity.ScoreRecord;
@@ -195,28 +196,14 @@ public class AdminScoreController {
                         .eq(ScoreRecord::getAdminHidden, (short) 0)
         );
 
-        BigDecimal bonusScore = records.stream()
-                .map(ScoreRecord::getScore)
-                .filter(score -> score != null)
-                .filter(score -> score.compareTo(BigDecimal.ZERO) > 0)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        ScoreCalculator.Summary summary =
+                ScoreCalculator.summarize(
+                        records.stream()
+                                .map(ScoreRecord::getScore)
+                                .toList()
+                );
 
-        BigDecimal deductScore = records.stream()
-                .map(ScoreRecord::getScore)
-                .filter(score -> score != null)
-                .filter(score -> score.compareTo(BigDecimal.ZERO) < 0)
-                .map(BigDecimal::abs)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal actualLimit = com.student.studentscoresystem.common.ScoreConstants.MAX_SCORE
-                .subtract(deductScore);
-
-        if (actualLimit.compareTo(BigDecimal.ZERO) < 0) {
-            actualLimit = BigDecimal.ZERO;
-        }
-
-        BigDecimal finalScore = bonusScore.min(actualLimit);
-        return Result.success(finalScore);
+        return Result.success(summary.getTotalScore());
     }
 
     @PutMapping("/correction/{recordId}")

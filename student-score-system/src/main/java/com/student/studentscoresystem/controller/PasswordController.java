@@ -4,10 +4,10 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.service.ISysUserService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.utils.LegacyCompatPasswordEncoder;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -21,8 +21,8 @@ public class PasswordController {
 
     private final ISysUserService sysUserService;
 
-    private final BCryptPasswordEncoder passwordEncoder =
-            new BCryptPasswordEncoder();
+    private final LegacyCompatPasswordEncoder passwordEncoder =
+            new LegacyCompatPasswordEncoder();
 
     public PasswordController(
             ISysUserService sysUserService
@@ -150,8 +150,6 @@ public class PasswordController {
         String databasePassword =
                 user.getPassword();
 
-        boolean correct;
-
         if (databasePassword == null
                 || databasePassword.isEmpty()) {
 
@@ -160,23 +158,15 @@ public class PasswordController {
             );
         }
 
-        if (databasePassword.startsWith("$2a$")
-                || databasePassword.startsWith("$2b$")
-                || databasePassword.startsWith("$2y$")) {
-
-            correct =
-                    passwordEncoder.matches(
-                            dto.getOldPassword(),
-                            databasePassword
-                    );
-
-        } else {
-
-            correct =
-                    databasePassword.equals(
-                            dto.getOldPassword()
-                    );
-        }
+        /*
+         * 统一使用 PasswordEncoder.matches 校验，
+         * 彻底废除 String.equals 明文比对。
+         */
+        boolean correct =
+                passwordEncoder.matches(
+                        dto.getOldPassword(),
+                        databasePassword
+                );
 
         if (!correct) {
 

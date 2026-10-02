@@ -698,3 +698,16 @@ ALTER TABLE public.department_score_apply
 CREATE UNIQUE INDEX IF NOT EXISTS uk_score_record_source
     ON public.score_record(source_type, source_id)
     WHERE source_id IS NOT NULL;
+
+-- ==========================================
+-- 5.7 同部门规则名称唯一约束
+--
+-- 同一个部门下不允许出现同名评分规则，
+-- 从数据库层面防止并发插入产生重复规则，
+-- 保证终审时按 部门 + 名称 匹配规则不会漂移。
+--
+-- 使用局部唯一索引：department_id 为空的记录不受影响。
+-- ==========================================
+CREATE UNIQUE INDEX IF NOT EXISTS uk_score_rule_dept_name
+    ON public.score_rule(department_id, name)
+    WHERE department_id IS NOT NULL;

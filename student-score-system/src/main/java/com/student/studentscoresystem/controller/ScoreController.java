@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.common.ScoreCalculator;
 import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.dto.ScoreAddDTO;
 import com.student.studentscoresystem.entity.Course;
@@ -404,6 +405,10 @@ public class ScoreController {
      */
     @GetMapping("/statistics")
     public Result<ScoreStatisticsVO> statistics(
+            @RequestParam(
+                    value = "semesterId",
+                    required = false
+            ) Long semesterId,
             HttpServletRequest request
     ) {
 
@@ -438,6 +443,11 @@ public class ScoreController {
                                 .eq(
                                         ScoreRecord::getAdminHidden,
                                         (short) 0
+                                )
+                                .eq(
+                                        semesterId != null,
+                                        ScoreRecord::getSemesterId,
+                                        semesterId
                                 )
                 );
 
@@ -503,61 +513,29 @@ public class ScoreController {
                         .toList();
 
 
-        BigDecimal bonusScore =
-                scoreList.stream()
-                        .filter(
-                                s -> s.compareTo(
-                                        BigDecimal.ZERO
-                                ) > 0
-                        )
-                        .reduce(
-                                BigDecimal.ZERO,
-                                BigDecimal::add
-                        );
-
-
-        BigDecimal deductScore =
-                scoreList.stream()
-                        .filter(
-                                s -> s.compareTo(
-                                        BigDecimal.ZERO
-                                ) < 0
-                        )
-                        .map(
-                                BigDecimal::abs
-                        )
-                        .reduce(
-                                BigDecimal.ZERO,
-                                BigDecimal::add
-                        );
-
-
-        BigDecimal actualLimit =
-                vo.getBaseLimit()
-                        .subtract(
-                                deductScore
-                        );
+        ScoreCalculator.Summary summary =
+                ScoreCalculator.summarize(
+                        scoreList
+                );
 
 
         vo.setActualLimit(
-                actualLimit
+                summary.getActualLimit()
         );
 
 
         vo.setTotalScore(
-                bonusScore.min(
-                        actualLimit
-                )
+                summary.getTotalScore()
         );
 
 
         vo.setBonusScore(
-                bonusScore
+                summary.getBonusScore()
         );
 
 
         vo.setDeductScore(
-                deductScore
+                summary.getDeductScore()
         );
 
 
@@ -726,50 +704,18 @@ public class ScoreController {
                     entry.getValue();
 
 
-            BigDecimal bonus =
-                    studentRecords.stream()
-                            .map(
-                                    ScoreRecord::getScore
-                            )
-                            .filter(
-                                    s -> s != null
-                                            && s.compareTo(
-                                            BigDecimal.ZERO
-                                    ) > 0
-                            )
-                            .reduce(
-                                    BigDecimal.ZERO,
-                                    BigDecimal::add
-                            );
-
-
-            BigDecimal deduct =
-                    studentRecords.stream()
-                            .map(
-                                    ScoreRecord::getScore
-                            )
-                            .filter(
-                                    s -> s != null
-                                            && s.compareTo(
-                                            BigDecimal.ZERO
-                                    ) < 0
-                            )
-                            .map(
-                                    BigDecimal::abs
-                            )
-                            .reduce(
-                                    BigDecimal.ZERO,
-                                    BigDecimal::add
-                            );
+            ScoreCalculator.Summary summary =
+                    ScoreCalculator.summarize(
+                            studentRecords.stream()
+                                    .map(
+                                            ScoreRecord::getScore
+                                    )
+                                    .toList()
+                    );
 
 
             BigDecimal finalScore =
-                    bonus.min(
-                            new BigDecimal("40")
-                                    .subtract(
-                                            deduct
-                                    )
-                    );
+                    summary.getTotalScore();
 
 
             SysUser user =

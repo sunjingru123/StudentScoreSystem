@@ -7,12 +7,10 @@ import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.mapper.ScoreApplyMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
-import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -29,23 +27,20 @@ import java.time.LocalDateTime;
 @Service
 public class CertificateScoreFinalizeService {
 
-    private final SysSemesterMapper sysSemesterMapper;
-
     private final ScoreRecordMapper scoreRecordMapper;
 
     private final ScoreApplyMapper scoreApplyMapper;
 
     private final IScoreFlowService scoreFlowService;
 
+    private final ISysSemesterService sysSemesterService;
+
     public CertificateScoreFinalizeService(
-            SysSemesterMapper sysSemesterMapper,
             ScoreRecordMapper scoreRecordMapper,
             ScoreApplyMapper scoreApplyMapper,
-            IScoreFlowService scoreFlowService
+            IScoreFlowService scoreFlowService,
+            ISysSemesterService sysSemesterService
     ) {
-
-        this.sysSemesterMapper =
-                sysSemesterMapper;
 
         this.scoreRecordMapper =
                 scoreRecordMapper;
@@ -55,6 +50,9 @@ public class CertificateScoreFinalizeService {
 
         this.scoreFlowService =
                 scoreFlowService;
+
+        this.sysSemesterService =
+                sysSemesterService;
     }
 
     /**
@@ -91,38 +89,17 @@ public class CertificateScoreFinalizeService {
         /*
          * =====================================================
          * 查询当前学期
+         *
+         * 统一从 sys_semester 动态获取，严禁写死。
          * =====================================================
          */
 
-        LocalDate today =
-                LocalDate.now();
-
         SysSemester semester =
-                sysSemesterMapper.selectOne(
-                        new LambdaQueryWrapper<SysSemester>()
-                                .le(
-                                        SysSemester::getStartDate,
-                                        today
-                                )
-                                .ge(
-                                        SysSemester::getEndDate,
-                                        today
-                                )
-                                .eq(
-                                        SysSemester::getStatus,
-                                        (short) 1
-                                )
-                                .orderByDesc(
-                                        SysSemester::getStartDate
-                                )
-                                .last(
-                                        "LIMIT 1"
-                                )
-                );
+                sysSemesterService.getCurrentSemester();
 
         if (semester == null) {
 
-            return "当前没有正在进行的学期，无法生成正式成绩记录";
+            return "当前没有可用学期，无法生成正式成绩记录";
         }
 
         /*

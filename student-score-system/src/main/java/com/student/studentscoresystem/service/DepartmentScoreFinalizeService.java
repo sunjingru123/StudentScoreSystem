@@ -7,12 +7,10 @@ import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.ScoreRuleMapper;
-import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -29,23 +27,20 @@ import java.time.LocalDateTime;
 @Service
 public class DepartmentScoreFinalizeService {
 
-    private final SysSemesterMapper sysSemesterMapper;
-
     private final ScoreRecordMapper scoreRecordMapper;
 
     private final ScoreRuleMapper scoreRuleMapper;
 
     private final IDepartmentScoreApplyService applyService;
 
+    private final ISysSemesterService sysSemesterService;
+
     public DepartmentScoreFinalizeService(
-            SysSemesterMapper sysSemesterMapper,
             ScoreRecordMapper scoreRecordMapper,
             ScoreRuleMapper scoreRuleMapper,
-            IDepartmentScoreApplyService applyService
+            IDepartmentScoreApplyService applyService,
+            ISysSemesterService sysSemesterService
     ) {
-
-        this.sysSemesterMapper =
-                sysSemesterMapper;
 
         this.scoreRecordMapper =
                 scoreRecordMapper;
@@ -55,6 +50,9 @@ public class DepartmentScoreFinalizeService {
 
         this.applyService =
                 applyService;
+
+        this.sysSemesterService =
+                sysSemesterService;
     }
 
     /**
@@ -163,6 +161,13 @@ public class DepartmentScoreFinalizeService {
                                 .eq(
                                         ScoreRule::getStatus,
                                         (short) 1
+                                )
+                                /*
+                                 * 同一部门规则名称已由唯一索引保证唯一，
+                                 * 这里再固定主键排序，避免匹配漂移。
+                                 */
+                                .orderByAsc(
+                                        ScoreRule::getId
                                 )
                                 .last(
                                         "LIMIT 1"
@@ -297,33 +302,12 @@ public class DepartmentScoreFinalizeService {
     /**
      * =========================================================
      * 查询当前正在进行的学期
+     *
+     * 统一从 sys_semester 动态获取，严禁写死。
      * =========================================================
      */
     private SysSemester getCurrentSemester() {
 
-        LocalDate today =
-                LocalDate.now();
-
-        return sysSemesterMapper.selectOne(
-                new LambdaQueryWrapper<SysSemester>()
-                        .le(
-                                SysSemester::getStartDate,
-                                today
-                        )
-                        .ge(
-                                SysSemester::getEndDate,
-                                today
-                        )
-                        .eq(
-                                SysSemester::getStatus,
-                                (short) 1
-                        )
-                        .orderByDesc(
-                                SysSemester::getStartDate
-                        )
-                        .last(
-                                "LIMIT 1"
-                        )
-        );
+        return sysSemesterService.getCurrentSemester();
     }
 }

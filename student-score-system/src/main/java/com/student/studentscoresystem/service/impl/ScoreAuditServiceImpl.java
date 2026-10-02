@@ -6,12 +6,14 @@ import com.student.studentscoresystem.entity.ScoreApply;
 import com.student.studentscoresystem.entity.ScoreAudit;
 import com.student.studentscoresystem.entity.ScoreFlow;
 import com.student.studentscoresystem.entity.ScoreRecord;
+import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.mapper.NoticeMessageMapper;
 import com.student.studentscoresystem.mapper.ScoreAuditMapper;
 import com.student.studentscoresystem.service.IScoreApplyService;
 import com.student.studentscoresystem.service.IScoreAuditService;
 import com.student.studentscoresystem.service.IScoreFlowService;
 import com.student.studentscoresystem.service.IScoreRecordService;
+import com.student.studentscoresystem.service.ISysSemesterService;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
@@ -39,11 +41,14 @@ public class ScoreAuditServiceImpl extends ServiceImpl<ScoreAuditMapper, ScoreAu
 
     private final NoticeMessageMapper noticeMessageMapper;
 
+    private final ISysSemesterService sysSemesterService;
+
     public ScoreAuditServiceImpl(
             IScoreApplyService scoreApplyService,
             IScoreRecordService scoreRecordService,
             IScoreFlowService scoreFlowService,
-            NoticeMessageMapper noticeMessageMapper
+            NoticeMessageMapper noticeMessageMapper,
+            ISysSemesterService sysSemesterService
     ) {
 
         this.scoreApplyService =
@@ -57,6 +62,9 @@ public class ScoreAuditServiceImpl extends ServiceImpl<ScoreAuditMapper, ScoreAu
 
         this.noticeMessageMapper =
                 noticeMessageMapper;
+
+        this.sysSemesterService =
+                sysSemesterService;
     }
 
     /**
@@ -164,6 +172,32 @@ public class ScoreAuditServiceImpl extends ServiceImpl<ScoreAuditMapper, ScoreAu
 
                 return "申请分值必须大于0，无法审核通过";
             }
+        }
+
+        /*
+         * =====================================================
+         * 5.5 解析当前生效学期
+         *
+         * 严禁写死学期 ID，统一从 sys_semester 动态获取。
+         * 在写任何数据之前先解析，避免出现半截数据。
+         * =====================================================
+         */
+
+        Long semesterId =
+                null;
+
+        if (dto.getAuditStatus() == 1) {
+
+            SysSemester currentSemester =
+                    sysSemesterService.getCurrentSemester();
+
+            if (currentSemester == null) {
+
+                return "当前没有可用学期，无法生成正式成绩记录";
+            }
+
+            semesterId =
+                    currentSemester.getId();
         }
 
         /*
@@ -290,7 +324,7 @@ public class ScoreAuditServiceImpl extends ServiceImpl<ScoreAuditMapper, ScoreAu
         );
 
         record.setSemesterId(
-                1L
+                semesterId
         );
 
         record.setStatus(

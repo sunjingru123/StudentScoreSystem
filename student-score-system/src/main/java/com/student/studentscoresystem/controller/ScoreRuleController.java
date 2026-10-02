@@ -14,6 +14,7 @@ import com.student.studentscoresystem.service.IScoreRuleService;
 import com.student.studentscoresystem.service.ScoreRuleManageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -108,13 +109,26 @@ public class ScoreRuleController {
             return Result.fail("没有管理员权限");
         }
 
-        String message = scoreRuleManageService.add(rule);
+        try {
 
-        if (message != null) {
-            return Result.fail(message);
+            String message = scoreRuleManageService.add(rule);
+
+            if (message != null) {
+                return Result.fail(message);
+            }
+
+            return Result.success(null);
+
+        } catch (DuplicateKeyException e) {
+
+            /*
+             * 并发下同一部门同名规则同时落库，
+             * 由数据库唯一索引 uk_score_rule_dept_name 拦截。
+             */
+            return Result.fail(
+                    "该部门下已经存在同名规则，请勿重复添加"
+            );
         }
-
-        return Result.success(null);
     }
 
     /**
@@ -135,13 +149,26 @@ public class ScoreRuleController {
             return Result.fail("没有管理员权限");
         }
 
-        String message = scoreRuleManageService.update(id, rule);
+        try {
 
-        if (message != null) {
-            return Result.fail(message);
+            String message = scoreRuleManageService.update(id, rule);
+
+            if (message != null) {
+                return Result.fail(message);
+            }
+
+            return Result.success(null);
+
+        } catch (DuplicateKeyException e) {
+
+            /*
+             * 修改后与同部门其他规则重名，
+             * 由数据库唯一索引 uk_score_rule_dept_name 拦截。
+             */
+            return Result.fail(
+                    "该部门下已经存在同名规则，请更换名称"
+            );
         }
-
-        return Result.success(null);
     }
 
     /**

@@ -14,9 +14,9 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.ISysUserService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.utils.LegacyCompatPasswordEncoder;
 import com.student.studentscoresystem.vo.DepartmentMemberVO;
 import com.student.studentscoresystem.vo.LoginVO;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -48,10 +48,12 @@ public class LoginController {
     private final DepartmentMapper departmentMapper;
 
     /**
-     * BCrypt 密码编码器
+     * 密码编码器
+     *
+     * 统一使用 BCrypt，并兼容历史明文口令的恒定时间校验。
      */
-    private final BCryptPasswordEncoder passwordEncoder =
-            new BCryptPasswordEncoder();
+    private final LegacyCompatPasswordEncoder passwordEncoder =
+            new LegacyCompatPasswordEncoder();
 
     public LoginController(
             ISysUserService sysUserService,
@@ -155,49 +157,19 @@ public class LoginController {
         String databasePassword =
                 user.getPassword();
 
+        /*
+         * 统一使用 PasswordEncoder.matches 校验：
+         *
+         * - BCrypt 密文：BCrypt 恒定时间校验；
+         * - 历史明文口令：MessageDigest.isEqual 恒定时间比较。
+         *
+         * 彻底废除 String.equals 明文比对。
+         */
         boolean passwordCorrect =
-                false;
-
-        boolean oldPlainPassword =
-                false;
-
-        if (databasePassword != null
-                && !databasePassword.isEmpty()) {
-
-            /*
-             * BCrypt 密码一般以这些前缀开头
-             */
-            if (databasePassword.startsWith("$2a$")
-                    || databasePassword.startsWith("$2b$")
-                    || databasePassword.startsWith("$2y$")) {
-
-                try {
-
-                    passwordCorrect =
-                            passwordEncoder.matches(
-                                    inputPassword,
-                                    databasePassword
-                            );
-
-                } catch (Exception ignored) {
-
-                    passwordCorrect = false;
-                }
-
-            } else {
-
-                /*
-                 * 兼容旧版明文密码
-                 */
-                passwordCorrect =
-                        databasePassword.equals(
-                                inputPassword
-                        );
-
-                oldPlainPassword =
-                        passwordCorrect;
-            }
-        }
+                passwordEncoder.matches(
+                        inputPassword,
+                        databasePassword
+                );
 
         if (!passwordCorrect) {
             recordFailure(username);
@@ -210,7 +182,9 @@ public class LoginController {
         // 5. 老账号登录成功后自动升级成 BCrypt
         // =====================================================
 
-        if (oldPlainPassword) {
+        if (LegacyCompatPasswordEncoder.needsUpgrade(
+                databasePassword
+        )) {
 
             user.setPassword(
                     passwordEncoder.encode(

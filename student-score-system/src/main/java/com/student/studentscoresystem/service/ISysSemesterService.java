@@ -13,4 +13,18 @@ import com.baomidou.mybatisplus.extension.service.IService;
  */
 public interface ISysSemesterService extends IService<SysSemester> {
 
+    /**
+     * =========================================================
+     * 获取当前生效的学期
+     *
+     * 查询顺序：
+     *
+     * 1. status = 1 且当前时间落在 start_date ~ end_date 内；
+     * 2. 否则回退到状态为启用的最近学期；
+     * 3. 再否则回退到最新创建的学期。
+     *
+     * @return 未配置任何学期时返回 null
+     * =========================================================
+     */
+    SysSemester getCurrentSemester();
 }

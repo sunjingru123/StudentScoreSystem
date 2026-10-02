@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.student.studentscoresystem.entity.ScoreAdminAdjustment;
 import com.student.studentscoresystem.entity.ScoreFlow;
 import com.student.studentscoresystem.entity.ScoreRecord;
+import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.mapper.ScoreAdminAdjustmentMapper;
 import com.student.studentscoresystem.service.IScoreAdminAdjustmentService;
 import com.student.studentscoresystem.service.IScoreFlowService;
 import com.student.studentscoresystem.service.IScoreRecordService;
+import com.student.studentscoresystem.service.ISysSemesterService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,10 +33,16 @@ public class ScoreAdminAdjustmentServiceImpl
      */
     private final IScoreFlowService scoreFlowService;
 
+    /**
+     * 学期 Service
+     */
+    private final ISysSemesterService sysSemesterService;
+
 
     public ScoreAdminAdjustmentServiceImpl(
             IScoreRecordService scoreRecordService,
-            IScoreFlowService scoreFlowService
+            IScoreFlowService scoreFlowService,
+            ISysSemesterService sysSemesterService
     ) {
 
         this.scoreRecordService =
@@ -42,6 +50,9 @@ public class ScoreAdminAdjustmentServiceImpl
 
         this.scoreFlowService =
                 scoreFlowService;
+
+        this.sysSemesterService =
+                sysSemesterService;
     }
 
 
@@ -304,13 +315,19 @@ public class ScoreAdminAdjustmentServiceImpl
 
 
         /*
-         * 管理员调整不绑定学期。
+         * 绑定当前生效学期。
          *
-         * 如果以后要求必须绑定学期，
-         * 再从当前用户或请求参数中补充。
+         * 管理员调整也属于成绩记录，必须归入当前学期，
+         * 否则按学期统计时会被过滤掉导致总分不一致。
+         * 未配置学期时保持为 null（兼容历史数据）。
          */
+        SysSemester currentSemester =
+                sysSemesterService.getCurrentSemester();
+
         record.setSemesterId(
-                null
+                currentSemester == null
+                        ? null
+                        : currentSemester.getId()
         );
 
 

@@ -2,7 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
-import com.student.studentscoresystem.common.ScoreConstants;
+import com.student.studentscoresystem.common.ScoreCalculator;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.SysUserMapper;
@@ -61,6 +61,10 @@ public class ScoreStatisticsController {
     @GetMapping("/{studentId}")
     public Result<ScoreStatisticsVO> detail(
             @PathVariable Long studentId,
+            @RequestParam(
+                    value = "semesterId",
+                    required = false
+            ) Long semesterId,
             HttpServletRequest request
     ) {
 
@@ -93,6 +97,11 @@ public class ScoreStatisticsController {
                                 .eq(
                                         ScoreRecord::getAdminHidden,
                                         (short) 0
+                                )
+                                .eq(
+                                        semesterId != null,
+                                        ScoreRecord::getSemesterId,
+                                        semesterId
                                 )
                                 .orderByDesc(
                                         ScoreRecord::getCreateTime
@@ -152,7 +161,11 @@ public class ScoreStatisticsController {
      */
     @GetMapping("/admin/{studentId}")
     public Result<ScoreStatisticsVO> adminDetail(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            @RequestParam(
+                    value = "semesterId",
+                    required = false
+            ) Long semesterId
     ) {
 
         SysUser user =
@@ -176,6 +189,11 @@ public class ScoreStatisticsController {
                                 .eq(
                                         ScoreRecord::getStudentId,
                                         studentId
+                                )
+                                .eq(
+                                        semesterId != null,
+                                        ScoreRecord::getSemesterId,
+                                        semesterId
                                 )
                                 .orderByDesc(
                                         ScoreRecord::getCreateTime
@@ -382,111 +400,18 @@ public class ScoreStatisticsController {
 
         /*
          * =====================================================
-         * 1. 基础最高上限
-         * =====================================================
-         */
-        BigDecimal baseLimit =
-                ScoreConstants.MAX_SCORE;
-
-
-        /*
-         * =====================================================
-         * 2. 计算加分
-         * =====================================================
-         */
-        BigDecimal bonusScore =
-                records.stream()
-                        .map(
-                                ScoreRecord::getScore
-                        )
-                        .filter(
-                                score ->
-                                        score != null
-                        )
-                        .filter(
-                                score ->
-                                        score.compareTo(
-                                                BigDecimal.ZERO
-                                        ) > 0
-                        )
-                        .reduce(
-                                BigDecimal.ZERO,
-                                BigDecimal::add
-                        );
-
-
-        /*
-         * =====================================================
-         * 3. 计算减分
-         * =====================================================
+         * 1~5. 统一使用 ScoreCalculator 计算
          *
-         * 数据库：
-         *
-         * -5
-         * -3
-         *
-         * 统计：
-         *
-         * deductScore = 8
-         */
-        BigDecimal deductScore =
-                records.stream()
-                        .map(
-                                ScoreRecord::getScore
-                        )
-                        .filter(
-                                score ->
-                                        score != null
-                        )
-                        .filter(
-                                score ->
-                                        score.compareTo(
-                                                BigDecimal.ZERO
-                                        ) < 0
-                        )
-                        .map(
-                                BigDecimal::abs
-                        )
-                        .reduce(
-                                BigDecimal.ZERO,
-                                BigDecimal::add
-                        );
-
-
-        /*
-         * =====================================================
-         * 4. 当前最高上限
+         * totalScore = min(bonusScore, max(0, 40 - deductScore))
          * =====================================================
          */
-        BigDecimal actualLimit =
-                baseLimit.subtract(
-                        deductScore
-                );
-
-
-        /*
-         * 上限最低不能低于 0
-         */
-        if (
-                actualLimit.compareTo(
-                        BigDecimal.ZERO
-                ) < 0
-        ) {
-
-            actualLimit =
-                    BigDecimal.ZERO;
-
-        }
-
-
-        /*
-         * =====================================================
-         * 5. 最终成绩
-         * =====================================================
-         */
-        BigDecimal totalScore =
-                bonusScore.min(
-                        actualLimit
+        ScoreCalculator.Summary summary =
+                ScoreCalculator.summarize(
+                        records.stream()
+                                .map(
+                                        ScoreRecord::getScore
+                                )
+                                .toList()
                 );
 
 
@@ -496,23 +421,23 @@ public class ScoreStatisticsController {
          * =====================================================
          */
         vo.setBaseLimit(
-                baseLimit
+                summary.getBaseLimit()
         );
 
         vo.setBonusScore(
-                bonusScore
+                summary.getBonusScore()
         );
 
         vo.setDeductScore(
-                deductScore
+                summary.getDeductScore()
         );
 
         vo.setActualLimit(
-                actualLimit
+                summary.getActualLimit()
         );
 
         vo.setTotalScore(
-                totalScore
+                summary.getTotalScore()
         );
 
 
