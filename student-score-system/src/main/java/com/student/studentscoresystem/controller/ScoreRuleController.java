@@ -15,6 +15,7 @@ import com.student.studentscoresystem.mapper.ScoreApplyMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
 import com.student.studentscoresystem.service.IScoreRuleService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,6 +59,8 @@ public class ScoreRuleController {
 
     private final SysUserPositionMapper sysUserPositionMapper;
 
+    private final DepartmentTemplateSyncService departmentTemplateSyncService;
+
     public ScoreRuleController(
             IScoreRuleService scoreRuleService,
             ExcelImportService excelImportService,
@@ -65,7 +68,8 @@ public class ScoreRuleController {
             ScoreRecordMapper scoreRecordMapper,
             ScoreApplyMapper scoreApplyMapper,
             SysPositionMapper sysPositionMapper,
-            SysUserPositionMapper sysUserPositionMapper
+            SysUserPositionMapper sysUserPositionMapper,
+            DepartmentTemplateSyncService departmentTemplateSyncService
     ) {
         this.scoreRuleService = scoreRuleService;
         this.excelImportService = excelImportService;
@@ -74,6 +78,7 @@ public class ScoreRuleController {
         this.scoreApplyMapper = scoreApplyMapper;
         this.sysPositionMapper = sysPositionMapper;
         this.sysUserPositionMapper = sysUserPositionMapper;
+        this.departmentTemplateSyncService = departmentTemplateSyncService;
     }
 
     /**
@@ -136,7 +141,6 @@ public class ScoreRuleController {
 
         rule.setId(null);
         rule.setName(rule.getName().trim());
-        rule.setCategory(emptyToNull(rule.getCategory()));
         rule.setDescription(emptyToNull(rule.getDescription()));
         rule.setScore(scaleScore(rule.getScore()));
         rule.setStatus(rule.getStatus() == null ? (short) 1 : rule.getStatus());
@@ -146,6 +150,12 @@ public class ScoreRuleController {
         if (!scoreRuleService.save(rule)) {
             return Result.fail("规则新增失败");
         }
+
+        /*
+         * 同步到该部门的加减分模板，
+         * 学生端「部门学生加减分申报」下拉即可选到。
+         */
+        departmentTemplateSyncService.sync(rule);
 
         return Result.success(null);
     }
@@ -186,9 +196,16 @@ public class ScoreRuleController {
             return Result.fail(message);
         }
 
+        /*
+         * 记下修改前的部门 / 名称，
+         * 用于同步模板改名。
+         */
+        Long oldDepartmentId = oldRule.getDepartmentId();
+        String oldName = oldRule.getName();
+
         oldRule.setDepartmentId(rule.getDepartmentId());
         oldRule.setName(rule.getName().trim());
-        oldRule.setCategory(emptyToNull(rule.getCategory()));
+        oldRule.setScoreType(rule.getScoreType());
         oldRule.setDescription(emptyToNull(rule.getDescription()));
         oldRule.setScore(scaleScore(rule.getScore()));
         oldRule.setStatus(
@@ -201,6 +218,16 @@ public class ScoreRuleController {
         if (!scoreRuleService.updateById(oldRule)) {
             return Result.fail("规则修改失败");
         }
+
+        /*
+         * 同步到该部门的加减分模板，
+         * 学生端「部门学生加减分申报」下拉即可选到。
+         */
+        departmentTemplateSyncService.syncRename(
+                oldDepartmentId,
+                oldName,
+                oldRule
+        );
 
         return Result.success(null);
     }
@@ -262,6 +289,12 @@ public class ScoreRuleController {
         if (!scoreRuleService.removeById(id)) {
             return Result.fail("规则删除失败");
         }
+
+        /*
+         * 同步删除对应部门的加减分模板，
+         * 避免学生端还能选到已删除的固定项目。
+         */
+        departmentTemplateSyncService.remove(rule);
 
         return Result.success(null);
     }
@@ -379,9 +412,10 @@ public class ScoreRuleController {
             return "规则名称不能超过 100 个字符";
         }
 
-        if (rule.getCategory() != null
-                && rule.getCategory().trim().length() > 50) {
-            return "分类不能超过 50 个字符";
+        if (rule.getScoreType() == null
+                || (rule.getScoreType() != 1
+                && rule.getScoreType() != -1)) {
+            return "请选择加分或减分";
         }
 
         if (rule.getScore() == null) {

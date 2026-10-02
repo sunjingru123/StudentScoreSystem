@@ -8,7 +8,7 @@ import lombok.Data;
  *
  * 列：
  *
- * 部门 | 规则名称 | 分类 | 分值 | 描述 | 状态
+ * 部门 | 规则名称 | 类型 | 分值 | 描述 | 状态
  */
 @Data
 public class ScoreRuleExcelRow {
@@ -19,8 +19,12 @@ public class ScoreRuleExcelRow {
     @ExcelProperty("规则名称")
     private String name;
 
-    @ExcelProperty("分类")
-    private String category;
+    /**
+     * 加分 / 减分
+     * 填写「加分」或「减分」
+     */
+    @ExcelProperty("类型")
+    private String scoreType;
 
     /**
      * 使用 String 接收，

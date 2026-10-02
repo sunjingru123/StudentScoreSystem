@@ -34,7 +34,12 @@ public class ScoreRule implements Serializable {
     private Long departmentId;
     private String name;
 
-    private String category;
+    /**
+     * 加减分类型
+     * 1  加分
+     * -1 减分
+     */
+    private Short scoreType;
 
     private BigDecimal score;
 

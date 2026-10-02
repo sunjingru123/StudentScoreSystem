@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS score_rule
 (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    category VARCHAR(50),
+    score_type SMALLINT,
     score NUMERIC(10,2) NOT NULL,
     department_id BIGINT,
     description TEXT,
@@ -577,6 +577,12 @@ CREATE TABLE IF NOT EXISTS department_score_template (
 -- =========================================================
 
 -- 5.1 测评规则 score_rule
+ALTER TABLE public.score_rule
+    DROP COLUMN IF EXISTS category;
+
+ALTER TABLE public.score_rule
+    ADD COLUMN IF NOT EXISTS score_type SMALLINT NULL;
+
 ALTER TABLE public.score_rule
     ADD COLUMN IF NOT EXISTS department_id BIGINT NULL;
 

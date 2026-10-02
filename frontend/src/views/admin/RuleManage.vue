@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>规则管理</h2>
-        <p>仅管理部门加减分的固定评分项目，部门临时/非固定模板不在这里维护</p>
+        <p>仅管理部门加减分的固定评分项目；新增 / 编辑后会同步到该部门的加减分模板，学生端可直接选择</p>
       </div>
 
       <div class="header-actions">
@@ -32,9 +32,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="name" label="规则名称" min-width="180" />
-        <el-table-column label="分类" width="120" align="center">
+        <el-table-column label="类型" width="110" align="center">
           <template #default="{ row }">
-            {{ row.category || '-' }}
+            <el-tag :type="Number(row.scoreType) === -1 ? 'danger' : 'success'">
+              {{ Number(row.scoreType) === -1 ? '减分' : '加分' }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="score" label="分值" width="100" align="center" />
@@ -108,13 +110,16 @@
           />
         </el-form-item>
 
-        <el-form-item label="分类" prop="category">
-          <el-input
-            v-model="form.category"
-            placeholder="例如：德育、学业、文体"
-            maxlength="50"
-            show-word-limit
-          />
+        <el-form-item label="类型" prop="scoreType">
+          <el-radio-group v-model="form.scoreType">
+            <el-radio :value="1">
+              加分
+            </el-radio>
+
+            <el-radio :value="-1">
+              减分
+            </el-radio>
+          </el-radio-group>
         </el-form-item>
 
         <el-form-item label="分值" prop="score">
@@ -186,7 +191,7 @@
         <div class="columns">
           <el-tag>部门</el-tag>
           <el-tag>规则名称</el-tag>
-          <el-tag>分类</el-tag>
+          <el-tag>类型</el-tag>
           <el-tag type="warning">
             分值
           </el-tag>
@@ -201,15 +206,19 @@
         </p>
 
         <p>
-          ② 分值必须大于 0，最多保留两位小数。
+          ② 类型填写「加分」或「减分」。
         </p>
 
         <p>
-          ③ 状态填写「启用」或「停用」，留空默认为启用。
+          ③ 分值必须大于 0，最多保留两位小数。
         </p>
 
         <p>
-          ④ 同一部门下「规则名称」已存在则更新，不存在则新增。
+          ④ 状态填写「启用」或「停用」，留空默认为启用。
+        </p>
+
+        <p>
+          ⑤ 同一部门下「规则名称」已存在则更新，不存在则新增。
         </p>
       </div>
 
@@ -349,7 +358,7 @@ const editId = ref(null)
 const form = reactive({
   departmentId: null,
   name: '',
-  category: '',
+  scoreType: 1,
   score: null,
   description: '',
   status: 1,
@@ -463,7 +472,7 @@ function resetForm() {
 
   form.departmentId = null
   form.name = ''
-  form.category = ''
+  form.scoreType = 1
   form.score = null
   form.description = ''
   form.status = 1
@@ -485,7 +494,7 @@ function openEditDialog(row) {
   editId.value = row.id
   form.departmentId = row.departmentId ?? null
   form.name = row.name || ''
-  form.category = row.category || ''
+  form.scoreType = Number(row.scoreType) === -1 ? -1 : 1
   form.score = row.score === null || row.score === undefined
     ? null
     : Number(row.score)
@@ -517,7 +526,7 @@ async function submitForm() {
     const data = {
       departmentId: form.departmentId,
       name: form.name.trim(),
-      category: form.category.trim(),
+      scoreType: form.scoreType,
       score: form.score,
       description: form.description.trim(),
       status: form.status,

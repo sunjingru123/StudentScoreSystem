@@ -19,6 +19,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final SysPositionMapper sysPositionMapper;
     private final ScoreRuleMapper scoreRuleMapper;
 
+    private final DepartmentTemplateSyncService departmentTemplateSyncService;
+
     private final BCryptPasswordEncoder passwordEncoder =
             new BCryptPasswordEncoder();
 
@@ -57,7 +60,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             SysUserDepartmentMapper userDepartmentMapper,
             SysUserPositionMapper sysUserPositionMapper,
             SysPositionMapper sysPositionMapper,
-            ScoreRuleMapper scoreRuleMapper
+            ScoreRuleMapper scoreRuleMapper,
+            DepartmentTemplateSyncService departmentTemplateSyncService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.departmentMapper = departmentMapper;
@@ -66,6 +70,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         this.sysUserPositionMapper = sysUserPositionMapper;
         this.sysPositionMapper = sysPositionMapper;
         this.scoreRuleMapper = scoreRuleMapper;
+        this.departmentTemplateSyncService = departmentTemplateSyncService;
     }
 
     /**
@@ -1226,8 +1231,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String ruleName =
                     trim(row.getName());
 
-            String category =
-                    trim(row.getCategory());
+            String scoreTypeText =
+                    trim(row.getScoreType());
 
             String scoreText =
                     trim(row.getScore());
@@ -1317,7 +1322,31 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             /*
              * =================================================
-             * 3. 分值
+             * 3. 加分 / 减分类型
+             * =================================================
+             */
+            Short scoreType =
+                    parseRuleScoreType(
+                            scoreTypeText
+                    );
+
+            if (scoreType == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "类型只能填写：加分、减分"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * =================================================
+             * 4. 分值
              * =================================================
              */
             if (isEmpty(scoreText)) {
@@ -1372,7 +1401,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             /*
              * =================================================
-             * 4. 状态
+             * 5. 状态
              * =================================================
              */
             Short status =
@@ -1396,7 +1425,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             /*
              * =================================================
-             * 5. 新增 / 更新
+             * 6. 新增 / 更新
              * =================================================
              */
             ScoreRule exist =
@@ -1429,8 +1458,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         ruleName
                 );
 
-                scoreRule.setCategory(
-                        emptyToNull(category)
+                scoreRule.setScoreType(
+                        scoreType
                 );
 
                 scoreRule.setScore(
@@ -1473,10 +1502,18 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     continue;
                 }
 
+                /*
+                 * 同步到该部门的加减分模板，
+                 * 学生端申报下拉即可选到。
+                 */
+                departmentTemplateSyncService.sync(
+                        scoreRule
+                );
+
             } else {
 
-                exist.setCategory(
-                        emptyToNull(category)
+                exist.setScoreType(
+                        scoreType
                 );
 
                 exist.setScore(
@@ -1514,6 +1551,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
                     continue;
                 }
+
+                /*
+                 * 同步到该部门的加减分模板，
+                 * 学生端申报下拉即可选到。
+                 */
+                departmentTemplateSyncService.sync(
+                        exist
+                );
             }
 
             successCount++;
@@ -1592,6 +1637,39 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
             return null;
         }
+    }
+
+    /**
+     * =========================================================
+     * 解析加分 / 减分类型
+     *
+     * 加分 -> 1
+     * 减分 -> -1
+     * 无法识别返回 null
+     * =========================================================
+     */
+    private Short parseRuleScoreType(
+            String typeText
+    ) {
+
+        if (isEmpty(typeText)) {
+
+            return null;
+        }
+
+        if ("加分".equals(typeText)
+                || "1".equals(typeText)) {
+
+            return (short) 1;
+        }
+
+        if ("减分".equals(typeText)
+                || "-1".equals(typeText)) {
+
+            return (short) -1;
+        }
+
+        return null;
     }
 
     /**
