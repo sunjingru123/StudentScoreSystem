@@ -3,6 +3,8 @@
 # =========================
 FROM maven:3.9-eclipse-temurin-21 AS build
 
+ENV TZ=Asia/Shanghai
+
 WORKDIR /app
 
 COPY pom.xml .
@@ -16,6 +18,8 @@ RUN mvn -DskipTests package
 # 第二阶段：运行 Spring Boot
 # =========================
 FROM eclipse-temurin:21-jre
+
+ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 

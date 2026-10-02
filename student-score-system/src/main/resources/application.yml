@@ -27,7 +27,10 @@ server:
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 默认关闭 SQL 控制台全量打印，避免生产环境泄露学生个人敏感数据；
+    # 本地调试可显式设置：
+    # MYBATIS_LOG_IMPL=org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: ${MYBATIS_LOG_IMPL:org.apache.ibatis.logging.nologging.NoLoggingImpl}
 
 jwt:
   # 生产环境必须设置 JWT_SECRET；应用不会再使用固定默认密钥。

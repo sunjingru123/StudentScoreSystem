@@ -495,6 +495,9 @@ public class ScoreRecordController {
             List<ScoreRecord> records
     ) {
 
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(records);
+
         return records.stream()
                 .map(record -> {
 
@@ -524,7 +527,7 @@ public class ScoreRecordController {
                      * 规则 / 个人证书 / 部门申报 / 管理员调整
                      */
                     vo.setRuleName(
-                            scoreProjectNameResolver.resolve(
+                            names.resolve(
                                     record
                             )
                     );

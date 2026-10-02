@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -202,12 +203,16 @@ public class ScoreProjectNameResolver {
         Map<String, String> detailNames =
                 new HashMap<>();
 
+        Map<String, String> sourceLabels =
+                new HashMap<>();
+
         if (records == null || records.isEmpty()) {
 
             return new PreloadedNames(
                     ruleNames,
                     shortNames,
-                    detailNames
+                    detailNames,
+                    sourceLabels
             );
         }
 
@@ -384,20 +389,50 @@ public class ScoreProjectNameResolver {
          */
         if (!departmentIds.isEmpty()) {
 
+            /*
+             * departmentIds 里存的是「部门申报 id」（score_record.source_id），
+             * 先按它查出申报，再从中取真实的 departmentId 去查部门名。
+             *
+             * 历史上这里误把「部门申报 id」当成部门 id 去查 department 表，
+             * 导致导出时部门名称前缀缺失，这里一并修正。
+             */
+            List<DepartmentScoreApply> departmentApplies =
+                    departmentScoreApplyMapper.selectBatchIds(
+                            departmentIds
+                    );
+
+            Set<Long> realDepartmentIds =
+                    new HashSet<>();
+
+            for (
+                    DepartmentScoreApply apply
+                    : departmentApplies
+            ) {
+
+                if (apply != null
+                        && apply.getDepartmentId() != null) {
+
+                    realDepartmentIds.add(
+                            apply.getDepartmentId()
+                    );
+                }
+            }
+
             Map<Long, String> departmentNames =
                     new HashMap<>();
 
-            for (var department : departmentMapper.selectBatchIds(departmentIds)) {
-                if (department != null && blankToNull(department.getName()) != null) {
-                    departmentNames.put(department.getId(), department.getName().trim());
+            if (!realDepartmentIds.isEmpty()) {
+
+                for (var department : departmentMapper.selectBatchIds(realDepartmentIds)) {
+                    if (department != null && blankToNull(department.getName()) != null) {
+                        departmentNames.put(department.getId(), department.getName().trim());
+                    }
                 }
             }
 
             for (
                     DepartmentScoreApply apply
-                    : departmentScoreApplyMapper.selectBatchIds(
-                    departmentIds
-            )
+                    : departmentApplies
             ) {
 
                 if (apply == null) {
@@ -416,6 +451,12 @@ public class ScoreProjectNameResolver {
                                 apply.getId()
                         );
 
+                String departmentName =
+                        departmentNameFor(
+                                apply.getDepartmentId(),
+                                departmentNames
+                        );
+
                 if (title != null
                         && key != null) {
 
@@ -424,15 +465,20 @@ public class ScoreProjectNameResolver {
                             title
                     );
 
-                    String departmentName = departmentNameFor(
-                            apply.getDepartmentId(),
-                            departmentNames
-                    );
                     detailNames.put(
                             key,
                             departmentName == null
                                     ? title
                                     : departmentName + "-" + title
+                    );
+                }
+
+                if (key != null
+                        && departmentName != null) {
+
+                    sourceLabels.put(
+                            key,
+                            departmentName
                     );
                 }
             }
@@ -480,7 +526,8 @@ public class ScoreProjectNameResolver {
         return new PreloadedNames(
                 ruleNames,
                 shortNames,
-                detailNames
+                detailNames,
+                sourceLabels
         );
     }
 
@@ -819,14 +866,18 @@ public class ScoreProjectNameResolver {
 
         private final Map<String, String> detailNames;
 
+        private final Map<String, String> sourceLabels;
+
         PreloadedNames(
                 Map<Long, String> ruleNames,
                 Map<String, String> shortNames,
-                Map<String, String> detailNames
+                Map<String, String> detailNames,
+                Map<String, String> sourceLabels
         ) {
             this.ruleNames = ruleNames;
             this.shortNames = shortNames;
             this.detailNames = detailNames;
+            this.sourceLabels = sourceLabels;
         }
 
         public String resolve(
@@ -837,6 +888,58 @@ public class ScoreProjectNameResolver {
                     record,
                     false
             );
+        }
+
+        /**
+         * 成绩明细中展示的中文来源名称。
+         *
+         * 与 {@link ScoreProjectNameResolver#resolveSourceLabel(ScoreRecord)}
+         * 结果保持一致，但全部取自批量预取结果，不再逐条查库。
+         */
+        public String resolveSourceLabel(ScoreRecord record) {
+
+            if (record == null || record.getSourceType() == null) {
+
+                return "其他";
+            }
+
+            String sourceType =
+                    record.getSourceType();
+
+            if (TYPE_CERTIFICATE.equals(sourceType)
+                    || TYPE_APPLY.equals(sourceType)) {
+
+                return "证书";
+            }
+
+            if (TYPE_DEPARTMENT.equals(sourceType)) {
+
+                String key =
+                        sourceKey(
+                                sourceType,
+                                record.getSourceId()
+                        );
+
+                if (key != null) {
+
+                    String departmentName =
+                            sourceLabels.get(key);
+
+                    if (departmentName != null) {
+
+                        return departmentName;
+                    }
+                }
+
+                return "部门申报";
+            }
+
+            if (TYPE_ADMIN_ADJUSTMENT.equals(sourceType)) {
+
+                return "管理员调整";
+            }
+
+            return "其他";
         }
 
         /**

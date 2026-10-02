@@ -289,6 +289,13 @@ public class ScoreController {
          * =====================================================
          */
 
+        /*
+         * 批量预取评分项目名称，避免逐条查库（N+1）。
+         */
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(records);
+
+
         List<ScoreDetailVO> result =
                 new ArrayList<>();
 
@@ -337,7 +344,7 @@ public class ScoreController {
             );
 
             vo.setSourceName(
-                    scoreProjectNameResolver.resolveSourceLabel(record)
+                    names.resolveSourceLabel(record)
             );
 
 
@@ -378,7 +385,7 @@ public class ScoreController {
              */
 
             vo.setRuleName(
-                    scoreProjectNameResolver.resolve(
+                    names.resolve(
                             record
                     )
             );
@@ -588,6 +595,9 @@ public class ScoreController {
          * =====================================================
          */
 
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(records);
+
         List<ScoreDetailVO> details =
                 records.stream()
                         .map(r -> {
@@ -616,7 +626,7 @@ public class ScoreController {
                             );
 
                             d.setRuleName(
-                                    scoreProjectNameResolver.resolve(
+                                    names.resolve(
                                             r
                                     )
                             );

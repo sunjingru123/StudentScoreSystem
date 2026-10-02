@@ -77,6 +77,9 @@ public class AdminScoreController {
                         .orderByDesc(ScoreRecord::getCreateTime)
         );
 
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(records);
+
         List<AdminScoreDetailVO> result = new ArrayList<>();
 
         for (ScoreRecord record : records) {
@@ -88,11 +91,11 @@ public class AdminScoreController {
             vo.setStudentNo(student.getStudentNo());
             vo.setClassName(student.getClassName());
 
-            vo.setRuleName(scoreProjectNameResolver.resolve(record));
+            vo.setRuleName(names.resolve(record));
 
             vo.setScore(record.getScore());
             vo.setSourceType(record.getSourceType());
-            vo.setSourceName(scoreProjectNameResolver.resolveSourceLabel(record));
+            vo.setSourceName(names.resolveSourceLabel(record));
             vo.setSourceId(record.getSourceId());
             vo.setAdminHidden(record.getAdminHidden());
             vo.setCreateTime(record.getCreateTime());

@@ -257,6 +257,9 @@ public class ScoreStatisticsController {
          *
          * 否则隐藏成绩会直接消失。
          */
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(allRecords);
+
         List<ScoreDetailVO> detail =
                 allRecords.stream()
                         .map(record -> {
@@ -287,7 +290,7 @@ public class ScoreStatisticsController {
                              * 规则 / 个人证书 / 部门申报 / 管理员调整
                              */
                             d.setRuleName(
-                                    scoreProjectNameResolver.resolve(
+                                    names.resolve(
                                             record
                                     )
                             );
@@ -309,7 +312,7 @@ public class ScoreStatisticsController {
                             );
 
                             d.setSourceName(
-                                    scoreProjectNameResolver.resolveSourceLabel(record)
+                                    names.resolveSourceLabel(record)
                             );
 
 
@@ -520,6 +523,9 @@ public class ScoreStatisticsController {
          *
          * 所以不会看到隐藏成绩。
          */
+        ScoreProjectNameResolver.PreloadedNames names =
+                scoreProjectNameResolver.preload(records);
+
         List<ScoreDetailVO> detail =
                 records.stream()
                         .map(record -> {
@@ -550,7 +556,7 @@ public class ScoreStatisticsController {
                              * 规则 / 个人证书 / 部门申报 / 管理员调整
                              */
                             d.setRuleName(
-                                    scoreProjectNameResolver.resolve(
+                                    names.resolve(
                                             record
                                     )
                             );
@@ -572,7 +578,7 @@ public class ScoreStatisticsController {
                             );
 
                             d.setSourceName(
-                                    scoreProjectNameResolver.resolveSourceLabel(record)
+                                    names.resolveSourceLabel(record)
                             );
 
 
