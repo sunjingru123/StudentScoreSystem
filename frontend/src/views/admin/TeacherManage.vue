@@ -396,10 +396,10 @@ async function loadTeacherList() {
   try {
     const res = await getTeacherList()
 
-    if (res.data?.code === 200) {
-      list.value = res.data.data || []
+    if (res?.code === 200) {
+      list.value = res?.data || []
     } else {
-      ElMessage.error(res.data?.message || '获取教师列表失败')
+      ElMessage.error(res?.message || '获取教师列表失败')
     }
 
   } catch (error) {
@@ -418,10 +418,10 @@ async function loadDepartments() {
   try {
     const res = await getTeacherDepartments()
 
-    if (res.data?.code === 200) {
-      departments.value = res.data.data || []
+    if (res?.code === 200) {
+      departments.value = res?.data || []
     } else {
-      ElMessage.error(res.data?.message || '获取部门失败')
+      ElMessage.error(res?.message || '获取部门失败')
     }
 
   } catch (error) {
@@ -515,7 +515,7 @@ async function submitTeacher() {
         })
       }
 
-      if (res.data?.code === 200) {
+      if (res?.code === 200) {
         ElMessage.success(
           isEdit.value ? '教师修改成功' : '教师新增成功'
         )
@@ -523,7 +523,7 @@ async function submitTeacher() {
         dialogVisible.value = false
         await loadTeacherList()
       } else {
-        ElMessage.error(res.data?.message || '操作失败')
+        ElMessage.error(res?.message || '操作失败')
       }
 
     } catch (error) {
@@ -553,11 +553,11 @@ async function disableTeacher(row) {
 
     const res = await apiDisableTeacher(row.id)
 
-    if (res.data?.code === 200) {
+    if (res?.code === 200) {
       ElMessage.success('教师已停用')
       await loadTeacherList()
     } else {
-      ElMessage.error(res.data?.message || '停用失败')
+      ElMessage.error(res?.message || '停用失败')
     }
 
   } catch (error) {
@@ -576,11 +576,11 @@ async function enableTeacher(row) {
   try {
     const res = await apiEnableTeacher(row.id)
 
-    if (res.data?.code === 200) {
+    if (res?.code === 200) {
       ElMessage.success('教师已启用')
       await loadTeacherList()
     } else {
-      ElMessage.error(res.data?.message || '启用失败')
+      ElMessage.error(res?.message || '启用失败')
     }
 
   } catch (error) {
@@ -605,10 +605,10 @@ async function resetPassword(row) {
 
     const res = await resetTeacherPassword(row.id)
 
-    if (res.data?.code === 200) {
+    if (res?.code === 200) {
       ElMessage.success('密码已重置为 123456')
     } else {
-      ElMessage.error(res.data?.message || '重置密码失败')
+      ElMessage.error(res?.message || '重置密码失败')
     }
 
   } catch (error) {

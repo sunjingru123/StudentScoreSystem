@@ -300,7 +300,7 @@ async function load() {
 
 
     const data =
-      res.data.data
+      res.data
 
 
     /*

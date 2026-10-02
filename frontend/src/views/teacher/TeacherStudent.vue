@@ -372,7 +372,7 @@ function loadStudents() {
     .get('/user/student/list')
     .then((res) => {
 
-      const data = res.data.data || []
+      const data = res.data || []
 
       studentList.value = data.map((student) => ({
         ...student,
@@ -406,7 +406,7 @@ async function loadStudentScores() {
     try {
       const res = await request.get(`/scoreStatistics/${student.id}`)
 
-      const data = res.data.data
+      const data = res.data
 
       if (data) {
         student.totalScore = data.totalScore || 0
@@ -514,7 +514,7 @@ function viewScore(student) {
     .get(`/scoreStatistics/${student.id}`)
     .then((res) => {
 
-      scoreData.value = res.data.data || {
+      scoreData.value = res.data || {
         studentName: student.realName,
 
         totalScore: 0,

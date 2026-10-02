@@ -1,19 +1,19 @@
-import axios from 'axios'
+import request from '@/utils/request'
 
-const
-  request = axios.create({
-    // 只需要这一行，注意不要多写
-    baseURL: '/api'
-  })
-
-request.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-
-  if (token) {
-    config.headers.Authorization = 'Bearer ' + token
-  }
-
-  return config
-})
-
+/**
+ * =========================================================
+ * 兼容旧引用
+ *
+ * 历史上 api/ 目录下存在一份独立的 axios 实例
+ * （无超时、无 401 处理、不解包响应）。
+ *
+ * 现已统一收敛到 @/utils/request：
+ *
+ * 1. 15 秒超时；
+ * 2. 401 统一重定向登录并清空本地缓存；
+ * 3. 响应数据结构统一解包（返回后端 Result）。
+ *
+ * 本文件仅作为转发，保留以兼容历史 import。
+ * =========================================================
+ */
 export default request

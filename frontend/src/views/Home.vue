@@ -644,7 +644,7 @@ onMounted(() => {
 
 
       score.value =
-        res.data.data
+        res?.data
 
     })
 
@@ -670,7 +670,7 @@ onMounted(() => {
 
 
       const list =
-        res.data.data || []
+        res?.data || []
 
 
       applyCount.value =

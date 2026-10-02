@@ -1500,7 +1500,7 @@ async function loadPermission() {
 
 
     const data =
-      res.data?.data || {}
+      res?.data || {}
 
 
     permission.departments =
@@ -1658,12 +1658,12 @@ async function loadAuditList() {
 
 
     if (
-      Number(res.data?.code) !== 200
+      Number(res?.code) !== 200
     ) {
 
       throw new Error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '获取待审核申请失败'
       )
 
@@ -1671,7 +1671,7 @@ async function loadAuditList() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     let list =
@@ -1980,12 +1980,12 @@ async function auditApply(
 
 
     if (
-      Number(res.data?.code) !== 200
+      Number(res?.code) !== 200
     ) {
 
       throw new Error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         `部门申报${actionText}失败`
       )
 
@@ -2155,7 +2155,7 @@ async function batchAuditPass() {
 
 
         if (
-          Number(res.data?.code) === 200
+          Number(res?.code) === 200
         ) {
 
           successCount++
@@ -2327,7 +2327,7 @@ async function batchAuditAllPass() {
 
 
         if (
-          Number(res.data?.code) === 200
+          Number(res?.code) === 200
         ) {
 
           successCount++
@@ -2485,12 +2485,12 @@ async function submitDepartment() {
 
 
     if (
-      Number(res.data?.code) !== 200
+      Number(res?.code) !== 200
     ) {
 
       throw new Error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '部门申报提交失败'
       )
 
@@ -2590,12 +2590,12 @@ async function loadMyApply() {
 
 
     if (
-      Number(res.data?.code) !== 200
+      Number(res?.code) !== 200
     ) {
 
       throw new Error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '获取部门申报记录失败'
       )
 
@@ -2603,7 +2603,7 @@ async function loadMyApply() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     let list =

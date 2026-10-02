@@ -525,12 +525,12 @@ async function loadList() {
 
 
     if (
-      res.data?.code !== 200
+      res?.code !== 200
     ) {
 
       ElMessage.error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '获取终审列表失败'
       )
 
@@ -542,7 +542,7 @@ async function loadList() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     if (Array.isArray(data)) {
@@ -745,7 +745,7 @@ async function submitAudit() {
 
 
     if (
-      res.data?.code === 200
+      res?.code === 200
     ) {
 
       ElMessage.success(
@@ -773,8 +773,8 @@ async function submitAudit() {
 
       ElMessage.error(
 
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '终审失败'
 
       )
@@ -934,7 +934,7 @@ async function batchPass() {
 
 
         if (
-          res.data?.code === 200
+          res?.code === 200
         ) {
 
           successCount++
@@ -947,7 +947,7 @@ async function batchPass() {
 
           console.error(
             `申请 ${row.id} 终审失败：`,
-            res.data
+            res
           )
 
         }

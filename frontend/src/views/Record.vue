@@ -97,7 +97,7 @@ function formatScore(row) {
 onMounted(() => {
   request.get('/scoreApply/my').then((res) => {
 
-    list.value = res?.data?.data ?? []
+    list.value = res?.data ?? []
   })
 })
 </script>

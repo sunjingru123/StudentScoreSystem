@@ -646,7 +646,7 @@ async function loadStudents() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     let records = []
@@ -716,14 +716,14 @@ async function loadStudents() {
      */
 
     else if (
-      Array.isArray(res.data)
+      Array.isArray(res?.data)
     ) {
 
       records =
-        res.data
+        res?.data
 
       total =
-        res.data.length
+        res?.data.length
 
     }
 
@@ -825,7 +825,7 @@ async function loadCurrentPageScores() {
 
 
           const data =
-            res.data?.data
+            res?.data
 
 
           /*
@@ -856,7 +856,7 @@ async function loadCurrentPageScores() {
             student.totalScore =
               data
               ??
-              res.data
+              res?.data
               ??
               0
 
@@ -1036,7 +1036,7 @@ async function loadScoreDetail() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     /*
@@ -1155,7 +1155,7 @@ async function refreshCurrentTotal() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     let total =
@@ -1180,7 +1180,7 @@ async function refreshCurrentTotal() {
       total =
         data
         ??
-        res.data
+        res?.data
         ??
         0
 

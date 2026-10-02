@@ -382,7 +382,7 @@ async function loadStudents(
 
 
     const data =
-      res.data.data
+      res.data
 
 
     if (
@@ -471,7 +471,7 @@ async function loadList() {
 
 
     const data =
-      res.data.data
+      res.data
 
 
     /*

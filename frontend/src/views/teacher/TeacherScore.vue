@@ -686,7 +686,6 @@ async function load() {
 
 
         const scoreData =
-          scoreRes?.data?.data ??
           scoreRes?.data ??
           {}
 
@@ -880,7 +879,6 @@ async function viewDetail(row) {
 
 
     const data =
-      res?.data?.data ??
       res?.data ??
       []
 

@@ -556,12 +556,12 @@ async function loadList() {
 
 
     if (
-      res.data?.code !== 200
+      res?.code !== 200
     ) {
 
       ElMessage.error(
-        res.data?.message ||
-        res.data?.msg ||
+        res?.message ||
+        res?.msg ||
         '获取档案失败'
       )
 
@@ -573,7 +573,7 @@ async function loadList() {
 
 
     const data =
-      res.data?.data
+      res?.data
 
 
     if (Array.isArray(data)) {
@@ -722,7 +722,7 @@ async function handleExport() {
 
     const blob =
       new Blob(
-        [res.data],
+        [res.data || res],
         {
           type:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
