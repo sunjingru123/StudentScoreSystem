@@ -9,6 +9,11 @@ import {
   ElMessage
 } from 'element-plus'
 
+import {
+  PUBLIC_PATHS,
+  decideAccess
+} from '@/router/access'
+
 
 // =========================================================
 // 登录
@@ -187,22 +192,6 @@ const router = createRouter({
         },
 
 
-        // ---------------------------------------------------
-        // 学生详情
-        // ---------------------------------------------------
-
-        {
-          path: 'student/:id',
-
-          name: 'StudentDetail',
-
-          component: () =>
-            import(
-              '@/views/admin/StudentDetail.vue'
-              ),
-        },
-
-
         // ===================================================
         // 部门加减分申报
         //
@@ -218,6 +207,15 @@ const router = createRouter({
             import(
               '@/views/student/DepartmentApply.vue'
               ),
+
+          meta: {
+
+            title: '部门加减分申报',
+
+            requiresDepartmentApply: true,
+
+          },
+
         },
 
 
@@ -590,61 +588,71 @@ router.addRoute({
 // 权限与首页
 // =========================================================
 
-// 读取后端真实部门 / 档案部权限。
+const authCache = {
+
+  token: null,
+
+  role: '',
+
+  canDepartmentApply: false,
+
+  departmentLeader: false,
+
+  archiveLeader: false,
+
+  loaded: false,
+
+  pending: null,
+
+  pendingToken: null,
+
+}
+
+
+// 清空登录态与鉴权缓存
+function clearAuth() {
+
+  localStorage.removeItem('user')
+
+  localStorage.removeItem('token')
+
+
+  authCache.token = null
+
+  authCache.role = ''
+
+  authCache.canDepartmentApply = false
+
+  authCache.departmentLeader = false
+
+  authCache.archiveLeader = false
+
+  authCache.loaded = false
+
+}
+
+
+// 读取权威鉴权上下文。
 //
-// localStorage 里的角色可以被人为修改，
-// 所以审核类权限一律以后端返回为准，
-// 不能只信任前端缓存的 user。
-async function loadBackendPermissions() {
+// 角色来自后端 /user/info，
+// 部门 / 档案部权限来自后端 /departmentScoreApply/my-permissions。
+//
+// 同一个 token 只拉取一次：
+//   - 刷新页面后重新拉取；
+//   - 重新登录（token 变化）后自动失效重拉。
+async function loadAuthContext(storedUser) {
 
-  try {
-
-    const res =
-      await request.get(
-        '/departmentScoreApply/my-permissions'
-      )
-
-
-    const data =
-      res?.data || {}
+  const token =
+    localStorage.getItem('token')
 
 
-    const departments =
-      Array.isArray(data.departments)
-        ? data.departments
-        : []
-
+  if (!token) {
 
     return {
 
-      departmentLeader:
-        data.canDepartmentAudit === true ||
-        Number(data.canDepartmentAudit) === 1,
+      role: '',
 
-      archiveLeader:
-        departments.some(
-          department =>
-
-            department &&
-            department.departmentName === '档案部' &&
-            (
-              department.position === '干事' ||
-              department.position === '副部长' ||
-              department.position === '部长'
-            )
-        ),
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      '读取后端权限失败：',
-      error
-    )
-
-
-    return {
+      canDepartmentApply: false,
 
       departmentLeader: false,
 
@@ -654,73 +662,242 @@ async function loadBackendPermissions() {
 
   }
 
-}
 
+  if (authCache.loaded && authCache.token === token) {
 
-// 各角色首页
-function homeForRole(role) {
-
-  if (role === '管理员') {
-
-    return '/admin/adminHome'
+    return authCache
 
   }
 
 
-  if (role === '辅导员') {
+  if (authCache.pending && authCache.pendingToken === token) {
 
-    return '/teacher'
+    return authCache.pending
 
   }
 
 
-  return '/home'
+  const pending =
+    (async () => {
+
+      let role = ''
+
+      let canDepartmentApply = false
+
+      let departmentLeader = false
+
+      let archiveLeader = false
+
+
+      try {
+
+        const infoRes =
+          await request.get('/user/info')
+
+
+        role =
+          infoRes?.data?.role || ''
+
+      } catch (error) {
+
+        console.error(
+          '获取当前用户角色失败：',
+          error
+        )
+
+        role = ''
+
+      }
+
+
+      try {
+
+        const permissionRes =
+          await request.get(
+            '/departmentScoreApply/my-permissions'
+          )
+
+
+        const data =
+          permissionRes?.data || {}
+
+
+        canDepartmentApply =
+          data.canDepartmentApply === true ||
+          Number(data.canDepartmentApply) === 1
+
+
+        departmentLeader =
+          data.canDepartmentAudit === true ||
+          Number(data.canDepartmentAudit) === 1
+
+
+        const departments =
+          Array.isArray(data.departments)
+            ? data.departments
+            : []
+
+
+        archiveLeader =
+          departments.some(
+            department =>
+
+              department &&
+              department.departmentName === '档案部' &&
+              (
+                department.position === '干事' ||
+                department.position === '副部长' ||
+                department.position === '部长'
+              )
+          )
+
+      } catch (error) {
+
+        console.error(
+          '获取部门权限失败：',
+          error
+        )
+
+        departmentLeader = false
+
+        archiveLeader = false
+
+        canDepartmentApply = false
+
+      }
+
+
+      // 后端未返回角色时，回退到登录时写入的本地角色。
+      // 仅作兜底，敏感权限始终以后端返回为准。
+      if (!role) {
+
+        role =
+          storedUser?.role || ''
+
+      }
+
+
+      authCache.token = token
+
+      authCache.role = role
+
+      authCache.canDepartmentApply = canDepartmentApply
+
+      authCache.departmentLeader = departmentLeader
+
+      authCache.archiveLeader = archiveLeader
+
+      authCache.loaded = true
+
+
+      return authCache
+
+    })()
+
+
+  authCache.pending = pending
+
+  authCache.pendingToken = token
+
+
+  try {
+
+    return await pending
+
+  } finally {
+
+    if (authCache.pending === pending) {
+
+      authCache.pending = null
+
+      authCache.pendingToken = null
+
+    }
+
+  }
 
 }
 
 
-// =========================================================
-// 全局路由守卫
-// =========================================================
+// 把判定结果转换为 vue-router 守卫的返回值
+function applyDecision(decision) {
 
-router.beforeEach(async (to) => {
-
-  const userStr =
-    localStorage.getItem('user')
-
-
-  // =======================================================
-  // 登录页
-  // =======================================================
-
-  if (to.path === '/login') {
+  if (decision.action === 'allow') {
 
     return true
 
   }
 
 
-  // =======================================================
-  // 未登录
-  // =======================================================
+  if (decision.action === 'logout') {
 
-  if (!userStr) {
+    clearAuth()
 
-    return '/login'
+    ElMessage.error('登录状态异常，请重新登录')
+
+    return { path: '/login', replace: true }
 
   }
 
 
-  // =======================================================
-  // 解析用户
-  // =======================================================
+  if (decision.warning) {
 
-  let user
+    ElMessage.warning(decision.warning)
+
+  }
+
+
+  return {
+
+    path: decision.path,
+
+    replace: true,
+
+  }
+
+}
+
+
+// =========================================================
+// 全局路由守卫（默认拒绝 + 白名单）
+// =========================================================
+
+router.beforeEach(async (to) => {
+
+  /* ---------- 白名单：登录页 / 404 / 403 ---------- */
+
+  if (PUBLIC_PATHS.includes(to.path)) {
+
+    return true
+
+  }
+
+
+  const token =
+    localStorage.getItem('token')
+
+
+  const userStr =
+    localStorage.getItem('user')
+
+
+  /* ---------- 未登录：直接阻断，不调用后端 ---------- */
+
+  if (!token || !userStr) {
+
+    return { path: '/login', replace: true }
+
+  }
+
+
+  /* ---------- 解析本地用户缓存 ---------- */
+
+  let storedUser
 
 
   try {
 
-    user =
+    storedUser =
       JSON.parse(userStr)
 
   } catch (error) {
@@ -730,350 +907,103 @@ router.beforeEach(async (to) => {
       error
     )
 
-    localStorage.removeItem(
-      'user'
+    clearAuth()
+
+    return { path: '/login', replace: true }
+
+  }
+
+
+  const firstLogin =
+    storedUser.firstLogin === true ||
+    storedUser.firstLogin === 1
+
+
+  /* ---------- 首次登录优先处理（不调用后端） ---------- */
+
+  if (firstLogin) {
+
+    return applyDecision(
+      decideAccess({
+
+        path: to.path,
+
+        role: storedUser.role,
+
+        firstLogin: true,
+
+      })
     )
 
-    localStorage.removeItem(
-      'token'
-    )
+  }
 
-    return '/login'
+
+  /* ---------- 加载权威鉴权上下文（带缓存） ---------- */
+
+  const auth =
+    await loadAuthContext(storedUser)
+
+
+  /* ---------- 收集目标路由的多级敏感标记（to.matched） ---------- */
+
+  const flags = {
+
+    requiresAdminExportPermission:
+      to.matched.some(
+        record =>
+          record.meta?.requiresAdminExportPermission === true
+      ),
+
+    requiresArchiveExportPermission:
+      to.matched.some(
+        record =>
+          record.meta?.requiresArchiveExportPermission === true
+      ),
+
+    requiresDepartmentLeader:
+      to.matched.some(
+        record =>
+          record.meta?.requiresDepartmentLeader === true
+      ),
+
+    requiresDepartmentApply:
+      to.matched.some(
+        record =>
+          record.meta?.requiresDepartmentApply === true
+      ),
+
+    requiresArchiveLeader:
+      to.matched.some(
+        record =>
+          record.meta?.requiresArchiveLeader === true
+      ),
 
   }
 
 
-  // =======================================================
-  // 首次登录强制修改密码
-  // =======================================================
+  const decision =
+    decideAccess({
 
-  if (
-    user.firstLogin === true
-    ||
-    user.firstLogin === 1
-  ) {
+      path: to.path,
 
-    if (
-      to.path === '/change-password'
-    ) {
+      flags,
 
-      return true
+      role: auth.role,
 
-    }
+      permissions: {
 
-    return '/change-password'
+        canDepartmentApply: auth.canDepartmentApply,
 
-  }
+        departmentLeader: auth.departmentLeader,
 
+        archiveLeader: auth.archiveLeader,
 
-  // =======================================================
-  // 已完成首次改密的用户
-  //
-  // 允许管理员、辅导员、学生主动进入修改密码页面。
-  // 否则后面的角色路由判断会把 /change-password
-  // 重定向回各自首页。
-  // =======================================================
+      },
 
-  if (
-    to.path === '/change-password'
-  ) {
+    })
 
-    return true
 
-  }
-
-
-  // =======================================================
-  // 系统角色
-  // =======================================================
-
-  const role =
-    user.role
-
-
-  const rolePrefixMap = {
-
-    学生:
-      '/home',
-
-    管理员:
-      '/admin',
-
-    辅导员:
-      '/teacher',
-
-  }
-
-
-  // =======================================================
-  // 无效角色
-  // =======================================================
-
-  if (
-    !rolePrefixMap[role]
-  ) {
-
-    localStorage.removeItem(
-      'user'
-    )
-
-    localStorage.removeItem(
-      'token'
-    )
-
-    return '/login'
-
-  }
-
-
-  // =======================================================
-  // 管理员导出
-  // =======================================================
-
-  if (
-    to.meta.requiresAdminExportPermission
-  ) {
-
-    if (
-      role === '管理员'
-    ) {
-
-      return true
-
-    }
-
-
-    if (
-      role === '学生'
-    ) {
-
-      return '/home'
-
-    }
-
-
-    if (
-      role === '辅导员'
-    ) {
-
-      return '/teacher'
-
-    }
-
-
-    return '/login'
-
-  }
-
-
-  // =======================================================
-  // 档案部汇总导出
-  // =======================================================
-
-  if (
-    to.meta.requiresArchiveExportPermission
-  ) {
-
-    if (
-      role === '管理员'
-    ) {
-
-      return true
-
-    }
-
-
-    if (
-      role === '学生'
-    ) {
-
-      const permissions =
-        await loadBackendPermissions()
-
-
-      if (
-        permissions.archiveLeader
-      ) {
-
-        return true
-
-      }
-
-
-      ElMessage.warning(
-        '你没有档案部汇总导出权限，无法访问该页面'
-      )
-
-      return '/home'
-
-    }
-
-
-    if (
-      role === '辅导员'
-    ) {
-
-      return '/teacher'
-
-    }
-
-
-    return '/login'
-
-  }
-
-
-  // =======================================================
-  // 部门负责人审核
-  // =======================================================
-
-  if (
-    to.meta.requiresDepartmentLeader
-  ) {
-
-    if (
-      role === '学生'
-    ) {
-
-      const permissions =
-        await loadBackendPermissions()
-
-
-      if (
-        permissions.departmentLeader
-      ) {
-
-        return true
-
-      }
-
-
-      ElMessage.warning(
-        '你不是部门负责人，无法访问部门审核页面'
-      )
-
-      return '/home'
-
-    }
-
-
-    return homeForRole(role)
-
-  }
-
-
-  // =======================================================
-  // 档案部负责人审核
-  // =======================================================
-
-  if (
-    to.meta.requiresArchiveLeader
-  ) {
-
-    if (
-      role === '学生'
-    ) {
-
-      const permissions =
-        await loadBackendPermissions()
-
-
-      if (
-        permissions.archiveLeader
-      ) {
-
-        return true
-
-      }
-
-
-      ElMessage.warning(
-        '你没有档案部证书审核权限，无法访问该页面'
-      )
-
-      return '/home'
-
-    }
-
-
-    return homeForRole(role)
-
-  }
-
-
-  // =======================================================
-  // 管理员
-  // =======================================================
-
-  if (
-    role === '管理员'
-  ) {
-
-    if (
-      !to.path.startsWith(
-        '/admin'
-      )
-    ) {
-
-      return '/admin/adminHome'
-
-    }
-
-
-    return true
-
-  }
-
-
-  // =======================================================
-  // 学生
-  // =======================================================
-
-  if (
-    role === '学生'
-  ) {
-
-    if (
-      !to.path.startsWith(
-        '/home'
-      )
-    ) {
-
-      return '/home'
-
-    }
-
-
-    return true
-
-  }
-
-
-  // =======================================================
-  // 辅导员
-  // =======================================================
-
-  if (
-    role === '辅导员'
-  ) {
-
-    if (
-      !to.path.startsWith(
-        '/teacher'
-      )
-    ) {
-
-      return '/teacher'
-
-    }
-
-
-    return true
-
-  }
-
-
-  return '/login'
+  return applyDecision(decision)
 
 })
 
