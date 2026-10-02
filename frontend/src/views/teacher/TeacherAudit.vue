@@ -310,7 +310,6 @@ function getCurrentTeacher() {
 
     const user = JSON.parse(userStr)
 
-    console.log('当前辅导员：', user)
 
     return user
 
@@ -336,19 +335,12 @@ async function loadList() {
 
   try {
 
-    console.log(
-      '开始获取辅导员最终审核列表'
-    )
 
     const res =
       await request.get(
         '/departmentScoreApply/final-audit/list'
       )
 
-    console.log(
-      '辅导员最终审核完整响应：',
-      res
-    )
 
     /*
      * utils/request 已经把 Axios response 拆掉
@@ -382,10 +374,6 @@ async function loadList() {
 
     selectedRows.value = []
 
-    console.log(
-      '最终审核列表：',
-      list.value
-    )
 
   } catch (error) {
 
@@ -497,10 +485,6 @@ async function pass(row) {
       }
     )
 
-    console.log(
-      '准备最终通过：',
-      row
-    )
 
     /*
      * 这里调用最终审核接口。
@@ -520,10 +504,6 @@ async function pass(row) {
       }
     )
 
-    console.log(
-      '最终审核通过响应：',
-      res
-    )
 
     ElMessage.success(
       '最终审核通过'
@@ -575,10 +555,6 @@ async function reject(row) {
       }
     )
 
-    console.log(
-      '准备最终驳回：',
-      row
-    )
 
     const res = await request.post(
       '/departmentScoreApply/final-audit',
@@ -588,10 +564,6 @@ async function reject(row) {
       }
     )
 
-    console.log(
-      '最终驳回响应：',
-      res
-    )
 
     ElMessage.success(
       '申请已驳回'

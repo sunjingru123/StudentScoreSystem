@@ -3,6 +3,12 @@ import {
   createWebHistory
 } from 'vue-router'
 
+import request from '@/utils/request'
+
+import {
+  ElMessage
+} from 'element-plus'
+
 
 // =========================================================
 // 登录
@@ -581,6 +587,99 @@ router.addRoute({
 
 
 // =========================================================
+// 权限与首页
+// =========================================================
+
+// 读取后端真实部门 / 档案部权限。
+//
+// localStorage 里的角色可以被人为修改，
+// 所以审核类权限一律以后端返回为准，
+// 不能只信任前端缓存的 user。
+async function loadBackendPermissions() {
+
+  try {
+
+    const res =
+      await request.get(
+        '/departmentScoreApply/my-permissions'
+      )
+
+
+    const data =
+      res?.data || {}
+
+
+    const departments =
+      Array.isArray(data.departments)
+        ? data.departments
+        : []
+
+
+    return {
+
+      departmentLeader:
+        data.canDepartmentAudit === true ||
+        Number(data.canDepartmentAudit) === 1,
+
+      archiveLeader:
+        departments.some(
+          department =>
+
+            department &&
+            department.departmentName === '档案部' &&
+            (
+              department.position === '干事' ||
+              department.position === '副部长' ||
+              department.position === '部长'
+            )
+        ),
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      '读取后端权限失败：',
+      error
+    )
+
+
+    return {
+
+      departmentLeader: false,
+
+      archiveLeader: false,
+
+    }
+
+  }
+
+}
+
+
+// 各角色首页
+function homeForRole(role) {
+
+  if (role === '管理员') {
+
+    return '/admin/adminHome'
+
+  }
+
+
+  if (role === '辅导员') {
+
+    return '/teacher'
+
+  }
+
+
+  return '/home'
+
+}
+
+
+// =========================================================
 // 全局路由守卫
 // =========================================================
 
@@ -788,7 +887,24 @@ router.beforeEach(async (to) => {
       role === '学生'
     ) {
 
-      return true
+      const permissions =
+        await loadBackendPermissions()
+
+
+      if (
+        permissions.archiveLeader
+      ) {
+
+        return true
+
+      }
+
+
+      ElMessage.warning(
+        '你没有档案部汇总导出权限，无法访问该页面'
+      )
+
+      return '/home'
 
     }
 
@@ -819,12 +935,29 @@ router.beforeEach(async (to) => {
       role === '学生'
     ) {
 
-      return true
+      const permissions =
+        await loadBackendPermissions()
+
+
+      if (
+        permissions.departmentLeader
+      ) {
+
+        return true
+
+      }
+
+
+      ElMessage.warning(
+        '你不是部门负责人，无法访问部门审核页面'
+      )
+
+      return '/home'
 
     }
 
 
-    return '/home'
+    return homeForRole(role)
 
   }
 
@@ -841,12 +974,29 @@ router.beforeEach(async (to) => {
       role === '学生'
     ) {
 
-      return true
+      const permissions =
+        await loadBackendPermissions()
+
+
+      if (
+        permissions.archiveLeader
+      ) {
+
+        return true
+
+      }
+
+
+      ElMessage.warning(
+        '你没有档案部证书审核权限，无法访问该页面'
+      )
+
+      return '/home'
 
     }
 
 
-    return '/home'
+    return homeForRole(role)
 
   }
 

@@ -117,8 +117,14 @@ jobs:
             # CREATE TABLE / INDEX IF NOT EXISTS + ADD COLUMN IF NOT EXISTS，
             # 可重复执行，会给已存在的表补上缺失字段
             # （例如 score_rule.department_id、score_apply.final_status）。
+            #
+            # --single-transaction 让整个脚本在单一事务里执行：
+            #   1. 任何一步失败时全部回滚，不会留下“半截”结构；
+            #   2. 与脚本内的幂等写法（IF NOT EXISTS / DO 守卫）配合，
+            #      重复部署不会重复改结构，也不会丢失历史数据。
+            # 脚本内已不再包含 BEGIN/COMMIT，避免提前提交破坏原子性。
             if ! docker exec -i -e PGPASSWORD="${DB_PASSWORD}" student-score-postgres \
-                 psql -U "${DB_USER}" -d student_score_system -v ON_ERROR_STOP=1 \
+                 psql -U "${DB_USER}" -d student_score_system -v ON_ERROR_STOP=1 --single-transaction \
                  < sql/02_create_table.sql; then
 
               echo "数据库表结构脚本执行失败，已中止部署"

@@ -643,10 +643,6 @@ async function loadStudents() {
       )
 
 
-    console.log(
-      '学生列表原始返回：',
-      res
-    )
 
 
     const data =
@@ -1037,10 +1033,6 @@ async function loadScoreDetail() {
       )
 
 
-    console.log(
-      '成绩明细原始返回：',
-      res
-    )
 
 
     const data =

@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.StudentAddDTO;
 import com.student.studentscoresystem.entity.SysPosition;
@@ -894,6 +895,7 @@ public class SysUserController {
      * =========================================================
      */
     @PutMapping("/student/disable/{id}")
+    @RequireRole("管理员")
     public Result<Void> disableStudent(
             @PathVariable Long id
     ) {
@@ -935,6 +937,7 @@ public class SysUserController {
      * =========================================================
      */
     @PutMapping("/student/enable/{id}")
+    @RequireRole("管理员")
     public Result<Void> enableStudent(
             @PathVariable Long id
     ) {
@@ -977,6 +980,7 @@ public class SysUserController {
      * =========================================================
      */
     @PostMapping("/student/add")
+    @RequireRole("管理员")
     public Result<Void> addStudent(
             @RequestBody StudentAddDTO dto
     ) {

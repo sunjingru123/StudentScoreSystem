@@ -468,10 +468,6 @@ async function loadList() {
       )
 
 
-    console.log(
-      '成绩调整分页数据：',
-      res
-    )
 
 
     const data =

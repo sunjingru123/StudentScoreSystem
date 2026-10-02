@@ -432,10 +432,6 @@ async function importStudents() {
         }
       )
 
-    console.log(
-      '学生 Excel 导入结果：',
-      res
-    )
 
     /*
      * 正确：
@@ -562,10 +558,6 @@ async function importDepartmentMembers() {
         }
       )
 
-    console.log(
-      '部门成员 Excel 导入结果：',
-      res
-    )
 
     /*
      * 这里必须使用 res.code，

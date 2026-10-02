@@ -297,10 +297,6 @@ async function load() {
       )
 
 
-    console.log(
-      '加分申请分页数据：',
-      res
-    )
 
 
     const data =

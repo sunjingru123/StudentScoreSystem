@@ -371,7 +371,6 @@ function loadStudents() {
   request
     .get('/user/student/list')
     .then((res) => {
-      console.log('学生列表返回：', res)
 
       const data = res.data.data || []
 
@@ -415,7 +414,6 @@ async function loadStudentScores() {
         student.scoreLoaded = true
       }
     } catch (error) {
-      console.log(`学生 ${student.id} 成绩获取失败`, error)
 
       student.scoreLoaded = false
     }
@@ -515,7 +513,6 @@ function viewScore(student) {
   request
     .get(`/scoreStatistics/${student.id}`)
     .then((res) => {
-      console.log('学生成绩：', res)
 
       scoreData.value = res.data.data || {
         studentName: student.realName,

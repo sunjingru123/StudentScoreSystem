@@ -346,7 +346,6 @@ async function loadScore() {
   try {
     const res = await getScore(studentId)
 
-    console.log('成绩统计接口返回：', res)
 
     /*
      * 你的 Result 一般结构：

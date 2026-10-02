@@ -554,10 +554,6 @@ function loadTeacher() {
       JSON.parse(userStr)
 
 
-    console.log(
-      '当前辅导员：',
-      user
-    )
 
 
     teacherName.value =
@@ -593,10 +589,6 @@ async function loadPending() {
         '/departmentScoreApply/final-audit/list'
       )
 
-    console.log(
-      '辅导员最终审核完整响应：',
-      res
-    )
 
     /*
      * utils/request 已经返回后端 Result
@@ -735,10 +727,6 @@ async function loadStudentCount() {
       )
 
 
-    console.log(
-      '首页学生人数响应：',
-      res
-    )
 
 
     const responseData =
@@ -782,10 +770,6 @@ async function loadStudentCount() {
       studentCount.value =
         Number(pageData.total) || 0
 
-      console.log(
-        '首页当前管理学生人数：',
-        studentCount.value
-      )
 
       return
 

@@ -733,10 +733,6 @@ function beforeUpload(
   file
 ) {
 
-  console.log(
-    '准备上传文件：',
-    file
-  )
 
 
   /*
@@ -826,23 +822,9 @@ function handleUploadSuccess(
   uploadFile
 ) {
 
-  console.log(
-    '================================='
-  )
 
-  console.log(
-    '服务器上传成功返回：',
-    response
-  )
 
-  console.log(
-    '上传文件对象：',
-    uploadFile
-  )
 
-  console.log(
-    '================================='
-  )
 
 
   /*
@@ -1202,10 +1184,6 @@ async function submitApply() {
       }
 
 
-    console.log(
-      '个人证书申报数据：',
-      data
-    )
 
 
     /*
@@ -1220,10 +1198,6 @@ async function submitApply() {
       )
 
 
-    console.log(
-      '个人证书申报接口返回：',
-      res
-    )
 
 
     /*

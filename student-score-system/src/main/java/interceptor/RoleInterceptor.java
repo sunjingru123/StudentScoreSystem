@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.List;
+
 
 @Component
 public class RoleInterceptor implements HandlerInterceptor {
@@ -177,10 +179,14 @@ public class RoleInterceptor implements HandlerInterceptor {
 
 
         // ==================================
-        // 8. 查询用户岗位
+        // 8. 查询用户全部岗位
+        //
+        // 注意：同一用户可能同时拥有多个岗位
+        // （例如「学生」+「部长」），
+        // 所以不能使用 selectOne，否则会抛异常。
         // ==================================
-        SysUserPosition userPosition =
-                sysUserPositionMapper.selectOne(
+        List<SysUserPosition> userPositions =
+                sysUserPositionMapper.selectList(
                         new LambdaQueryWrapper<SysUserPosition>()
                                 .eq(
                                         SysUserPosition::getUserId,
@@ -189,7 +195,8 @@ public class RoleInterceptor implements HandlerInterceptor {
                 );
 
 
-        if (userPosition == null) {
+        if (userPositions == null
+                || userPositions.isEmpty()) {
 
             response.setStatus(403);
 
@@ -207,37 +214,64 @@ public class RoleInterceptor implements HandlerInterceptor {
 
 
         // ==================================
-        // 9. 查询岗位
+        // 9. 逐个岗位判断是否命中要求
         // ==================================
-        SysPosition position =
-                sysPositionMapper.selectById(
-                        userPosition.getPositionId()
-                );
+        boolean allowed = false;
+
+        for (
+                SysUserPosition userPosition
+                : userPositions
+        ) {
+
+            if (userPosition == null
+                    || userPosition.getPositionId() == null) {
+
+                continue;
+
+            }
+
+            SysPosition position =
+                    sysPositionMapper.selectById(
+                            userPosition.getPositionId()
+                    );
 
 
-        if (position == null) {
+            if (position == null
+                    || position.getName() == null) {
 
-            response.setStatus(403);
+                continue;
 
-            response.setContentType(
-                    "application/json;charset=UTF-8"
-            );
+            }
 
-            response.getWriter().write(
-                    "{\"message\":\"岗位不存在\"}"
-            );
+            for (
+                    String requiredRole
+                    : requireRole.value()
+            ) {
 
-            return false;
+                if (position.getName()
+                        .equals(requiredRole)) {
+
+                    allowed = true;
+
+                    break;
+
+                }
+
+            }
+
+            if (allowed) {
+
+                break;
+
+            }
 
         }
 
 
         // ==================================
-        // 10. 判断岗位权限
+        // 10. 没有命中任何要求岗位
         // ==================================
-        if (!position.getName()
-                .equals(requireRole.value())) {
-
+        if (!allowed) {
 
             response.setStatus(403);
 

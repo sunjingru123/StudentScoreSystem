@@ -538,11 +538,7 @@ const tableRef = ref(null)
 
 async function loadList() {
 
-  console.log('====================================')
 
-  console.log(
-    '开始加载部门加减分最终审核列表'
-  )
 
   loading.value = true
 
@@ -554,16 +550,8 @@ async function loadList() {
       )
 
 
-    console.log(
-      '最终审核接口完整响应：',
-      res
-    )
 
 
-    console.log(
-      '最终审核接口业务数据：',
-      res?.data
-    )
 
 
     const result = res
@@ -652,17 +640,8 @@ async function loadList() {
     }
 
 
-    console.log(
-      '最终审核列表：',
-      list.value
-    )
 
-    console.log(
-      '待最终审核数量：',
-      list.value.length
-    )
 
-    console.log('====================================')
 
   }
 
@@ -792,10 +771,6 @@ function handleSelectionChange(rows) {
     rows || []
 
 
-  console.log(
-    '当前选择：',
-    selectedRows.value
-  )
 
 }
 
@@ -846,19 +821,7 @@ async function finalAuditRequest(
   }
 
 
-  console.log(
-    '===================================='
-  )
 
-  console.log(
-    '开始最终审核：',
-    {
-      id: row.id,
-      studentName: row.studentName,
-      departmentName: row.departmentName,
-      status
-    }
-  )
 
 
   const res =
@@ -874,10 +837,6 @@ async function finalAuditRequest(
     )
 
 
-  console.log(
-    `申请 ${row.id} 最终审核响应：`,
-    res
-  )
 
 
   const result =
@@ -1174,18 +1133,8 @@ async function batchPass() {
     []
 
 
-  console.log(
-    '===================================='
-  )
 
-  console.log(
-    '开始一键最终审核'
-  )
 
-  console.log(
-    '选中的申请：',
-    rows
-  )
 
 
   /*
@@ -1362,14 +1311,6 @@ async function batchPass() {
      * =====================================================
      */
 
-    console.log(
-      '批量审核完成',
-      {
-        successCount,
-        failCount,
-        failedRows
-      }
-    )
 
 
     if (

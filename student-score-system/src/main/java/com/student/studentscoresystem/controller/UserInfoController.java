@@ -2,11 +2,13 @@ package com.student.studentscoresystem.controller;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.service.ISysUserService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.LoginVO;
+import com.student.studentscoresystem.vo.StudentVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +46,8 @@ public class UserInfoController {
 
 
     @GetMapping("/student-list")
-    public Result<?> studentList(HttpServletRequest request) {
+    @RequireRole("管理员")
+    public Result<List<StudentVO>> studentList(HttpServletRequest request) {
 
         String token = request.getHeader("Authorization");
 
@@ -77,7 +80,8 @@ public class UserInfoController {
                                     )
                     );
 
-            List<SysUser> students = new java.util.ArrayList<>();
+            List<StudentVO> students =
+                    new java.util.ArrayList<>();
 
             for (SysUserPosition relation : relations) {
 
@@ -88,7 +92,9 @@ public class UserInfoController {
                         && student.getStatus() != null
                         && student.getStatus() == 1) {
 
-                    students.add(student);
+                    students.add(
+                            toStudentVO(student)
+                    );
                 }
             }
 
@@ -97,6 +103,49 @@ public class UserInfoController {
         } catch (Exception e) {
             return Result.fail("Token无效");
         }
+    }
+
+
+    /**
+     * 将 SysUser 转换为安全的 StudentVO，
+     * 避免把密码等敏感字段返回给前端。
+     */
+    private StudentVO toStudentVO(
+            SysUser user
+    ) {
+
+        StudentVO vo =
+                new StudentVO();
+
+        vo.setId(
+                user.getId()
+        );
+
+        vo.setStudentNo(
+                user.getStudentNo()
+        );
+
+        vo.setUsername(
+                user.getUsername()
+        );
+
+        vo.setRealName(
+                user.getRealName()
+        );
+
+        vo.setPhone(
+                user.getPhone()
+        );
+
+        vo.setClassName(
+                user.getClassName()
+        );
+
+        vo.setStatus(
+                user.getStatus()
+        );
+
+        return vo;
     }
     @GetMapping("/info")
     public Result<LoginVO> info(

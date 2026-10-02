@@ -351,10 +351,6 @@ function loadTeacher() {
       JSON.parse(userStr)
 
 
-    console.log(
-      '当前辅导员：',
-      user
-    )
 
 
     teacherName.value =

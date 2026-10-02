@@ -96,7 +96,6 @@ function formatScore(row) {
 
 onMounted(() => {
   request.get('/scoreApply/my').then((res) => {
-    console.log('我的申请记录：', res)
 
     list.value = res?.data?.data ?? []
   })

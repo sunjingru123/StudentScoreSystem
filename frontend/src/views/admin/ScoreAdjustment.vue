@@ -477,10 +477,6 @@ async function loadStudents() {
       )
 
 
-    console.log(
-      '管理员成绩调整：学生列表返回：',
-      res
-    )
 
 
     /*
@@ -591,10 +587,6 @@ async function loadList() {
       )
 
 
-    console.log(
-      '管理员成绩调整记录：',
-      res
-    )
 
 
     /*
@@ -783,10 +775,6 @@ async function submit() {
       )
 
 
-    console.log(
-      '成绩调整返回：',
-      res
-    )
 
 
     if (

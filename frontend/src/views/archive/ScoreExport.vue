@@ -130,17 +130,12 @@ const loadSemesters = async () => {
 
   try {
 
-    console.log('========== 开始获取学期 ==========')
 
     const res =
       await request.get(
         '/scoreExport/semesters'
       )
 
-    console.log(
-      '获取学期原始返回：',
-      res
-    )
 
 
     /*
@@ -167,10 +162,6 @@ const loadSemesters = async () => {
         : res
 
 
-    console.log(
-      '解析后的返回：',
-      result
-    )
 
 
     if (
@@ -181,10 +172,6 @@ const loadSemesters = async () => {
       semesters.value =
         result.data || []
 
-      console.log(
-        '学期列表：',
-        semesters.value
-      )
 
 
       if (
@@ -275,13 +262,6 @@ const handleExport = async () => {
 
   try {
 
-    console.log(
-      '开始导出：',
-      {
-        semesterId: form.semesterId,
-        className: form.className.trim()
-      }
-    )
 
 
     const response =

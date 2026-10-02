@@ -2157,10 +2157,6 @@ async function loadPermission() {
         '/departmentScoreApply/my-permissions',
       )
 
-    console.log(
-      '部门权限：',
-      res
-    )
 
     /*
      * @/utils/request 已经返回后端 Result
@@ -2218,19 +2214,6 @@ async function loadPermission() {
       data.canDepartmentAudit === true ||
       Number(data.canDepartmentAudit) === 1
 
-    console.log(
-      '最终部门权限：',
-      {
-        departments:
-        permission.departments,
-
-        canDepartmentApply:
-        permission.canDepartmentApply,
-
-        canDepartmentAudit:
-        permission.canDepartmentAudit
-      }
-    )
 
 
     /*
@@ -2320,9 +2303,6 @@ async function loadStudentList() {
 
   try {
 
-    console.log(
-      '开始获取全部学生列表'
-    )
 
 
     const allStudents = []
@@ -2348,9 +2328,6 @@ async function loadStudentList() {
 
     while (true) {
 
-      console.log(
-        `正在获取学生第 ${pageNum} 页`
-      )
 
 
       const res =
@@ -2369,10 +2346,6 @@ async function loadStudentList() {
         )
 
 
-      console.log(
-        `第 ${pageNum} 页学生列表响应：`,
-        res
-      )
 
 
       const responseData =
@@ -2417,10 +2390,6 @@ async function loadStudentList() {
       }
 
 
-      console.log(
-        `第 ${pageNum} 页学生数量：`,
-        records.length
-      )
 
 
       /*
@@ -2588,28 +2557,10 @@ async function loadStudentList() {
     /* 输出最终结果 */
     /* ================================================== */
 
-    console.log(
-      '================================'
-    )
 
-    console.log(
-      '学生总数：',
-      students.length
-    )
 
-    console.log(
-      '最终可申报学生数量：',
-      studentList.value.length
-    )
 
-    console.log(
-      '最终可申报学生：',
-      studentList.value
-    )
 
-    console.log(
-      '================================'
-    )
 
 
     /* ================================================== */
@@ -2633,10 +2584,6 @@ async function loadStudentList() {
       )
 
 
-    console.log(
-      '检查孙靖茹：',
-      target
-    )
 
   }
 
@@ -3790,14 +3737,7 @@ async function submitOneStudent(studentId) {
     }
 
 
-    console.log(
-      '========== 提交部门申报 =========='
-    )
 
-    console.log(
-      '提交数据：',
-      data
-    )
 
 
     const res =
@@ -3807,10 +3747,6 @@ async function submitOneStudent(studentId) {
       )
 
 
-    console.log(
-      '部门申报接口响应：',
-      res
-    )
 
 
     const responseData =

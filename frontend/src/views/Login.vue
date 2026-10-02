@@ -149,19 +149,28 @@ const handleLogin =
 
       // =====================================================
       // 保存用户信息
+      //
+      // token 单独存放，user 中不再保留 token，
+      // 避免完整登录响应（含凭据）被整体写入 localStorage。
       // =====================================================
+
+      const {
+        token,
+        ...safeUser
+      } = user
+
 
       localStorage.setItem(
         'user',
-        JSON.stringify(user)
+        JSON.stringify(safeUser)
       )
 
 
-      if (user.token) {
+      if (token) {
 
         localStorage.setItem(
           'token',
-          user.token
+          token
         )
       }
 

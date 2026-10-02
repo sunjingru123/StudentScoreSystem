@@ -560,10 +560,6 @@ function handleArchiveExport(
   department
 ) {
 
-  console.log(
-    '进入档案部加减分汇总导出:',
-    department
-  )
 
 
   router.push({
@@ -625,10 +621,6 @@ onMounted(() => {
 
 
 
-  console.log(
-    '当前登录用户:',
-    user
-  )
 
 
 
@@ -640,10 +632,6 @@ onMounted(() => {
     user?.departments || []
 
 
-  console.log(
-    '当前用户部门:',
-    departments.value
-  )
 
 
 
@@ -654,10 +642,6 @@ onMounted(() => {
   getScore(user.id)
     .then((res) => {
 
-      console.log(
-        '成绩返回:',
-        res
-      )
 
       score.value =
         res.data.data
@@ -683,10 +667,6 @@ onMounted(() => {
     .get('/scoreApply/my')
     .then((res) => {
 
-      console.log(
-        '我的申请记录:',
-        res
-      )
 
 
       const list =

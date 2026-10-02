@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRecordOperationLog;
@@ -48,6 +49,7 @@ public class ScoreRecordAdminController {
      * 0 = 作废
      */
     @GetMapping("/student/{studentId}")
+    @RequireRole("管理员")
     public Result<List<ScoreRecord>> studentRecords(
             @PathVariable Long studentId
     ) {
@@ -79,6 +81,7 @@ public class ScoreRecordAdminController {
      * 作废成绩
      */
     @PutMapping("/void/{id}")
+    @RequireRole("管理员")
     public Result<Void> voidRecord(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,
@@ -141,6 +144,7 @@ public class ScoreRecordAdminController {
      * 恢复成绩
      */
     @PutMapping("/restore/{id}")
+    @RequireRole("管理员")
     public Result<Void> restoreRecord(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,
@@ -203,6 +207,7 @@ public class ScoreRecordAdminController {
      * 查询某条成绩的操作记录
      */
     @GetMapping("/logs/{id}")
+    @RequireRole("管理员")
     public Result<List<ScoreRecordOperationLog>> logs(
             @PathVariable Long id
     ) {

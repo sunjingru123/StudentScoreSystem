@@ -428,10 +428,6 @@ function loadUser() {
       JSON.parse(userStr)
 
 
-    console.log(
-      '当前学生用户：',
-      user
-    )
 
 
     userName.value =
@@ -469,14 +465,7 @@ async function loadPermission() {
       )
 
 
-    console.log(
-      '========== MainLayout 部门权限 =========='
-    )
 
-    console.log(
-      '部门权限响应：',
-      res
-    )
 
 
     /*
@@ -536,15 +525,7 @@ async function loadPermission() {
       )
 
 
-    console.log(
-      'MainLayout 部门审核权限：',
-      departmentLeader.value
-    )
 
-    console.log(
-      'MainLayout 档案部负责人权限：',
-      archiveLeader.value
-    )
 
 
   }

@@ -9,7 +9,10 @@ import java.lang.annotation.*;
 public @interface RequireRole {
 
 
-    String value();
+    /**
+     * 允许访问的岗位名称，命中任意一个即可通过。
+     */
+    String[] value();
 
 
 }

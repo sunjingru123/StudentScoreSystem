@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -49,7 +50,10 @@ public class SysUser implements Serializable {
 
     /**
      * BCrypt 加密后的密码
+     *
+     * 该字段禁止通过 JSON 序列化返回前端，防止敏感信息泄露。
      */
+    @JsonIgnore
     private String password;
 
     /**

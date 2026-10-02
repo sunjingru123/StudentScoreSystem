@@ -8,15 +8,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.*;
 import com.student.studentscoresystem.mapper.*;
+import com.student.studentscoresystem.service.CertificateScoreFinalizeService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ScoreApplyVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +37,7 @@ public class ScoreApplyController {
 
     private final DepartmentMapper departmentMapper;
 
-    private final ScoreRecordMapper scoreRecordMapper;
-
-    private final SysSemesterMapper sysSemesterMapper;
+    private final CertificateScoreFinalizeService certificateScoreFinalizeService;
 
     public ScoreApplyController(
             ScoreApplyMapper scoreApplyMapper,
@@ -48,8 +46,7 @@ public class ScoreApplyController {
             ObjectMapper objectMapper,
             SysUserDepartmentMapper userDepartmentMapper,
             DepartmentMapper departmentMapper,
-            ScoreRecordMapper scoreRecordMapper,
-            SysSemesterMapper sysSemesterMapper
+            CertificateScoreFinalizeService certificateScoreFinalizeService
     ) {
 
         this.scoreApplyMapper =
@@ -70,11 +67,8 @@ public class ScoreApplyController {
         this.departmentMapper =
                 departmentMapper;
 
-        this.scoreRecordMapper =
-                scoreRecordMapper;
-
-        this.sysSemesterMapper =
-                sysSemesterMapper;
+        this.certificateScoreFinalizeService =
+                certificateScoreFinalizeService;
     }
 
     /**
@@ -1702,7 +1696,6 @@ public class ScoreApplyController {
      * ========================================================
      */
     @PostMapping("/final-audit")
-    @Transactional
     public Result<Void> finalAudit(
             @RequestBody AuditRequest request,
             HttpServletRequest httpRequest
@@ -1908,185 +1901,47 @@ public class ScoreApplyController {
 
         /*
          * =====================================================
-         * 查询当前学期
+         * 终审通过
+         *
+         * 正式成绩生成已下沉到 Service，
+         * 在同一个事务内完成：
+         * 学期校验 + 重复守卫 + ScoreRecord + ScoreFlow + 申请状态。
          * =====================================================
          */
 
-        LocalDate today =
-                LocalDate.now();
+        try {
 
-        SysSemester semester =
-                sysSemesterMapper.selectOne(
-                        new LambdaQueryWrapper<SysSemester>()
-                                .le(
-                                        SysSemester::getStartDate,
-                                        today
-                                )
-                                .ge(
-                                        SysSemester::getEndDate,
-                                        today
-                                )
-                                .eq(
-                                        SysSemester::getStatus,
-                                        (short) 1
-                                )
-                                .orderByDesc(
-                                        SysSemester::getStartDate
-                                )
-                                .last(
-                                        "LIMIT 1"
-                                )
+            String message =
+                    certificateScoreFinalizeService
+                            .finalizeApproval(
+                                    apply,
+                                    reviewerId
+                            );
+
+            if (message != null) {
+
+                return Result.error(
+                        message
                 );
+            }
 
-        if (
-                semester == null
-        ) {
-
-            return Result.error(
-                    "当前没有正在进行的学期，无法生成正式成绩记录"
+            return Result.success(
+                    null
             );
-        }
 
-        /*
-         * =====================================================
-         * 防止重复生成 ScoreRecord
-         * =====================================================
-         */
+        } catch (DuplicateKeyException e) {
 
-        Long existCount =
-                scoreRecordMapper.selectCount(
-                        new LambdaQueryWrapper<ScoreRecord>()
-                                .eq(
-                                        ScoreRecord::getSourceType,
-                                        "CERTIFICATE"
-                                )
-                                .eq(
-                                        ScoreRecord::getSourceId,
-                                        apply.getId()
-                                )
-                );
-
-        if (
-                existCount != null
-                        &&
-                        existCount > 0
-        ) {
-
+            /*
+             * 并发场景：
+             *
+             * 另一个请求已经为同一申请生成成绩记录，
+             * 唯一索引 uk_score_record_source 拦截了重复写入，
+             * 事务整体回滚，这里做幂等提示。
+             */
             return Result.error(
                     "该证书已经生成正式成绩记录，不能重复审批"
             );
         }
-
-        /*
-         * =====================================================
-         * 创建正式成绩记录
-         * =====================================================
-         */
-
-        ScoreRecord record =
-                new ScoreRecord();
-
-        record.setStudentId(
-                apply.getStudentId()
-        );
-
-        /*
-         * 个人证书暂时没有 ruleId
-         */
-        record.setRuleId(
-                apply.getRuleId()
-        );
-
-        record.setScore(
-                apply.getApplyScore()
-        );
-
-        record.setSemesterId(
-                semester.getId()
-        );
-
-        /*
-         * 来源类型
-         */
-        record.setSourceType(
-                "CERTIFICATE"
-        );
-
-        /*
-         * 来源申请ID
-         */
-        record.setSourceId(
-                apply.getId()
-        );
-
-        /*
-         * 正常
-         */
-        record.setStatus(
-                (short) 1
-        );
-
-        /*
-         * 管理员未隐藏
-         */
-        record.setAdminHidden(
-                (short) 0
-        );
-
-        record.setCreateTime(
-                LocalDateTime.now()
-        );
-
-        int insertResult =
-                scoreRecordMapper.insert(
-                        record
-                );
-
-        if (
-                insertResult <= 0
-        ) {
-
-            return Result.error(
-                    "正式成绩生成失败"
-            );
-        }
-
-        /*
-         * =====================================================
-         * 更新申请最终状态
-         * =====================================================
-         */
-
-        apply.setFinalStatus(
-                (short) 1
-        );
-
-        apply.setFinalReviewerId(
-                reviewerId
-        );
-
-        apply.setFinalReviewTime(
-                LocalDateTime.now()
-        );
-
-        /*
-         * 1 = 整个证书审核完成
-         */
-        apply.setStatus(
-                (short) 1
-        );
-
-        apply.setUpdateTime(
-                LocalDateTime.now()
-        );
-
-        scoreApplyMapper.updateById(
-                apply
-        );
-
-        return Result.success(
-                null
-        );
     }
 
     /**

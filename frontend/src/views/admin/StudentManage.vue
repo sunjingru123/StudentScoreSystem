@@ -688,20 +688,12 @@ async function loadStudents() {
       )
 
 
-    console.log(
-      '学生列表原始返回：',
-      res,
-    )
 
 
     const data =
       unwrapResult(res)
 
 
-    console.log(
-      '解析后的学生列表：',
-      data,
-    )
 
 
     /*
@@ -1071,20 +1063,12 @@ async function loadScoreDetail() {
       )
 
 
-    console.log(
-      '学生成绩明细原始返回：',
-      res,
-    )
 
 
     const data =
       unwrapResult(res)
 
 
-    console.log(
-      '解析后的学生成绩明细：',
-      data,
-    )
 
 
     /*

@@ -502,9 +502,6 @@ async function loadList() {
 
   try {
 
-    console.log(
-      '开始加载辅导员终审列表'
-    )
 
 
     /*
@@ -525,10 +522,6 @@ async function loadList() {
       )
 
 
-    console.log(
-      '终审列表响应：',
-      res
-    )
 
 
     if (
@@ -585,10 +578,6 @@ async function loadList() {
     }
 
 
-    console.log(
-      '当前待终审数据：',
-      list.value
-    )
 
   }
 
@@ -753,10 +742,6 @@ async function submitAudit() {
       )
 
 
-    console.log(
-      '终审响应：',
-      res
-    )
 
 
     if (
@@ -931,9 +916,6 @@ async function batchPass() {
 
       try {
 
-        console.log(
-          `开始终审申请：${row.id}`
-        )
 
 
         const res =
@@ -949,10 +931,6 @@ async function batchPass() {
           )
 
 
-        console.log(
-          `申请 ${row.id} 终审结果：`,
-          res
-        )
 
 
         if (

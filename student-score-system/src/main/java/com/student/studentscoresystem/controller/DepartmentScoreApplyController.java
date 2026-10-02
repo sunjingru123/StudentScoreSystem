@@ -8,22 +8,18 @@ import com.student.studentscoresystem.dto.DepartmentScoreFinalAuditDTO;
 import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.DepartmentScoreApply;
 import com.student.studentscoresystem.entity.DepartmentScoreTemplate;
-import com.student.studentscoresystem.entity.ScoreRecord;
-import com.student.studentscoresystem.entity.ScoreRule;
-import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
-import com.student.studentscoresystem.mapper.ScoreRecordMapper;
-import com.student.studentscoresystem.mapper.ScoreRuleMapper;
-import com.student.studentscoresystem.mapper.SysSemesterMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,26 +42,20 @@ public class DepartmentScoreApplyController {
 
     private final SysUserDepartmentMapper userDepartmentMapper;
 
-    private final ScoreRecordMapper scoreRecordMapper;
-
-    private final ScoreRuleMapper scoreRuleMapper;
-
     private final DepartmentMapper departmentMapper;
 
     private final SysUserMapper sysUserMapper;
 
-    private final SysSemesterMapper sysSemesterMapper;
+    private final DepartmentScoreFinalizeService departmentScoreFinalizeService;
 
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
             IDepartmentScoreTemplateService templateService,
             SysUserDepartmentMapper userDepartmentMapper,
-            ScoreRecordMapper scoreRecordMapper,
-            ScoreRuleMapper scoreRuleMapper,
             DepartmentMapper departmentMapper,
             SysUserMapper sysUserMapper,
-            SysSemesterMapper sysSemesterMapper) {
+            DepartmentScoreFinalizeService departmentScoreFinalizeService) {
 
         this.applyService = applyService;
 
@@ -74,20 +64,14 @@ public class DepartmentScoreApplyController {
         this.userDepartmentMapper =
                 userDepartmentMapper;
 
-        this.scoreRecordMapper =
-                scoreRecordMapper;
-
-        this.scoreRuleMapper =
-                scoreRuleMapper;
-
         this.departmentMapper =
                 departmentMapper;
 
         this.sysUserMapper =
                 sysUserMapper;
 
-        this.sysSemesterMapper =
-                sysSemesterMapper;
+        this.departmentScoreFinalizeService =
+                departmentScoreFinalizeService;
     }
 
 
@@ -195,45 +179,7 @@ public class DepartmentScoreApplyController {
     }
 
 
-    /*
-     * =========================================================
-     * 查询当前正在进行的学期
-     * =========================================================
-     */
-    private SysSemester getCurrentSemester() {
 
-        LocalDate today =
-                LocalDate.now();
-
-
-        return sysSemesterMapper.selectOne(
-
-                new LambdaQueryWrapper<SysSemester>()
-
-                        .le(
-                                SysSemester::getStartDate,
-                                today
-                        )
-
-                        .ge(
-                                SysSemester::getEndDate,
-                                today
-                        )
-
-                        .eq(
-                                SysSemester::getStatus,
-                                (short) 1
-                        )
-
-                        .orderByDesc(
-                                SysSemester::getStartDate
-                        )
-
-                        .last(
-                                "LIMIT 1"
-                        )
-        );
-    }
 
 
     /*
@@ -2182,7 +2128,6 @@ public class DepartmentScoreApplyController {
      * 辅导员终审
      * =========================================================
      */
-    @Transactional
     @PutMapping("/final-audit/{id}")
     public Result<Void> finalAudit(
             @PathVariable Long id,
@@ -2298,53 +2243,55 @@ public class DepartmentScoreApplyController {
         }
 
 
-        LocalDateTime now =
-                LocalDateTime.now();
-
-
-        apply.setFinalStatus(
-                finalStatus
-        );
-
-
-        apply.setFinalReviewerId(
-                currentUserId
-        );
-
-
-        apply.setFinalReviewRemark(
-                dto.getReviewRemark()
-        );
-
-
-        apply.setFinalReviewTime(
-                now
-        );
-
-
-        apply.setUpdateTime(
-                now
-        );
-
-
-        boolean updated =
-                applyService.updateById(
-                        apply
-                );
-
-
-        if (!updated) {
-
-            throw new IllegalArgumentException(
-                    "终审状态更新失败"
-            );
-        }
-
-
         /*
+         * =====================================================
          * 终审驳回
+         * =====================================================
          */
         if (finalStatus == 2) {
+
+            LocalDateTime now =
+                    LocalDateTime.now();
+
+
+            apply.setFinalStatus(
+                    (short) 2
+            );
+
+
+            apply.setFinalReviewerId(
+                    currentUserId
+            );
+
+
+            apply.setFinalReviewRemark(
+                    dto.getReviewRemark()
+            );
+
+
+            apply.setFinalReviewTime(
+                    now
+            );
+
+
+            apply.setUpdateTime(
+                    now
+            );
+
+
+            boolean updated =
+                    applyService.updateById(
+                            apply
+                    );
+
+
+            if (!updated) {
+
+                return Result.fail(
+                        "终审状态更新失败"
+                );
+            }
+
 
             System.out.println(
                     "========== 部门加减分终审驳回 =========="
@@ -2385,337 +2332,47 @@ public class DepartmentScoreApplyController {
          * =====================================================
          * 终审通过
          *
-         * 生成正式成绩
+         * 正式成绩生成已下沉到 Service，
+         * 在同一个事务内完成：
+         * 重复守卫 + 分值校验 + 学期校验 + 规则匹配 +
+         * ScoreRecord + 申报状态。
          * =====================================================
          */
-        if (finalStatus == 1) {
 
+        try {
 
-            /*
-             * 防止重复生成
-             */
-            Long recordCount =
+            String message =
+                    departmentScoreFinalizeService
+                            .finalizeApproval(
+                                    apply,
+                                    currentUserId,
+                                    dto.getReviewRemark()
+                            );
 
-                    scoreRecordMapper.selectCount(
+            if (message != null) {
 
-                            new LambdaQueryWrapper<ScoreRecord>()
-
-                                    .eq(
-                                            ScoreRecord::getSourceType,
-                                            "DEPARTMENT"
-                                    )
-
-                                    .eq(
-                                            ScoreRecord::getSourceId,
-                                            apply.getId()
-                                    )
-                    );
-
-
-            if (recordCount != null
-                    && recordCount > 0) {
-
-                throw new IllegalArgumentException(
-                        "该申报已经生成正式成绩记录，请勿重复生成"
+                return Result.error(
+                        message
                 );
             }
 
+            return Result.success(
+                    null
+            );
+
+        } catch (DuplicateKeyException e) {
 
             /*
-             * 申报分值
-             */
-            BigDecimal realScore =
-                    apply.getScore();
-
-
-            if (realScore == null) {
-
-                throw new IllegalArgumentException(
-                        "该申报分值为空，无法生成成绩记录"
-                );
-            }
-
-
-            /*
-             * 减分转负数
-             */
-            if (Short.valueOf((short) -1)
-                    .equals(
-                            apply.getScoreType()
-                    )) {
-
-                realScore =
-                        realScore.negate();
-            }
-
-
-            /*
-             * 当前学期
-             */
-            SysSemester currentSemester =
-                    getCurrentSemester();
-
-
-            if (currentSemester == null) {
-
-                throw new IllegalArgumentException(
-                        "当前没有正在进行的学期，无法生成正式成绩记录"
-                );
-            }
-
-
-            /*
-             * 查找正式成绩规则
-             */
-            ScoreRule scoreRule =
-
-                    scoreRuleMapper.selectOne(
-
-                            new LambdaQueryWrapper<ScoreRule>()
-
-                                    .eq(
-                                            ScoreRule::getDepartmentId,
-                                            apply.getDepartmentId()
-                                    )
-
-                                    .eq(
-                                            ScoreRule::getName,
-                                            apply.getTitle()
-                                    )
-
-                                    .eq(
-                                            ScoreRule::getStatus,
-                                            (short) 1
-                                    )
-
-                                    .last(
-                                            "LIMIT 1"
-                                    )
-                    );
-
-
-            /*
-             * =================================================
-             * 有正式规则（固定加减分项目）：
+             * 并发场景：
              *
-             * 要求申报分值与规则分值一致，
-             * 避免部门随意改动固定项目的分值。
-             *
-             * 没有正式规则：
-             *
-             * 说明这是部门自己的非固定活动，
-             * 分值以申报单上填写的为准，直接生成成绩。
-             * =================================================
+             * 另一个请求已经为同一申报生成成绩记录，
+             * 唯一索引 uk_score_record_source 拦截了重复写入，
+             * 事务整体回滚，这里做幂等提示。
              */
-            if (scoreRule != null) {
-
-                /*
-                 * 正式规则分值
-                 */
-                if (scoreRule.getScore() == null
-                        || scoreRule.getScore()
-                        .compareTo(BigDecimal.ZERO) <= 0) {
-
-                    throw new IllegalArgumentException(
-                            "正式加减分规则分值配置错误：" +
-                                    scoreRule.getName()
-                    );
-                }
-
-
-                /*
-                 * 申报分值必须与正式规则一致
-                 */
-                if (apply.getScore() == null
-                        || scoreRule.getScore()
-                        .compareTo(
-                                apply.getScore()
-                        ) != 0) {
-
-                    throw new IllegalArgumentException(
-
-                            "部门申报分值与正式加减分规则分值不一致：" +
-
-                                    "申报分值=" +
-
-                                    apply.getScore() +
-
-                                    "，正式规则分值=" +
-
-                                    scoreRule.getScore()
-                    );
-                }
-            }
-
-
-            /*
-             * 创建正式成绩
-             */
-            ScoreRecord record =
-                    new ScoreRecord();
-
-
-            record.setStudentId(
-                    apply.getStudentId()
-            );
-
-
-            /*
-             * 非固定活动没有正式规则，
-             *
-             * score_record.rule_id 允许为空。
-             */
-            record.setRuleId(
-                    scoreRule == null
-                            ? null
-                            : scoreRule.getId()
-            );
-
-
-            record.setScore(
-                    realScore
-            );
-
-
-            record.setSemesterId(
-                    currentSemester.getId()
-            );
-
-
-            record.setSourceType(
-                    "DEPARTMENT"
-            );
-
-
-            record.setSourceId(
-                    apply.getId()
-            );
-
-
-            record.setStatus(
-                    (short) 1
-            );
-
-
-            record.setAdminHidden(
-                    (short) 0
-            );
-
-
-            record.setCreateTime(
-                    now
-            );
-
-
-            int result =
-                    scoreRecordMapper.insert(
-                            record
-                    );
-
-
-            if (result <= 0) {
-
-                throw new IllegalArgumentException(
-                        "终审通过，但成绩记录生成失败"
-                );
-            }
-
-
-            /*
-             * 日志
-             */
-            System.out.println(
-                    "========== 部门加减分正式成绩生成成功 =========="
-            );
-
-            System.out.println(
-                    "applyId = "
-                            + apply.getId()
-            );
-
-            System.out.println(
-                    "studentId = "
-                            + record.getStudentId()
-            );
-
-            System.out.println(
-                    "departmentId = "
-                            + apply.getDepartmentId()
-            );
-
-            System.out.println(
-                    "departmentName = "
-                            + department.getName()
-            );
-
-            System.out.println(
-                    "templateId = "
-                            + apply.getTemplateId()
-            );
-
-            System.out.println(
-                    "ruleId = "
-                            + record.getRuleId()
-            );
-
-            System.out.println(
-                    "ruleName = "
-                            + (scoreRule == null
-                            ? "（非固定活动，无正式规则）"
-                            : scoreRule.getName())
-            );
-
-            System.out.println(
-                    "ruleScore = "
-                            + (scoreRule == null
-                            ? "-"
-                            : scoreRule.getScore())
-            );
-
-            System.out.println(
-                    "score = "
-                            + record.getScore()
-            );
-
-            System.out.println(
-                    "semesterId = "
-                            + record.getSemesterId()
-            );
-
-            System.out.println(
-                    "semesterName = "
-                            + currentSemester.getName()
-            );
-
-            System.out.println(
-                    "semesterStartDate = "
-                            + currentSemester.getStartDate()
-            );
-
-            System.out.println(
-                    "semesterEndDate = "
-                            + currentSemester.getEndDate()
-            );
-
-            System.out.println(
-                    "sourceType = "
-                            + record.getSourceType()
-            );
-
-            System.out.println(
-                    "sourceId = "
-                            + record.getSourceId()
-            );
-
-            System.out.println(
-                    "=============================================="
+            return Result.error(
+                    "该申报已经生成正式成绩记录，请勿重复生成"
             );
         }
-
-
-        return Result.success(
-                null
-        );
     }
 
 

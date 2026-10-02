@@ -565,10 +565,6 @@ async function load() {
     }
 
 
-    console.log(
-      '学生列表请求参数：',
-      params
-    )
 
 
     /* =========================
@@ -584,10 +580,6 @@ async function load() {
       )
 
 
-    console.log(
-      '学生列表响应：',
-      studentRes
-    )
 
 
     const responseData =
@@ -828,10 +820,6 @@ function handleSizeChange(size) {
 
 async function viewDetail(row) {
 
-  console.log(
-    '查看学生公开流水：',
-    row
-  )
 
 
   /* =========================
@@ -889,10 +877,6 @@ async function viewDetail(row) {
       )
 
 
-    console.log(
-      '学生公开流水：',
-      res
-    )
 
 
     const data =

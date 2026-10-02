@@ -4,20 +4,14 @@ import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.ScoreRuleExcelRow;
-import com.student.studentscoresystem.entity.Department;
-import com.student.studentscoresystem.entity.ScoreApply;
-import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.ScoreRule;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUserPosition;
-import com.student.studentscoresystem.mapper.DepartmentMapper;
-import com.student.studentscoresystem.mapper.ScoreApplyMapper;
-import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
-import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
 import com.student.studentscoresystem.service.IScoreRuleService;
+import com.student.studentscoresystem.service.ScoreRuleManageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,11 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,38 +38,26 @@ public class ScoreRuleController {
 
     private final IScoreRuleService scoreRuleService;
 
+    private final ScoreRuleManageService scoreRuleManageService;
+
     private final ExcelImportService excelImportService;
-
-    private final DepartmentMapper departmentMapper;
-
-    private final ScoreRecordMapper scoreRecordMapper;
-
-    private final ScoreApplyMapper scoreApplyMapper;
 
     private final SysPositionMapper sysPositionMapper;
 
     private final SysUserPositionMapper sysUserPositionMapper;
 
-    private final DepartmentTemplateSyncService departmentTemplateSyncService;
-
     public ScoreRuleController(
             IScoreRuleService scoreRuleService,
+            ScoreRuleManageService scoreRuleManageService,
             ExcelImportService excelImportService,
-            DepartmentMapper departmentMapper,
-            ScoreRecordMapper scoreRecordMapper,
-            ScoreApplyMapper scoreApplyMapper,
             SysPositionMapper sysPositionMapper,
-            SysUserPositionMapper sysUserPositionMapper,
-            DepartmentTemplateSyncService departmentTemplateSyncService
+            SysUserPositionMapper sysUserPositionMapper
     ) {
         this.scoreRuleService = scoreRuleService;
+        this.scoreRuleManageService = scoreRuleManageService;
         this.excelImportService = excelImportService;
-        this.departmentMapper = departmentMapper;
-        this.scoreRecordMapper = scoreRecordMapper;
-        this.scoreApplyMapper = scoreApplyMapper;
         this.sysPositionMapper = sysPositionMapper;
         this.sysUserPositionMapper = sysUserPositionMapper;
-        this.departmentTemplateSyncService = departmentTemplateSyncService;
     }
 
     /**
@@ -115,6 +94,8 @@ public class ScoreRuleController {
     /**
      * =========================================================
      * 新增规则
+     *
+     * 规则落库与模板同步在同一个事务中完成。
      * =========================================================
      */
     @PostMapping("/add")
@@ -127,35 +108,11 @@ public class ScoreRuleController {
             return Result.fail("没有管理员权限");
         }
 
-        if (rule == null) {
-            return Result.fail("参数不能为空");
-        }
-
-        String message = checkRule(rule, null);
+        String message = scoreRuleManageService.add(rule);
 
         if (message != null) {
             return Result.fail(message);
         }
-
-        LocalDateTime now = LocalDateTime.now();
-
-        rule.setId(null);
-        rule.setName(rule.getName().trim());
-        rule.setDescription(emptyToNull(rule.getDescription()));
-        rule.setScore(scaleScore(rule.getScore()));
-        rule.setStatus(rule.getStatus() == null ? (short) 1 : rule.getStatus());
-        rule.setCreateTime(now);
-        rule.setUpdateTime(now);
-
-        if (!scoreRuleService.save(rule)) {
-            return Result.fail("规则新增失败");
-        }
-
-        /*
-         * 同步到该部门的加减分模板，
-         * 学生端「部门学生加减分申报」下拉即可选到。
-         */
-        departmentTemplateSyncService.sync(rule);
 
         return Result.success(null);
     }
@@ -163,6 +120,8 @@ public class ScoreRuleController {
     /**
      * =========================================================
      * 修改规则
+     *
+     * 规则落库与模板同步在同一个事务中完成。
      * =========================================================
      */
     @PutMapping("/update/{id}")
@@ -176,58 +135,11 @@ public class ScoreRuleController {
             return Result.fail("没有管理员权限");
         }
 
-        if (id == null) {
-            return Result.fail("规则 ID 不能为空");
-        }
-
-        if (rule == null) {
-            return Result.fail("参数不能为空");
-        }
-
-        ScoreRule oldRule = scoreRuleService.getById(id);
-
-        if (oldRule == null) {
-            return Result.fail("规则不存在");
-        }
-
-        String message = checkRule(rule, id);
+        String message = scoreRuleManageService.update(id, rule);
 
         if (message != null) {
             return Result.fail(message);
         }
-
-        /*
-         * 记下修改前的部门 / 名称，
-         * 用于同步模板改名。
-         */
-        Long oldDepartmentId = oldRule.getDepartmentId();
-        String oldName = oldRule.getName();
-
-        oldRule.setDepartmentId(rule.getDepartmentId());
-        oldRule.setName(rule.getName().trim());
-        oldRule.setScoreType(rule.getScoreType());
-        oldRule.setDescription(emptyToNull(rule.getDescription()));
-        oldRule.setScore(scaleScore(rule.getScore()));
-        oldRule.setStatus(
-                rule.getStatus() == null
-                        ? oldRule.getStatus()
-                        : rule.getStatus()
-        );
-        oldRule.setUpdateTime(LocalDateTime.now());
-
-        if (!scoreRuleService.updateById(oldRule)) {
-            return Result.fail("规则修改失败");
-        }
-
-        /*
-         * 同步到该部门的加减分模板，
-         * 学生端「部门学生加减分申报」下拉即可选到。
-         */
-        departmentTemplateSyncService.syncRename(
-                oldDepartmentId,
-                oldName,
-                oldRule
-        );
 
         return Result.success(null);
     }
@@ -250,51 +162,11 @@ public class ScoreRuleController {
             return Result.fail("没有管理员权限");
         }
 
-        if (id == null) {
-            return Result.fail("规则 ID 不能为空");
+        String message = scoreRuleManageService.delete(id);
+
+        if (message != null) {
+            return Result.fail(message);
         }
-
-        ScoreRule rule = scoreRuleService.getById(id);
-
-        if (rule == null) {
-            return Result.fail("规则不存在");
-        }
-
-        Long recordCount = scoreRecordMapper.selectCount(
-                new LambdaQueryWrapper<ScoreRecord>()
-                        .eq(ScoreRecord::getRuleId, id)
-        );
-
-        if (recordCount != null && recordCount > 0) {
-            return Result.fail(
-                    "该规则已被成绩记录引用（" +
-                            recordCount +
-                            " 条），不能删除，建议改为停用"
-            );
-        }
-
-        Long applyCount = scoreApplyMapper.selectCount(
-                new LambdaQueryWrapper<ScoreApply>()
-                        .eq(ScoreApply::getRuleId, id)
-        );
-
-        if (applyCount != null && applyCount > 0) {
-            return Result.fail(
-                    "该规则已被申报记录引用（" +
-                            applyCount +
-                            " 条），不能删除，建议改为停用"
-            );
-        }
-
-        if (!scoreRuleService.removeById(id)) {
-            return Result.fail("规则删除失败");
-        }
-
-        /*
-         * 同步删除对应部门的加减分模板，
-         * 避免学生端还能选到已删除的固定项目。
-         */
-        departmentTemplateSyncService.remove(rule);
 
         return Result.success(null);
     }
@@ -374,97 +246,6 @@ public class ScoreRuleController {
                 .doWrite(new ArrayList<ScoreRuleExcelRow>());
 
         response.flushBuffer();
-    }
-
-    /**
-     * =========================================================
-     * 规则数据校验
-     *
-     * 返回 null 表示校验通过
-     * =========================================================
-     */
-    private String checkRule(
-            ScoreRule rule,
-            Long excludeId
-    ) {
-
-        if (rule.getDepartmentId() == null) {
-            return "请选择所属部门";
-        }
-
-        Department department = departmentMapper.selectById(
-                rule.getDepartmentId()
-        );
-
-        if (department == null) {
-            return "所属部门不存在";
-        }
-
-        String name = rule.getName() == null
-                ? ""
-                : rule.getName().trim();
-
-        if (name.isEmpty()) {
-            return "规则名称不能为空";
-        }
-
-        if (name.length() > 100) {
-            return "规则名称不能超过 100 个字符";
-        }
-
-        if (rule.getScoreType() == null
-                || (rule.getScoreType() != 1
-                && rule.getScoreType() != -1)) {
-            return "请选择加分或减分";
-        }
-
-        if (rule.getScore() == null) {
-            return "请输入分值";
-        }
-
-        if (rule.getScore().compareTo(BigDecimal.ZERO) <= 0) {
-            return "分值必须大于 0";
-        }
-
-        /*
-         * 同一个部门下不允许出现同名规则，
-         * 因为部门申报终审时是按 部门 + 规则名称 匹配正式规则的。
-         */
-        Long count = scoreRuleService.count(
-                new LambdaQueryWrapper<ScoreRule>()
-                        .eq(ScoreRule::getDepartmentId, rule.getDepartmentId())
-                        .eq(ScoreRule::getName, name)
-                        .ne(excludeId != null, ScoreRule::getId, excludeId)
-        );
-
-        if (count != null && count > 0) {
-            return "该部门下已经存在同名规则：" + name;
-        }
-
-        return null;
-    }
-
-    /**
-     * =========================================================
-     * 分值保留两位小数
-     * =========================================================
-     */
-    private BigDecimal scaleScore(BigDecimal score) {
-        return score.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * =========================================================
-     * 空字符串转 null
-     * =========================================================
-     */
-    private String emptyToNull(String value) {
-
-        if (value == null || value.trim().isEmpty()) {
-            return null;
-        }
-
-        return value.trim();
     }
 
     /**

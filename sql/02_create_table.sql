@@ -422,7 +422,6 @@ CREATE TABLE IF NOT EXISTS score_record_operation_log (
         FOREIGN KEY (operator_id) REFERENCES sys_user(id)
 );
 
-BEGIN;
 -- =========================================================
 -- 1. 部门表 department 新增 department_type 字段
 -- =========================================================
@@ -546,8 +545,6 @@ CREATE INDEX IF NOT EXISTS idx_dsa_status ON public.department_score_apply(statu
 CREATE INDEX IF NOT EXISTS idx_dsa_reviewer ON public.department_score_apply(reviewer_id);
 CREATE INDEX IF NOT EXISTS idx_dsa_create_time ON public.department_score_apply(create_time);
 
-COMMIT;
-
 -- =========================================================
 -- 4.部门加分模板 department_score_template
 -- =========================================================
@@ -577,11 +574,51 @@ CREATE TABLE IF NOT EXISTS department_score_template (
 -- =========================================================
 
 -- 5.1 测评规则 score_rule
-ALTER TABLE public.score_rule
-    DROP COLUMN IF EXISTS category;
-
+--
+-- 历史库可能还保留已废弃的 category（自由文本分类，如：德育/学业/文体），
+-- 而现行业务已统一改用 score_type（1=加分，-1=减分）。
+--
+-- 修复要点：
+--   1. 先补齐 score_type 列；
+--   2. 在删除 category 之前，把它的业务语义幂等回填到 score_type，
+--      否则重复部署时会先 DROP 再补列，导致历史规则丢失、score_type 为空；
+--   3. 回填完成后才安全删除旧列（不可逆操作放最后）。
+-- 全程幂等：category 已不存在、或 score_type 已填时，不会覆盖任何数据。
 ALTER TABLE public.score_rule
     ADD COLUMN IF NOT EXISTS score_type SMALLINT NULL;
+
+DO $$
+BEGIN
+    -- 仅当历史 category 列仍然存在时，才依据其语义回填
+    IF EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'score_rule'
+           AND column_name = 'category'
+    ) THEN
+        -- 减分类规则：category 中含“减”或“扣”字
+        UPDATE public.score_rule
+           SET score_type = -1
+         WHERE score_type IS NULL
+           AND category IS NOT NULL
+           AND (category LIKE '%减%' OR category LIKE '%扣%');
+
+        -- 其余（含“加”字，以及德育/学业/文体等默认加分项）回填为加分
+        UPDATE public.score_rule
+           SET score_type = 1
+         WHERE score_type IS NULL;
+    END IF;
+END $$;
+
+-- 兜底：其它历史来源导致的 score_type 为空，统一按加分默认值回填
+UPDATE public.score_rule
+   SET score_type = 1
+ WHERE score_type IS NULL;
+
+-- 语义已迁移到 score_type，旧分类列不再被代码使用，安全删除
+ALTER TABLE public.score_rule
+    DROP COLUMN IF EXISTS category;
 
 ALTER TABLE public.score_rule
     ADD COLUMN IF NOT EXISTS department_id BIGINT NULL;
@@ -649,3 +686,15 @@ ALTER TABLE public.department_score_apply
 
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS final_review_time TIMESTAMP WITHOUT TIME ZONE;
+
+-- ==========================================
+-- 5.6 成绩记录来源唯一约束
+--
+-- 同一业务来源（source_type + source_id）只允许生成一条成绩记录，
+-- 从数据库层面防止终审并发重复计分。
+--
+-- 使用局部唯一索引：source_id 为空的历史/导入记录不受影响。
+-- ==========================================
+CREATE UNIQUE INDEX IF NOT EXISTS uk_score_record_source
+    ON public.score_record(source_type, source_id)
+    WHERE source_id IS NOT NULL;
