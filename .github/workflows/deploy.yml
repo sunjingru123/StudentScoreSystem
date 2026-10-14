@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -41,7 +42,9 @@ jobs:
           context: ./student-score-system
           file: ./student-score-system/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-backend:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -52,7 +55,9 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-frontend:latest
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPO }}/student-score-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -83,6 +88,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           IMAGE_REPO: ${{ env.IMAGE_REPO }}
+          IMAGE_TAG: ${{ github.sha }}
           DB_USER: ${{ secrets.DB_USER || 'deng' }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -93,20 +99,33 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT || 22 }}
-          envs: IMAGE_REPO,DB_USER,DB_PASSWORD,JWT_SECRET,GHCR_USER,GHCR_TOKEN
+          envs: IMAGE_REPO,IMAGE_TAG,DB_USER,DB_PASSWORD,JWT_SECRET,GHCR_USER,GHCR_TOKEN
           script: |
+            set -eu
+
+            if [ -z "${JWT_SECRET}" ]; then
+              echo "GitHub Actions Secret JWT_SECRET 未配置，已中止部署以保护服务器现有配置"
+              exit 1
+            fi
+
+            if [ "$(printf %s "${JWT_SECRET}" | wc -c)" -lt 32 ]; then
+              echo "JWT_SECRET 长度不足 32 字节，已中止部署"
+              exit 1
+            fi
+
             mkdir -p /opt/student-score-system/uploads
             cd /opt/student-score-system
 
-            # 写入环境变量
+            # 仅在必填密钥通过校验后更新环境文件，避免空 Secret 覆盖线上有效配置。
             cat <<EOF > .env
             IMAGE_REPO=${IMAGE_REPO}
+            IMAGE_TAG=${IMAGE_TAG}
             DB_USER=${DB_USER:-deng}
             DB_PASSWORD=${DB_PASSWORD}
             JWT_SECRET=${JWT_SECRET}
             EOF
 
-            # 登录 GHCR 并拉取
+            # 登录 GHCR 并拉取当前提交对应的不可变镜像。
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
             docker compose -f docker-compose.prod.yml pull
 
@@ -132,13 +151,15 @@ jobs:
               exit 1
             fi
 
-            # 启动前后端服务
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # 兼容早期由 docker run 或其他 Compose 项目创建的同名容器，
+            # 防止名称冲突导致“镜像已推送但服务未切换”。
+            docker rm -f student-score-frontend student-score-backend 2>/dev/null || true
 
-            # 关键：将现有的 PG18 容器动态加入到项目的 score-network 网络中
+            # 启动当前提交对应的前后端容器。
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+
+            # 将独立运行的 PostgreSQL 容器加入应用网络后重启后端，使其立即重连。
             docker network connect score-network student-score-postgres 2>/dev/null || true
-
-            # 重启一下后端以立即连接网络
             docker restart student-score-backend
 
             # 清理无用镜像

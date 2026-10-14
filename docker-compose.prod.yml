@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/${IMAGE_REPO}/student-score-backend:latest
+    image: ghcr.io/${IMAGE_REPO}/student-score-backend:${IMAGE_TAG:-latest}
     container_name: student-score-backend
     restart: unless-stopped
     environment:
@@ -16,7 +16,7 @@ services:
       - score-network
 
   frontend:
-    image: ghcr.io/${IMAGE_REPO}/student-score-frontend:latest
+    image: ghcr.io/${IMAGE_REPO}/student-score-frontend:${IMAGE_TAG:-latest}
     container_name: student-score-frontend
     restart: unless-stopped
     ports:
