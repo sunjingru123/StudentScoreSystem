@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>学生成绩管理系统 · 全项目审计报告</title>
+    <base href="file:///D:/r/StudentScoreSystem/">
+    <style>:root {
+  color-scheme: light;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #24292e;
+  background: #ffffff;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+body {
+  padding: 0;
+}
+
+main {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.5em 0 0.5em;
+  color: #24292e;
+}
+
+h1 {
+  font-size: 2em;
+  font-weight: 600;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eaecef;
+}
+
+h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eaecef;
+}
+
+h3 {
+  font-size: 1.25em;
+}
+
+h4 {
+  font-size: 1em;
+}
+
+h5 {
+  font-size: 0.875em;
+}
+
+h6 {
+  font-size: 0.85em;
+  color: #57606a;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre {
+  margin: 0 0 1rem;
+}
+
+a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+}
+
+blockquote {
+  border-left: 4px solid #d0d7de;
+  color: #57606a;
+  margin-left: 0;
+  padding: 0 1em;
+}
+
+blockquote > :first-child {
+  margin-top: 0;
+}
+
+blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+code,
+pre,
+kbd {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 85%;
+}
+
+code {
+  background: rgba(175, 184, 193, 0.2);
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+}
+
+pre:not(.hljs) {
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+pre:not(.hljs) code {
+  background: transparent;
+  padding: 0;
+  font-size: 100%;
+  border-radius: 0;
+}
+
+pre.hljs {
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+pre.hljs code {
+  background: transparent;
+  padding: 0;
+  font-size: 100%;
+  border-radius: 0;
+}
+
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border: 1px solid #d0d7de;
+  padding: 0.4rem 0.8rem;
+  text-align: left;
+}
+
+thead th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+  background: #f6f8fa;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid #d0d7de;
+  margin: 2rem 0;
+}
+
+li + li {
+  margin-top: 0.25em;
+}
+
+ul,
+ol {
+  padding-left: 2em;
+}
+
+.page {
+  page-break-after: always;
+}
+
+/* Auto-generated table of contents (markdown-it-toc-done-right) */
+.markdown-toc {
+  margin: 0 0 2em;
+  page-break-after: always;
+}
+
+.markdown-toc ul,
+.markdown-toc ol {
+  list-style: none;
+  padding-left: 1.25em;
+  margin: 0;
+}
+
+.markdown-toc > ul,
+.markdown-toc > ol {
+  padding-left: 0;
+}
+
+.markdown-toc li {
+  margin: 0.25em 0;
+  line-height: 1.4;
+}
+
+.markdown-toc a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.markdown-toc a:hover {
+  text-decoration: underline;
+}
+</style>
+    <style>pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em
+}
+code.hljs {
+  padding: 3px 5px
+}
+/*!
+  Theme: GitHub
+  Description: Light theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-light
+  Current colors taken from GitHub's CSS
+*/
+.hljs {
+  color: #24292e;
+  background: #ffffff
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  /* prettylights-syntax-keyword */
+  color: #d73a49
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  /* prettylights-syntax-entity */
+  color: #6f42c1
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  /* prettylights-syntax-constant */
+  color: #005cc5
+}
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+  /* prettylights-syntax-string */
+  color: #032f62
+}
+.hljs-built_in,
+.hljs-symbol {
+  /* prettylights-syntax-variable */
+  color: #e36209
+}
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  /* prettylights-syntax-comment */
+  color: #6a737d
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+  /* prettylights-syntax-entity-tag */
+  color: #22863a
+}
+.hljs-subst {
+  /* prettylights-syntax-storage-modifier-import */
+  color: #24292e
+}
+.hljs-section {
+  /* prettylights-syntax-markup-heading */
+  color: #005cc5;
+  font-weight: bold
+}
+.hljs-bullet {
+  /* prettylights-syntax-markup-list */
+  color: #735c0f
+}
+.hljs-emphasis {
+  /* prettylights-syntax-markup-italic */
+  color: #24292e;
+  font-style: italic
+}
+.hljs-strong {
+  /* prettylights-syntax-markup-bold */
+  color: #24292e;
+  font-weight: bold
+}
+.hljs-addition {
+  /* prettylights-syntax-markup-inserted */
+  color: #22863a;
+  background-color: #f0fff4
+}
+.hljs-deletion {
+  /* prettylights-syntax-markup-deleted */
+  color: #b31d28;
+  background-color: #ffeef0
+}
+.hljs-char.escape_,
+.hljs-link,
+.hljs-params,
+.hljs-property,
+.hljs-punctuation,
+.hljs-tag {
+  /* purposely ignored */
+  
+}</style>
+    
+  </head>
+  <body>
+    <main>
+      <h1>学生成绩管理系统 · 全项目审计报告</h1>
+<ul>
+<li><strong>审计对象</strong>：<code>D:\r\StudentScoreSystem</code></li>
+<li><strong>技术栈</strong>：Spring Boot 3 + MyBatis-Plus + PostgreSQL + JWT（后端，202 个 Java 文件）；Vue 3 + Vite + Element Plus + Pinia + Axios（前端，40+ 个 <code>.vue</code>）</li>
+<li><strong>审计日期</strong>：2026-10-02</li>
+<li><strong>审计方式</strong>：分模块静态审计（后端安全/鉴权、后端业务逻辑与数据一致性、数据库与 SQL、前端、部署与配置），<strong>未运行构建或测试</strong></li>
+<li><strong>基线提交</strong>：<code>2445469</code>（HEAD）</li>
+</ul>
+<h2>严重等级说明</h2>
+<table>
+<thead>
+<tr>
+<th>等级</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔴 严重</td>
+<td>可直接导致敏感数据泄露、越权、数据丢失或不可逆损坏，需立即处理</td>
+</tr>
+<tr>
+<td>🟠 高</td>
+<td>明显安全或正确性缺陷，有实际利用/触发场景</td>
+</tr>
+<tr>
+<td>🟡 中</td>
+<td>健壮性、性能、一致性问题，随数据量或并发增长而恶化</td>
+</tr>
+<tr>
+<td>🔵 低</td>
+<td>代码质量、规范、可维护性问题</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ 本报告为静态代码审计结论，部分条目（尤其是并发与运行时行为）建议在修复前先复现确认。</p>
+</blockquote>
+<hr>
+<h2>一、执行摘要</h2>
+<p>本次审计共发现 <strong>严重 11 项、高 20 项、中 30+ 项、低 20+ 项</strong>。最需要优先处理的几类风险：</p>
+<ol>
+<li><strong>敏感数据泄露（🔴）</strong>：<code>/user/student-list</code> 等接口只需合法 Token 即返回完整 <code>SysUser</code>，且 <code>SysUser.password</code>（BCrypt 哈希）无 <code>@JsonIgnore</code>，任意登录用户可批量获取全体学生密码哈希、手机号、邮箱。</li>
+<li><strong>大面积垂直/水平越权（🔴）</strong>：成绩管理、成绩审核、账号禁用/启用/新建、待审列表等多处接口<strong>完全没有角色或归属校验</strong>，任意学生可审批加分、作废他人成绩、禁用账号。前端路由权限也被 <code>localStorage</code> 角色欺骗绕过。</li>
+<li><strong>生产密钥已泄露（🔴）</strong>：<code>generator/CodeGenerator.java</code> 硬编码真实数据库口令 <code>jinru20070507</code> 且已被 git 跟踪。</li>
+<li><strong>多步写操作无事务（🔴）</strong>：审核、规则同步、终审等流程&quot;先写 A 再写 B&quot;且无 <code>@Transactional</code>，失败即产生永久脏数据。</li>
+<li><strong>不可逆的数据库迁移（🔴）</strong>：<code>score_rule</code> 迁移先 <code>ADD score_type</code> 再 <code>DROP COLUMN category</code>，<strong>全程无数据回填</strong>，历史规则数据永久丢失且每次部署重复执行。</li>
+<li><strong>重复计分（🔴）</strong>：审核幂等校验的 <code>sourceType</code> 常量与写入值不一致，防重逻辑永远失效，同一申请可被重复加分；终审为无锁的 count-then-insert 竞态。</li>
+</ol>
+<hr>
+<h2>二、🔴 严重问题清单（跨模块汇总）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>位置</th>
+<th>问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td><code>.../controller/UserInfoController.java:46-95</code> + <code>entity/SysUser.java:53</code></td>
+<td><code>/user/student-list</code> 无管理员校验，返回含 <code>password</code>（BCrypt 哈希）的 <code>SysUser</code> 列表</td>
+</tr>
+<tr>
+<td>S2</td>
+<td><code>.../controller/ScoreRecordAdminController.java:50-199</code></td>
+<td><code>/admin/scoreRecord/**</code> 三个接口无角色校验，任意学生可读他人成绩、作废/恢复成绩</td>
+</tr>
+<tr>
+<td>S3</td>
+<td><code>.../controller/ScoreAuditController.java:143-282</code></td>
+<td><code>/scoreAudit/audit</code>、<code>/pending</code> 未校验审核岗位，任意学生可审批加分、查看全部待审</td>
+</tr>
+<tr>
+<td>S4</td>
+<td><code>.../controller/SysUserController.java:896-967,979+</code></td>
+<td>`/user/student/disable</td>
+</tr>
+<tr>
+<td>S5</td>
+<td><code>.../generator/CodeGenerator.java:21</code></td>
+<td>硬编码真实数据库口令 <code>jinru20070507</code>，文件已被 git 跟踪</td>
+</tr>
+<tr>
+<td>S6</td>
+<td><code>.../controller/ScoreAuditController.java:308-319 vs 375</code></td>
+<td>幂等校验读 <code>&quot;SCORE_APPLY&quot;</code>、写入 <code>&quot;APPLY&quot;</code>，防重永久失效，可重复加分</td>
+</tr>
+<tr>
+<td>S7</td>
+<td><code>.../controller/ScoreAuditController.java:143-473</code></td>
+<td><code>audit()</code> 无事务，串行 5 处写，失败即脏数据</td>
+</tr>
+<tr>
+<td>S8</td>
+<td><code>.../controller/ScoreAuditController.java:343-419</code></td>
+<td><code>applyScore</code> 为 null 触发 NPE，且此前申请状态已提交为&quot;通过&quot;</td>
+</tr>
+<tr>
+<td>S9</td>
+<td><code>.../controller/ScoreRuleController.java:150-158 / 218-230 / 289-297</code></td>
+<td>规则落库与模板同步无事务，异常时两边不一致</td>
+</tr>
+<tr>
+<td>S10</td>
+<td><code>.../controller/ScoreApplyController.java:1956-2052</code>、<code>DepartmentScoreApplyController.java:2397-2421</code></td>
+<td>终审 count-then-insert 无锁无唯一约束，并发重复生成成绩</td>
+</tr>
+<tr>
+<td>S11</td>
+<td><code>sql/02_create_table.sql:580-584</code></td>
+<td><code>DROP COLUMN category</code> 无回填，历史规则 <code>score_type</code> 永久为 NULL</td>
+</tr>
+<tr>
+<td>S12</td>
+<td><code>frontend/src/router/index.js:587-706,774-851</code></td>
+<td>前端权限判断形同虚设（学生即放行 / 角色取自可篡改的 <code>localStorage</code>）</td>
+</tr>
+<tr>
+<td>S13</td>
+<td><code>frontend/src/views/Login.vue:154-166</code> + <code>layout/MainLayout.vue:431</code></td>
+<td>token 存入 <code>localStorage</code> 且被 <code>console.log</code> 打印，易被窃取</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>三、🛡️ 后端安全与鉴权</h2>
+<h3>严重</h3>
+<ul>
+<li><strong><code>UserInfoController.java:46-95</code></strong> — <code>/user/student-list</code> 只要 Token 合法即返回 <code>Result&lt;List&lt;SysUser&gt;&gt;</code>（L95），而 <code>SysUser.java:53</code> 的 <code>password</code> 无 <code>@JsonIgnore</code> → <strong>全体学生 BCrypt 哈希、手机号、邮箱泄露</strong>。建议：返回 <code>StudentVO</code>，并在 <code>SysUser.password</code> 加 <code>@JsonIgnore</code>（或全局忽略）。</li>
+<li><strong><code>ScoreRecordAdminController.java:50-75, 81-137, 143-199</code></strong> — <code>/admin/scoreRecord/**</code> 三个接口无角色校验，<code>getUserId</code> 仅判空（L104、L166）。</li>
+<li><strong><code>ScoreAuditController.java:143-282</code></strong> — 仅 <code>auditorId != null</code>（L155-160）确认登录，未校验审核岗位。</li>
+<li><strong><code>SysUserController.java:896-926, 937-967, 979+</code></strong> — 禁用/启用/新建学生无管理员校验（对比 L1206 <code>reset-password</code> 有校验）。</li>
+</ul>
+<h3>高</h3>
+<ul>
+<li><strong><code>LoginController.java:161-199</code>、<code>PasswordController.java:163-179</code></strong> — 仍兼容明文口令：非 BCrypt 前缀时用 <code>String.equals</code> 比对（非恒定时间，存在计时侧信道）。</li>
+<li><strong><code>SysUserController.java:75-80, 517-522, 696-701</code></strong> — <code>student/list</code>、<code>student/all</code>、<code>student/search</code> 无管理员校验，可枚举全体学生。</li>
+<li><strong><code>WebConfig.java:39-53</code></strong> — 授权仅靠 <code>JwtInterceptor</code>（认证）+ <code>@RequireRole</code>（仅 8 个 Controller 使用，<code>RequireRole.java:7</code> 仅支持方法级），大量写接口处于&quot;仅需登录&quot;状态。建议引入 Spring Security + <code>@PreAuthorize</code>。</li>
+</ul>
+<h3>中</h3>
+<ul>
+<li><strong><code>LoginController.java:31-33, 109-112, 415-422</code></strong> — 防爆破按 username 计锁且无清理：可对已知用户名发起 5 次失败锁定账号（DoS）；<code>failures</code> 为无界 <code>ConcurrentHashMap</code>，内存可被撑大；无 IP 限速。</li>
+<li><strong><code>JwtConfiguration.java:15-16</code> vs <code>utils/JwtUtil.java:11-14</code></strong> — 校验读 <code>${jwt.secret}</code>，签发却读 <code>System.getenv(&quot;JWT_SECRET&quot;)</code>，两套来源不一致。</li>
+<li><strong><code>JwtUtil.java:41-57</code></strong> — 无 <code>jti</code>/<code>issuer</code>/<code>audience</code>，未显式指定 HS256；Token 固定 24h，改密/禁用后旧 Token 仍有效，无登出失效机制。</li>
+<li><strong><code>JwtInterceptor.java:74-109</code></strong> — 支持从 Cookie 取 Token，配合 <code>CorsConfig.java:14</code> 的 <code>allowCredentials(true)</code>，若 Cookie 无 <code>SameSite</code>/<code>HttpOnly</code> 存在 CSRF 风险；而 <code>RoleInterceptor.java:96-118</code> 只读 <code>Authorization</code> 头，两处逻辑不一致。</li>
+<li><strong><code>RoleInterceptor.java:182-239</code></strong> — <code>selectOne</code>（L183）对多岗位用户抛 <code>TooManyResultsException</code> 返回 500；<code>position.getName().equals(...)</code>（L238）null 时 NPE；多岗位仅取一条。</li>
+<li><strong><code>PasswordController.java:102-114</code>、<code>SysUserController.java:1280</code></strong> — 口令仅校验长度 6-50，无复杂度要求；重置口令固定 <code>123456</code>。</li>
+<li><strong>全局</strong> — <code>pom.xml:100-104</code> 仅引入 <code>spring-security-crypto</code>，无 <code>spring-boot-starter-security</code>（无 CSRF 防护、无安全响应头）；<code>application.yml:30</code> 开启 <code>StdOutImpl</code>，生产打印含敏感数据的 SQL。</li>
+</ul>
+<h3>低</h3>
+<ul>
+<li><strong><code>CorsConfig.java:11-15</code></strong> — 允许来源硬编码 <code>http://localhost:5173</code> 与公网隧道 <code>https://frp-box.com:25848</code>，配合 <code>allowCredentials</code> 存在凭据泄露风险。</li>
+<li><strong><code>JwtInterceptor.java:188</code></strong> — 异常时 <code>e.printStackTrace()</code>。</li>
+<li><strong><code>application.yml:6</code></strong> — <code>DB_PASSWORD</code> 默认空串。</li>
+<li><strong><code>UserInfoController.java:117</code></strong> — <code>token.replace(&quot;Bearer &quot;,&quot;&quot;)</code> 未判空。</li>
+<li>✅ <strong><code>GlobalExceptionHandler.java:17-35</code></strong> — 日志记录完整异常、对外仅返回通用话术，处理得当。</li>
+</ul>
+<blockquote>
+<p>说明：<code>ActivityArchiveController</code>、<code>ActivityController</code>、<code>SysDepartmentController</code> 等 11 个 Controller 为仅含 <code>@RequestMapping</code> 的空类，无实际接口；<code>DepartmentScoreTemplateController</code>、<code>ScoreApplyController</code> 已实现部门/岗位归属校验。</p>
+</blockquote>
+<hr>
+<h2>四、🧩 后端业务逻辑与数据一致性</h2>
+<blockquote>
+<p>路径相对 <code>student-score-system/src/main/java/com/student/studentscoresystem/</code>（下表记作 <code>~/</code>）</p>
+</blockquote>
+<h3>严重</h3>
+<ol>
+<li><strong><code>~/controller/ScoreAuditController.java:308-319</code></strong> — 幂等校验读 <code>sourceType=&quot;SCORE_APPLY&quot;</code>，写入为 <code>&quot;APPLY&quot;</code>（L375），<strong>防重永不生效</strong>，同一申请反复审核会重复生成 <code>ScoreRecord</code>/<code>ScoreFlow</code>。建议统一常量并在 <code>score_record(source_type, source_id)</code> 建唯一索引。</li>
+<li><strong><code>~/controller/ScoreAuditController.java:143-473</code></strong> — <code>audit()</code> 无 <code>@Transactional</code>，串行 5 处写：audit（L264）→ apply 状态（L272-282）→ record（L387）→ flow（L456）→ 通知（L539），任一步失败即永久不一致。</li>
+<li><strong><code>~/controller/ScoreAuditController.java:343-419</code></strong> — <code>applyScore</code> 为 null 时 NPE（L353 使用、L417-418 再次 <code>subtract</code>），而 apply 状态已提交为&quot;通过&quot;。</li>
+<li><strong><code>~/controller/ScoreRuleController.java:150-158 / 218-230 / 289-297</code></strong> — 规则落库与 <code>DepartmentTemplateSyncService</code> 同步无事务。</li>
+<li><strong><code>~/controller/ScoreApplyController.java:1956-1978, 2040-2052</code></strong> — <code>finalAudit</code> 先 count 再 insert，无锁无唯一约束，并发终审重复生成证书成绩；且未生成 <code>ScoreFlow</code>（与 <code>ScoreAuditController</code> 不一致）。</li>
+<li><strong><code>~/controller/DepartmentScoreApplyController.java:2397-2421</code></strong> — 部门终审同样是 count-then-insert 竞态（L2495-2548 按 title 匹配规则）。</li>
+</ol>
+<h3>高</h3>
+<ol start="7">
+<li><strong><code>ScoreAuditController.java:143-230</code></strong> — 审核仅校验&quot;不能审自己&quot;（L222-230），无角色/权限校验。</li>
+<li><strong><code>ScoreAuditController.java:357-359</code></strong> — <code>record.setSemesterId(1L)</code> 硬编码学期，成绩永远落在 1 号学期。</li>
+<li><strong><code>service/impl/ScoreStatisticsServiceImpl.java:36</code></strong> — <code>score.compareTo(...)</code> 未判空，NPE。</li>
+<li><strong><code>ScoreStatisticsServiceImpl.java:44-52</code></strong> — <code>total = 40 + bonus - deduct</code> 与其余入口的 <code>total = min(bonus, 40 - deduct)</code> 不一致，且不过滤学期 → 统计错误。</li>
+<li><strong><code>ScoreRuleController.java:433-442</code></strong> — 同名规则 count 后插入，无唯一约束，可产生同部门同名规则，终审按&quot;部门+名称&quot;匹配产生歧义。</li>
+</ol>
+<h3>中</h3>
+<ol start="12">
+<li><strong><code>service/ScoreProjectNameResolver.java:390</code></strong> — <code>departmentMapper.selectBatchIds(departmentIds)</code> 中 <code>departmentIds</code> 实际存的是 <code>DepartmentScoreApply.id</code>（L259-263），导出时&quot;部门-标题&quot;前缀恒为空。</li>
+<li><strong><code>ScoreRecordController.java:494-537</code></strong> — <code>convertVO</code> 每条调用 <code>resolve()</code>（内部 <code>selectById</code>）→ N+1；<strong><code>AdminScoreController.java:81-100</code></strong> 每条再调 <code>resolve</code>+<code>resolveSourceLabel</code>（2 次查询）→ N+1。建议改用 <code>preload</code> 批量预取。</li>
+<li><strong><code>ScoreRecordController.java:168-178</code></strong> — <code>list()</code> 一次性加载全部成绩（无分页），叠加 N+1。</li>
+<li><strong><code>AdminScoreController.java:109-180</code></strong> 与 <strong><code>ScoreRecordController.java:293-439</code></strong> — hide/restore “查状态→改→写日志”，无事务、无乐观锁，且两套端点重复。</li>
+<li><strong><code>AdminScoreController.java:222-265</code></strong> — 成绩更正未校验 <code>newScore</code> 范围（可为负/超上限），整实体 <code>updateById</code> 会覆盖并发改动。</li>
+<li><strong><code>DepartmentScoreApplyController.java:2470-2548</code></strong> — 终审用 <code>apply.getTitle()</code> 精确匹配 <code>score_rule.name</code>，规则改名后匹配不到，被当作&quot;非固定活动&quot;按申报值生成成绩，绕过&quot;分值须等于规则分值&quot;校验。建议改用 <code>rule_id</code>/<code>template_id</code> 关联。</li>
+<li><strong><code>DepartmentScoreApplyController.java:1810-1838</code></strong>（batchPass 循环 selectOne）与 <strong>L2727-2800</strong>（fillNames 每条最多 3 次 selectById）— N+1。</li>
+<li><strong><code>service/impl/ExcelImportServiceImpl.java:82/480/1163</code></strong> — Excel 解析在 <code>@Transactional</code> 方法内执行；<code>importStudents</code> 循环内每行 2 次 select + 写（L294-462），大文件长时间占用连接/事务。</li>
+<li><strong><code>ExcelImportServiceImpl.java:414</code></strong> — <code>updateById</code>（L459 <code>insert</code>）返回值被忽略仍 <code>successCount++</code>，失败被计为成功。</li>
+<li><strong><code>DepartmentScoreApplyController.java:573-585</code></strong> — 学生申报查重为 count 后 save，无事务/唯一约束；<strong><code>ScoreApplyController.java:360-853</code></strong> 证书申报无任何查重。</li>
+<li><strong><code>AdminScoreController.java:187-220</code></strong> 与 <strong><code>ScoreRecordController.java:215-228</code></strong> — 统计/明细仅过滤 <code>adminHidden</code>，未过滤 <code>status</code>、未按学期；而导出（<code>ScoreExportServiceImpl.java:370-391</code>）过滤 <code>status</code> 且按学期 → 同一学生&quot;总分&quot;口径不一致。</li>
+</ol>
+<h3>低</h3>
+<ol start="23">
+<li><strong><code>DepartmentScoreApplyController.java:2349-2375, 2627-2712, 699-741, 823-830</code></strong> — 大量 <code>System.out.println</code>。</li>
+<li><strong><code>ScoreApplyController.java:749, 846</code></strong> — <code>e.printStackTrace()</code>。</li>
+<li><strong><code>service/ScoreProjectNameResolver.java:687-696</code></strong> — <code>readJson</code> 吞掉所有异常返回 null。</li>
+</ol>
+<hr>
+<h2>五、🗄️ 数据库与 SQL</h2>
+<blockquote>
+<p>范围：<code>sql/01~04</code>、<code>entity/</code> 28 个实体。<code>sql/04_init_data.sql</code> 为 0 字节空文件。</p>
+</blockquote>
+<h3>严重</h3>
+<ul>
+<li><strong><code>sql/02_create_table.sql:580-584</code></strong> — 迁移块先 <code>ADD COLUMN score_type</code> 再 <code>DROP COLUMN IF EXISTS category</code>，<strong>全程无回填</strong>（全仓库无 <code>UPDATE score_rule SET score_type</code>）。<code>category</code> 是唯一原始来源，删除后历史规则 <code>score_type</code> 全为 NULL，而代码强校验 <code>score_type ∈ {1,-1}</code>（<code>ScoreRuleController.java:413-419</code>、<code>ExcelImportServiceImpl.java:1326-1335</code>）→ <strong>历史规则无法编辑/统计，数据永久丢失</strong>。且 <code>deploy.yml:120-122</code> 每次部署都执行该脚本并 <code>ON_ERROR_STOP=1</code>，<code>DROP COLUMN</code> 反复执行、不可逆。</li>
+<li><strong><code>sql/02_create_table.sql:575-576 vs 581</code></strong> — 注释声明&quot;不会删除、不会覆盖任何数据&quot;，但 L581 实际 <code>DROP COLUMN</code>，注释与行为矛盾。</li>
+<li><strong><code>sql/02_create_table.sql:429-440, 443-455</code></strong> — <code>department</code> 用 <code>CREATE TABLE IF NOT EXISTS</code> 携带 <code>pk_department</code>/<code>uk_department_name</code>/<code>ck_department_status</code>；表已存在时这些 PK/UNIQUE/CHECK <strong>不会被补建</strong>（DO 块只补了列）。同缺陷见 <code>sys_user_department</code>（464-495）、<code>department_score_apply</code>（500-520）。</li>
+</ul>
+<h3>高</h3>
+<ul>
+<li><strong><code>sql/02_create_table.sql:362-370</code></strong> — <code>score</code> 表 <code>student_id</code>、<code>course_id</code> 无外键、无索引，可写入孤儿成绩。</li>
+<li><strong><code>sql/02_create_table.sql:350-357</code></strong> — <code>course.teacher_id</code> 无 FK、无索引。</li>
+<li><strong><code>sql/02_create_table.sql:586-590, 599-612, 632-651, 554-564</code></strong> — 补充的外键型列普遍无约束/索引：<code>score_rule.department_id</code>（有索引无 FK）、<code>score_apply.preliminary_reviewer_id/final_reviewer_id</code>、<code>department_score_apply.applicant_id/template_id/final_reviewer_id</code>、<code>department_score_template.department_id</code>（NOT NULL 却无 FK）。</li>
+<li><strong>唯一约束缺失</strong>：<code>activity_student</code>（123-136，缺 <code>UNIQUE(activity_id, student_id)</code>）、<code>sys_user_position</code>（54-68）、<code>score</code>（362-370，缺 <code>UNIQUE(student_id, course_id, semester)</code>）、<code>department_score_template</code>（554-564，缺 <code>UNIQUE(department_id, name)</code>）、<code>sys_semester</code>（73-83，缺 <code>UNIQUE(name)</code>）。</li>
+<li><strong>FK 列普遍无索引</strong>（PG 不自动建）：重点 <code>score_record(student_id, rule_id, semester_id)</code>、<code>score_apply(student_id, rule_id, status)</code>、<code>score_audit(apply_id)</code>、<code>notice_message(receiver_id)</code>、<code>operation_log(user_id)</code>。</li>
+<li><strong><code>sql/04_init_data.sql:1</code>（空）</strong> + 应用层弱口令：<code>SysUserController.java:1027, 1278</code>、<code>TeacherManageController.java:518</code>、<code>ExcelImportServiceImpl.java:321, 385</code>、<code>login.http:4-8</code>、<code>TeacherManage.vue:321</code> — 新库无种子账号；所有新建/重置账号同一弱口令 <code>123456</code>。</li>
+<li><strong><code>sql/02_create_table.sql:28-37 vs 429-440</code></strong> — 存在两套部门表：<code>sys_department</code> 与 <code>department</code>（<code>sys_user_position.department_id</code> → <code>sys_department</code>，<code>sys_user_department.department_id</code> → <code>department</code>），实体并存 → 部门主数据双源。</li>
+</ul>
+<h3>中</h3>
+<ul>
+<li>所有 <code>update_time</code> 仅 <code>DEFAULT CURRENT_TIMESTAMP</code>，<strong>无 ON UPDATE 触发器</strong>，更新后不变化。</li>
+<li><strong><code>sql/02_create_table.sql:511 vs 639</code></strong> — <code>department_score_apply</code> 同时有 <code>review_comment</code>（建表）与 <code>review_remark</code>（ALTER），实体用 <code>reviewRemark</code>，<code>review_comment</code> 为死列。</li>
+<li><strong><code>sql/02_create_table.sql:393-405</code></strong> — <code>score_record_admin_log</code> 表无实体/Mapper，全仓库无引用。</li>
+<li><strong><code>sql/02_create_table.sql:368 vs 224,235</code></strong> — <code>score.semester VARCHAR(50)</code> 与 <code>score_record.semester_id BIGINT</code> 建模不一致。</li>
+<li><strong><code>sql/02_create_table.sql:367</code></strong> — <code>score.score INTEGER</code> 无法存储小数成绩。</li>
+<li><strong><code>sql/02_create_table.sql:433,459</code></strong> — <code>department.department_type</code> 及 <code>idx_department_type</code> 全仓库未使用。</li>
+<li><strong><code>sql/01_create_database.sql:19</code></strong> — <code>CREATE DATABASE</code> 无存在性判断与 <code>ENCODING</code>，非幂等。</li>
+</ul>
+<h3>低</h3>
+<ul>
+<li>约束存在性判断仅用 <code>pg_constraint.conname</code>，未限定 schema/table。</li>
+<li><code>sys_position.status</code> 在 <code>Position.java</code>（Integer）与 <code>SysPosition.java</code>（Short）两种类型。</li>
+<li><code>gender/status/score_type/source_type</code> 等枚举列多数无 CHECK。</li>
+<li><code>sys_semester.start_date/end_date</code> 无先后校验。</li>
+<li><code>score_apply.material_file VARCHAR(500)</code> 与 <code>department_score_apply.evidence_url VARCHAR(1000)</code> 长度不一致。</li>
+<li><code>sql/03_table_comment.sql:1-80</code> 仅表级注释、缺多张表注释；L11 把 <code>sys_department</code> 注释为&quot;部门组织表&quot;（与实际新表 <code>department</code> 混淆）。</li>
+<li><code>score_admin_adjustment</code>、<code>score_record_operation_log</code> 用显式 sequence + <code>&quot;public&quot;.</code> 前缀，其余表用 <code>BIGSERIAL</code>，风格不一。</li>
+<li><code>department_score_template</code> 建在 <code>COMMIT</code>（549）之后且无 FK/唯一约束。</li>
+</ul>
+<hr>
+<h2>六、🖥️ 前端</h2>
+<h3>严重</h3>
+<ul>
+<li><strong><code>frontend/src/router/index.js:814-851</code></strong> — <code>requiresDepartmentLeader</code>/<code>requiresArchiveLeader</code> 仅判断 <code>role === '学生'</code> 即返回 <code>true</code>，任意学生可进入部门/证书审核页。</li>
+<li><strong><code>frontend/src/router/index.js:774-807</code></strong> — <code>requiresArchiveExportPermission</code> 对 <code>role === '学生'</code> 直接放行，任意学生可访问汇总导出。</li>
+<li><strong><code>frontend/src/router/index.js:587-706</code></strong> — 角色完全取自 <code>localStorage.user</code>（L589-590、691-692），可篡改为 <code>管理员</code> 绕过守卫进入 <code>/admin/*</code>。</li>
+<li><strong><code>frontend/src/views/Login.vue:154-166</code></strong> — 整个 <code>res.data</code>（含 token）写入 <code>localStorage.user</code>；<strong><code>layout/MainLayout.vue:431</code></strong> 又 <code>console.log</code> 打印含 token 的对象 → 易被脚本窃取。</li>
+</ul>
+<h3>高</h3>
+<ul>
+<li><strong>两套 axios 实例</strong>：<code>utils/request.js:1-32</code>（有 unwrap/401 登出/15s 超时）与 <code>api/request.js:1-19</code>（无拦截器、无超时）；<code>api/</code> 下混用（<code>teacher/semester/score/adminScore/file</code> → <code>api/request</code>，<code>student/apply/login</code> → <code>utils/request</code>）→ 响应结构不一致、401 只覆盖一半、部分请求可能长期挂起。</li>
+<li><strong><code>views/archive/ArchiveHome.vue:558-576, 713-730</code></strong> — 用 <code>@/utils/request</code>（已返回 <code>response.data</code>）却按未 unwrap 约定读取 <code>res.data?.code</code>，导出 <code>new Blob([res.data])</code> 为空 → 列表恒失败、导出为空文件（该文件未被路由引用，属死文件）。</li>
+<li><strong><code>views/admin/TeacherManage.vue:253-256, 318-321, 457-460, 512-515</code></strong> 与 <strong><code>views/admin/StudentManage.vue:1412, 1426</code></strong> — 硬编码并明文展示默认弱口令 <code>123456</code>。</li>
+</ul>
+<h3>中</h3>
+<ul>
+<li><strong><code>api/request.js:3-7</code></strong> — 仅设 <code>baseURL</code>，无 <code>timeout</code>、无 401 拦截。</li>
+<li><strong><code>nginx.conf:14-25</code></strong> — 缺 <code>X-Frame-Options</code>/<code>CSP</code>/<code>X-Content-Type-Options</code>，并主动 <code>proxy_set_header Origin &quot;&quot;</code>，削弱后端跨域校验。</li>
+<li><strong><code>index.html:1-8</code></strong> — 无 CSP，<code>&lt;html lang=&quot;&quot;&gt;</code> 为空。</li>
+<li><strong><code>vite.config.js:17-21</code></strong> — <code>host:'0.0.0.0'</code> 且 <code>allowedHosts:true</code>，对任意 Host 开放（DNS rebinding/隧道滥用）。</li>
+<li><strong><code>src/main.js:13-43</code></strong> — 未调用 <code>createPinia()</code>，而 <code>stores/counter.js</code> 未被使用。</li>
+<li><strong><code>views/Apply.vue:249-257, 715-723</code></strong> — <code>el-upload</code> 直连 <code>/api/file/upload</code> 并手写 <code>Authorization</code>，绕过统一请求。</li>
+<li><strong><code>api/student.js:4-10</code> vs <code>api/adminScore.js:18-27</code></strong> — 同一端点 <code>/user/student/list</code> 定义两份且返回结构不同；<code>api/login.js</code> 与 <code>Login.vue</code> 直连 <code>/login</code> 重复。</li>
+<li><strong><code>api/file.js:15-19</code></strong> — 上传到 <code>/fileInfo/upload</code>，后端实为 <code>/file/upload</code>，一旦调用必 404（当前为死代码）。</li>
+</ul>
+<h3>低</h3>
+<ul>
+<li>大量 <code>console.log</code> 打印用户对象与后端原始响应（<code>MainLayout.vue:431</code>、<code>Apply.vue:829-845</code>、<code>archive/ScoreExport.vue:133-172</code>、<code>Home.vue:628</code>）。</li>
+<li>三套布局（<code>MainLayout</code>/<code>AdminLayout</code>/<code>TeacherLayout</code>）头部、移动端抽屉、响应式 CSS 大段复制。</li>
+<li><strong><code>views/admin/RuleManage.vue:526-533</code></strong> — 提交携带 <code>status</code>，但后端 <code>ScoreRuleController.java:206-210</code> 更新忽略该字段，<strong>规则启停实际不生效</strong>。</li>
+<li><strong><code>vite.config.js:10</code></strong> — <code>vueDevTools()</code> 无条件注册。</li>
+<li><strong><code>views/Home.vue:654</code></strong> 用 <code>user.id</code>，<code>views/Score.vue:338</code> 用 <code>user.id || user.userId</code>；<code>Home.vue:662-664</code> 直接取 <code>res.data.data</code> 未兜底。</li>
+</ul>
+<blockquote>
+<p>字段一致性：抽查后端字段均有对应（<code>scoreType</code>、<code>awardCategory</code>），未发现 <code>category</code> 遗漏。</p>
+</blockquote>
+<hr>
+<h2>七、🚀 部署、构建与配置</h2>
+<h3>严重</h3>
+<ul>
+<li><strong><code>student-score-system/src/main/java/generator/CodeGenerator.java:21</code></strong> — 硬编码真实数据库口令 <code>jinru20070507</code>（L19 用户名 <code>postgres</code>），文件已被 git 跟踪 → <strong>已发生泄露</strong>。建议：立即轮换口令、改为 <code>System.getenv</code>、用 <code>git filter-repo</code>/BFG 清理历史、将该生成器移出主源码树。</li>
+</ul>
+<h3>高</h3>
+<ul>
+<li><strong>镜像 tag 全部 <code>latest</code></strong>：<code>docker-compose.yml:3,24</code>、<code>docker-compose.prod.yml:3,19</code>、<code>deploy.yml:44,55</code> → 无法回滚/复现。</li>
+<li><strong>容器以 root 运行</strong>：<code>frontend/Dockerfile:20,26</code>、<code>student-score-system/Dockerfile:18,26</code> 均无 <code>USER</code>。</li>
+<li><strong>无 <code>.dockerignore</code></strong>：<code>frontend/Dockerfile:12</code> <code>COPY . .</code> 会把宿主 <code>node_modules/</code>、<code>dist/</code> 等打进镜像。</li>
+<li><strong><code>CorsConfig.java:12-14</code></strong> — 生产信任外部隧道域名 <code>https://frp-box.com:25848</code> 且 <code>allowCredentials(true)</code>。</li>
+<li><strong><code>application.yml:30</code></strong> — <code>StdOutImpl</code> 无条件生效，生产打印全部 SQL 与参数。</li>
+<li><strong><code>deploy.yml:102-107</code></strong> — 服务器上 <code>cat &lt;&lt;EOF &gt; .env</code> 写入 <code>DB_PASSWORD</code>、<code>JWT_SECRET</code> 明文，未设 <code>umask</code>/<code>chmod</code>（默认 0644）。</li>
+</ul>
+<h3>中</h3>
+<ul>
+<li><strong><code>deploy.yml:102</code></strong> — <code>cat &lt;&lt;EOF</code>（未加引号分隔符），密钥含 <code>$</code>/反引号/<code>\</code> 会被展开，导致 <code>.env</code> 损坏或注入。</li>
+<li><strong>无 <code>healthcheck</code></strong>：<code>docker-compose.yml:29-30</code>、<code>docker-compose.prod.yml:24-25</code>，<code>depends_on</code> 无 <code>condition</code>，前端可能持续 502。</li>
+<li><strong>数据库容器未纳入编排</strong>：两个 compose 均无 postgres 服务，仅靠 <code>deploy.yml:133</code> 动态 <code>docker network connect</code>，无数据卷/健康检查/备份。</li>
+<li><strong><code>deploy.yml:130,133,136</code></strong> — 先 <code>up -d</code> 后端再连网再 <code>docker restart backend</code>，首启必连不上库。</li>
+<li><strong>无资源限制与日志轮转</strong>：两个 compose 均无 <code>deploy.resources</code>/<code>mem_limit</code>/<code>logging.options</code>。</li>
+<li><strong><code>frontend/nginx.conf:1-39</code></strong> — 无安全响应头，未 <code>server_tokens off</code>。</li>
+<li><strong>可变基础镜像 tag</strong>：<code>frontend/Dockerfile:4,20</code>、<code>student-score-system/Dockerfile:4,18</code>。</li>
+<li><strong><code>.gitignore:18</code></strong> — 仅忽略精确 <code>.env</code>，未覆盖 <code>.env.*</code>；<code>frontend/.gitignore</code> 无 <code>.env*</code>。</li>
+<li><strong><code>docker-compose.yml:19</code>、<code>docker-compose.prod.yml:14</code></strong> — <code>./uploads:/app/uploads</code> 相对路径 bind mount。</li>
+<li><strong><code>application.yml:6</code></strong> — <code>password: ${DB_PASSWORD:}</code> 默认空口令。</li>
+</ul>
+<h3>低</h3>
+<ul>
+<li><code>login.http:5-6</code>（已跟踪）与 <code>TeacherManage.vue:318,457</code>、<code>SysUserController.java:1027</code> 默认口令 <code>123456</code>。</li>
+<li>容器未设时区（无 <code>TZ</code>），日志/定时任务为 UTC。</li>
+<li><strong><code>student-score-system/Dockerfile:22,26</code></strong> — 无 JVM 内存参数、无 <code>HEALTHCHECK</code>。</li>
+<li><strong><code>pom.xml:60-69</code></strong> — <code>mybatis-plus-generator</code>、<code>velocity-engine-core</code> 未设 <code>provided</code>。</li>
+<li><strong><code>.gitignore:26</code></strong>（<code>*.sql</code>）— 通配忽略所有 SQL，未来新增迁移脚本会被静默排除。</li>
+<li><strong><code>README.md:1-14</code></strong> — 无部署与密钥管理说明。</li>
+</ul>
+<blockquote>
+<p>✅ <code>JWT_SECRET</code> 无默认值且启动强校验（<code>JwtConfiguration.java:23-28</code>，非空且 ≥32 字节），实现正确；frontend 仅绑定 <code>127.0.0.1:3080</code>，未对外暴露，符合预期。</p>
+</blockquote>
+<hr>
+<h2>八、修复优先级建议</h2>
+<p><strong>第一优先级（立即，安全与数据）</strong></p>
+<ol>
+<li>为 <code>SysUser.password</code> 加 <code>@JsonIgnore</code>，<code>/user/student-list</code> 等接口返回 VO 并补管理员校验（S1）。</li>
+<li>为 <code>ScoreRecordAdminController</code>、<code>ScoreAuditController</code>、<code>SysUserController</code> 的写/敏感读接口补齐角色与归属校验（S2/S3/S4）。</li>
+<li>轮换泄露的数据库口令，清理 git 历史，移除 <code>CodeGenerator</code> 硬编码（S5）。</li>
+<li>修复审核幂等常量不一致，并在 <code>score_record(source_type, source_id)</code> 建唯一索引（S6）。</li>
+<li>修正 <code>score_rule</code> 迁移：先回填 <code>score_type</code> 再删除 <code>category</code>（S11）。</li>
+</ol>
+<p><strong>第二优先级（本迭代）</strong></p>
+<ol start="6">
+<li>为审核、终审、规则同步等流程补 <code>@Transactional(rollbackFor = Exception.class)</code>，并将业务逻辑下沉到 Service（S7/S8/S9/S10）。</li>
+<li>统一计分口径（<code>min(bonus, 40 - deduct)</code>）、按学期过滤、修复硬编码学期 <code>setSemesterId(1L)</code>。</li>
+<li>前端统一为单一 axios 实例；路由权限改为后端返回的权限点，移除 <code>localStorage.user</code> 中的 token 与敏感 <code>console.log</code>。</li>
+<li>补齐数据库外键、唯一约束与索引。</li>
+</ol>
+<p><strong>第三优先级（持续改进）</strong></p>
+<ol start="10">
+<li>引入 Spring Security、密码复杂度与随机化初始口令、登录限速。</li>
+<li>部署：镜像固定 tag、容器非 root、<code>.dockerignore</code>、<code>healthcheck</code>、资源限制与日志轮转、<code>umask 077</code> 写 <code>.env</code>、将 postgres 纳入 compose。</li>
+<li>清理死代码/空控制器/废弃表（<code>score_record_admin_log</code>、<code>review_comment</code>、<code>ArchiveHome.vue</code> 等）。</li>
+</ol>
+<hr>
+<h2>九、审计方法与局限</h2>
+<ul>
+<li><strong>方法</strong>：按模块划分（后端安全、后端业务逻辑、数据库、前端、部署），对源码进行静态阅读与交叉引用；未执行编译、单元测试、集成测试或运行时验证。</li>
+<li><strong>局限</strong>：
+<ul>
+<li>未验证&quot;数据库中是否已存在部分唯一索引/外键&quot;——若已存在，业务逻辑章节中若干&quot;并发重复插入&quot;条目可降级为&quot;缺少冲突处理&quot;。</li>
+<li>并发类问题（S9/S10 等）为代码推理结论，需构造并发场景复现确认。</li>
+<li><code>CorsConfig</code> 中隧道域名 <code>frp-box.com:25848</code> 的归属未确认。</li>
+</ul>
+</li>
+<li><strong>免责</strong>：本报告仅覆盖所列举的静态代码证据，不构成完整渗透测试结论。</li>
+</ul>
+
+    </main>
+  </body>
+</html>

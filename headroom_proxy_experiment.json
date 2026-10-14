@@ -1,0 +1,77 @@
+[
+  {
+    "label": "JSON-高重复 (200条同构记录)",
+    "chars": 90874,
+    "tokens_before": 31245,
+    "tokens_after": 13883,
+    "tokens_saved": 17362,
+    "compression_ratio": 0.4443270923347736,
+    "transforms_applied": [
+      "router:mixed:0.32"
+    ],
+    "transforms_summary": {
+      "router:mixed:0.32": 1
+    },
+    "ccr_hashes": []
+  },
+  {
+    "label": "JSON-低重复 (60条异构记录)",
+    "chars": 20090,
+    "tokens_before": 7216,
+    "tokens_after": 3636,
+    "tokens_saved": 3580,
+    "compression_ratio": 0.503880266075388,
+    "transforms_applied": [
+      "router:mixed:0.36"
+    ],
+    "transforms_summary": {
+      "router:mixed:0.36": 1
+    },
+    "ccr_hashes": []
+  },
+  {
+    "label": "散文文本 (audit.md 前40KB)",
+    "chars": 18584,
+    "tokens_before": 8148,
+    "tokens_after": 8148,
+    "tokens_saved": 0,
+    "compression_ratio": 1.0,
+    "transforms_applied": [
+      "router:noop"
+    ],
+    "transforms_summary": {
+      "router:noop": 1
+    },
+    "ccr_hashes": []
+  },
+  {
+    "label": "Java代码 (最大文件)",
+    "chars": 40000,
+    "tokens_before": 6566,
+    "tokens_after": 6566,
+    "tokens_saved": 0,
+    "compression_ratio": 1.0,
+    "transforms_applied": [
+      "router:noop"
+    ],
+    "transforms_summary": {
+      "router:noop": 1
+    },
+    "ccr_hashes": []
+  },
+  {
+    "label": "日志/堆栈 (10遍重复栈)",
+    "chars": 13379,
+    "tokens_before": 2877,
+    "tokens_after": 472,
+    "tokens_saved": 2405,
+    "compression_ratio": 0.1640597844977407,
+    "transforms_applied": [
+      "router:log:0.03"
+    ],
+    "transforms_summary": {
+      "router:log:0.03": 1
+    },
+    "ccr_hashes": []
+  }
+]
