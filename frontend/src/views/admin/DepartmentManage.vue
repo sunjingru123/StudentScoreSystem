@@ -134,13 +134,16 @@ async function submitForm() {
   saving.value = true
   try {
     const data = { name: form.name.trim() }
-    if (editId.value) {
-      await updateDepartment(editId.value, data)
-      ElMessage.success('部门修改成功')
-    } else {
-      await addDepartment(data)
-      ElMessage.success('部门新增成功')
+    const response = editId.value
+      ? await updateDepartment(editId.value, data)
+      : await addDepartment(data)
+
+    if (response?.code !== 200) {
+      ElMessage.error(response?.message || '部门保存失败')
+      return
     }
+
+    ElMessage.success(editId.value ? '部门修改成功' : '部门新增成功')
     dialogVisible.value = false
     await loadDepartments()
   } catch (error) {
@@ -159,8 +162,15 @@ async function changeStatus(row, enabled) {
       `${action}部门`,
       { type: 'warning' }
     )
-    if (enabled) await enableDepartment(row.id)
-    else await disableDepartment(row.id)
+    const response = enabled
+      ? await enableDepartment(row.id)
+      : await disableDepartment(row.id)
+
+    if (response?.code !== 200) {
+      ElMessage.error(response?.message || `${action}部门失败`)
+      return
+    }
+
     ElMessage.success(`部门已${action}`)
     await loadDepartments()
   } catch (error) {
