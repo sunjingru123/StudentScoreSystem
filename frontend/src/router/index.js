@@ -590,7 +590,6 @@ async function loadAuthContext(storedUser) {
       role = infoRes?.data?.role || ''
     } catch (error) {
       console.error('获取当前用户角色失败：', error)
-
       role = ''
     }
 
