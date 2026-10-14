@@ -1,19 +1,10 @@
-import {
-  createRouter,
-  createWebHistory
-} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 
 import request from '@/utils/request'
 
-import {
-  ElMessage
-} from 'element-plus'
+import { ElMessage } from 'element-plus'
 
-import {
-  PUBLIC_PATHS,
-  decideAccess
-} from '@/router/access'
-
+import { PUBLIC_PATHS, decideAccess } from '@/router/access'
 
 // =========================================================
 // 登录
@@ -21,7 +12,6 @@ import {
 
 import Login from '@/views/Login.vue'
 import ChangePassword from '@/views/ChangePassword.vue'
-
 
 // =========================================================
 // 学生端
@@ -36,7 +26,6 @@ import Record from '@/views/Record.vue'
 
 import StudentMessage from '@/views/student/Message.vue'
 
-
 // =========================================================
 // 管理员端
 // =========================================================
@@ -49,7 +38,7 @@ import StudentManage from '@/views/admin/StudentManage.vue'
 import RuleManage from '@/views/admin/RuleManage.vue'
 import ExcelImport from '@/views/admin/ExcelImport.vue'
 import SemesterManage from '@/views/admin/SemesterManage.vue'
-
+import DepartmentManage from '@/views/admin/DepartmentManage.vue'
 
 // =========================================================
 // 辅导员端
@@ -62,17 +51,14 @@ import TeacherActivity from '@/views/teacher/TeacherActivity.vue'
 import TeacherScore from '@/views/teacher/TeacherScore.vue'
 import TeacherMessage from '@/views/teacher/TeacherMessage.vue'
 
-
 // =========================================================
 // Router
 // =========================================================
 
 const router = createRouter({
-
   history: createWebHistory(),
 
   routes: [
-
     // =======================================================
     // 根路径
     // =======================================================
@@ -81,7 +67,6 @@ const router = createRouter({
       path: '/',
       redirect: '/login',
     },
-
 
     // =======================================================
     // 登录
@@ -93,7 +78,6 @@ const router = createRouter({
       component: Login,
     },
 
-
     // =======================================================
     // 修改密码
     // =======================================================
@@ -103,7 +87,6 @@ const router = createRouter({
       name: 'ChangePassword',
       component: ChangePassword,
     },
-
 
     // =======================================================
     // 学生端
@@ -124,7 +107,6 @@ const router = createRouter({
       component: MainLayout,
 
       children: [
-
         // ---------------------------------------------------
         // 首页
         // ---------------------------------------------------
@@ -137,7 +119,6 @@ const router = createRouter({
           component: Home,
         },
 
-
         // ---------------------------------------------------
         // 我的成绩
         // ---------------------------------------------------
@@ -149,7 +130,6 @@ const router = createRouter({
 
           component: Score,
         },
-
 
         // ---------------------------------------------------
         // 个人加分申请
@@ -165,7 +145,6 @@ const router = createRouter({
           component: Apply,
         },
 
-
         // ---------------------------------------------------
         // 我的申请记录
         // ---------------------------------------------------
@@ -177,7 +156,6 @@ const router = createRouter({
 
           component: Record,
         },
-
 
         // ---------------------------------------------------
         // 学生消息
@@ -191,7 +169,6 @@ const router = createRouter({
           component: StudentMessage,
         },
 
-
         // ===================================================
         // 部门加减分申报
         //
@@ -203,21 +180,14 @@ const router = createRouter({
 
           name: 'StudentDepartmentApply',
 
-          component: () =>
-            import(
-              '@/views/student/DepartmentApply.vue'
-              ),
+          component: () => import('@/views/student/DepartmentApply.vue'),
 
           meta: {
-
             title: '部门加减分申报',
 
             requiresDepartmentApply: true,
-
           },
-
         },
-
 
         // ===================================================
         // 部门负责人审核
@@ -232,21 +202,14 @@ const router = createRouter({
 
           name: 'DepartmentScoreAudit',
 
-          component: () =>
-            import(
-              '@/views/student/DepartmentScoreAudit.vue'
-              ),
+          component: () => import('@/views/student/DepartmentScoreAudit.vue'),
 
           meta: {
-
             title: '部门申报审核',
 
             requiresDepartmentLeader: true,
-
           },
-
         },
-
 
         // ===================================================
         // 个人证书审核
@@ -262,21 +225,14 @@ const router = createRouter({
 
           name: 'CertificateAudit',
 
-          component: () =>
-            import(
-              '@/views/student/CertificateAudit.vue'
-              ),
+          component: () => import('@/views/student/CertificateAudit.vue'),
 
           meta: {
-
             title: '个人证书审核',
 
             requiresArchiveLeader: true,
-
           },
-
         },
-
 
         // ===================================================
         // 加减分汇总导出
@@ -290,25 +246,16 @@ const router = createRouter({
 
           name: 'ArchiveScoreExport',
 
-          component: () =>
-            import(
-              '@/views/archive/ScoreExport.vue'
-              ),
+          component: () => import('@/views/archive/ScoreExport.vue'),
 
           meta: {
-
             title: '加减分汇总导出',
 
             requiresArchiveExportPermission: true,
-
           },
-
         },
-
       ],
-
     },
-
 
     // =======================================================
     // 旧地址兼容
@@ -319,7 +266,6 @@ const router = createRouter({
 
       redirect: '/home/score-export',
     },
-
 
     // =======================================================
     // 管理员
@@ -335,7 +281,6 @@ const router = createRouter({
       redirect: '/admin/adminHome',
 
       children: [
-
         // ---------------------------------------------------
         // 管理员首页
         // ---------------------------------------------------
@@ -347,7 +292,6 @@ const router = createRouter({
 
           component: AdminHome,
         },
-
 
         // ---------------------------------------------------
         // 学生管理
@@ -361,7 +305,6 @@ const router = createRouter({
           component: StudentManage,
         },
 
-
         // ---------------------------------------------------
         // 学期管理
         // ---------------------------------------------------
@@ -374,7 +317,6 @@ const router = createRouter({
           component: SemesterManage,
         },
 
-
         // ---------------------------------------------------
         // 学生详情
         // ---------------------------------------------------
@@ -384,12 +326,8 @@ const router = createRouter({
 
           name: 'AdminStudentDetail',
 
-          component: () =>
-            import(
-              '@/views/admin/StudentDetail.vue'
-              ),
+          component: () => import('@/views/admin/StudentDetail.vue'),
         },
-
 
         // ---------------------------------------------------
         // 教师管理
@@ -403,13 +341,25 @@ const router = createRouter({
           component: TeacherManage,
 
           meta: {
-
             title: '教师管理',
-
           },
-
         },
 
+        // ---------------------------------------------------
+        // 部门管理
+        // ---------------------------------------------------
+
+        {
+          path: 'department',
+
+          name: 'AdminDepartment',
+
+          component: DepartmentManage,
+
+          meta: {
+            title: '部门管理',
+          },
+        },
 
         // ---------------------------------------------------
         // 加分规则
@@ -423,7 +373,6 @@ const router = createRouter({
           component: RuleManage,
         },
 
-
         // ---------------------------------------------------
         // 成绩调整
         // ---------------------------------------------------
@@ -433,12 +382,8 @@ const router = createRouter({
 
           name: 'AdminScoreAdjustment',
 
-          component: () =>
-            import(
-              '@/views/admin/ScoreAdjustment.vue'
-              ),
+          component: () => import('@/views/admin/ScoreAdjustment.vue'),
         },
-
 
         // ---------------------------------------------------
         // Excel 导入
@@ -452,7 +397,6 @@ const router = createRouter({
           component: ExcelImport,
         },
 
-
         // ---------------------------------------------------
         // 管理员汇总导出
         // ---------------------------------------------------
@@ -462,25 +406,16 @@ const router = createRouter({
 
           name: 'AdminScoreExport',
 
-          component: () =>
-            import(
-              '@/views/archive/ScoreExport.vue'
-              ),
+          component: () => import('@/views/archive/ScoreExport.vue'),
 
           meta: {
-
             title: '加减分汇总导出',
 
             requiresAdminExportPermission: true,
-
           },
-
         },
-
       ],
-
     },
-
 
     // =======================================================
     // 辅导员
@@ -494,7 +429,6 @@ const router = createRouter({
       component: TeacherLayout,
 
       children: [
-
         // ---------------------------------------------------
         // 辅导员首页
         // ---------------------------------------------------
@@ -507,7 +441,6 @@ const router = createRouter({
           component: TeacherHome,
         },
 
-
         // ---------------------------------------------------
         // 部门申报终审
         // ---------------------------------------------------
@@ -517,12 +450,8 @@ const router = createRouter({
 
           name: 'CounselorDepartmentScoreAudit',
 
-          component: () =>
-            import(
-              '@/views/teacher/DepartmentScoreAudit.vue'
-              ),
+          component: () => import('@/views/teacher/DepartmentScoreAudit.vue'),
         },
-
 
         // ---------------------------------------------------
         // 活动管理
@@ -536,7 +465,6 @@ const router = createRouter({
           component: TeacherActivity,
         },
 
-
         // ---------------------------------------------------
         // 成绩查看
         // ---------------------------------------------------
@@ -549,7 +477,6 @@ const router = createRouter({
           component: TeacherScore,
         },
 
-
         // ---------------------------------------------------
         // 消息
         // ---------------------------------------------------
@@ -561,35 +488,26 @@ const router = createRouter({
 
           component: TeacherMessage,
         },
-
       ],
-
     },
-
   ],
-
 })
-
 
 // =========================================================
 // 404
 // =========================================================
 
 router.addRoute({
-
   path: '/:pathMatch(.*)*',
 
   redirect: '/login',
-
 })
-
 
 // =========================================================
 // 权限与首页
 // =========================================================
 
 const authCache = {
-
   token: null,
 
   role: '',
@@ -605,17 +523,13 @@ const authCache = {
   pending: null,
 
   pendingToken: null,
-
 }
-
 
 // 清空登录态与鉴权缓存
 function clearAuth() {
-
   localStorage.removeItem('user')
 
   localStorage.removeItem('token')
-
 
   authCache.token = null
 
@@ -628,9 +542,7 @@ function clearAuth() {
   authCache.archiveLeader = false
 
   authCache.loaded = false
-
 }
-
 
 // 读取权威鉴权上下文。
 //
@@ -641,15 +553,10 @@ function clearAuth() {
 //   - 刷新页面后重新拉取；
 //   - 重新登录（token 变化）后自动失效重拉。
 async function loadAuthContext(storedUser) {
-
-  const token =
-    localStorage.getItem('token')
-
+  const token = localStorage.getItem('token')
 
   if (!token) {
-
     return {
-
       role: '',
 
       canDepartmentApply: false,
@@ -657,355 +564,220 @@ async function loadAuthContext(storedUser) {
       departmentLeader: false,
 
       archiveLeader: false,
-
     }
-
   }
-
 
   if (authCache.loaded && authCache.token === token) {
-
     return authCache
-
   }
-
 
   if (authCache.pending && authCache.pendingToken === token) {
-
     return authCache.pending
-
   }
 
+  const pending = (async () => {
+    let role = ''
 
-  const pending =
-    (async () => {
+    let canDepartmentApply = false
 
-      let role = ''
+    let departmentLeader = false
 
-      let canDepartmentApply = false
+    let archiveLeader = false
 
-      let departmentLeader = false
+    try {
+      const infoRes = await request.get('/user/info')
 
-      let archiveLeader = false
+      role = infoRes?.data?.role || ''
+    } catch (error) {
+      console.error('获取当前用户角色失败：', error)
 
+      role = ''
+    }
 
-      try {
+    try {
+      const permissionRes = await request.get('/departmentScoreApply/my-permissions')
 
-        const infoRes =
-          await request.get('/user/info')
+      const data = permissionRes?.data || {}
 
+      canDepartmentApply = data.canDepartmentApply === true || Number(data.canDepartmentApply) === 1
 
-        role =
-          infoRes?.data?.role || ''
+      departmentLeader = data.canDepartmentAudit === true || Number(data.canDepartmentAudit) === 1
 
-      } catch (error) {
+      const departments = Array.isArray(data.departments) ? data.departments : []
 
-        console.error(
-          '获取当前用户角色失败：',
-          error
-        )
+      archiveLeader = departments.some(
+        (department) =>
+          department &&
+          department.departmentName === '档案部' &&
+          (department.position === '干事' ||
+            department.position === '副部长' ||
+            department.position === '部长'),
+      )
+    } catch (error) {
+      console.error('获取部门权限失败：', error)
 
-        role = ''
+      departmentLeader = false
 
-      }
+      archiveLeader = false
 
+      canDepartmentApply = false
+    }
 
-      try {
+    // 后端未返回角色时，回退到登录时写入的本地角色。
+    // 仅作兜底，敏感权限始终以后端返回为准。
+    if (!role) {
+      role = storedUser?.role || ''
+    }
 
-        const permissionRes =
-          await request.get(
-            '/departmentScoreApply/my-permissions'
-          )
+    authCache.token = token
 
+    authCache.role = role
 
-        const data =
-          permissionRes?.data || {}
+    authCache.canDepartmentApply = canDepartmentApply
 
+    authCache.departmentLeader = departmentLeader
 
-        canDepartmentApply =
-          data.canDepartmentApply === true ||
-          Number(data.canDepartmentApply) === 1
+    authCache.archiveLeader = archiveLeader
 
+    authCache.loaded = true
 
-        departmentLeader =
-          data.canDepartmentAudit === true ||
-          Number(data.canDepartmentAudit) === 1
-
-
-        const departments =
-          Array.isArray(data.departments)
-            ? data.departments
-            : []
-
-
-        archiveLeader =
-          departments.some(
-            department =>
-
-              department &&
-              department.departmentName === '档案部' &&
-              (
-                department.position === '干事' ||
-                department.position === '副部长' ||
-                department.position === '部长'
-              )
-          )
-
-      } catch (error) {
-
-        console.error(
-          '获取部门权限失败：',
-          error
-        )
-
-        departmentLeader = false
-
-        archiveLeader = false
-
-        canDepartmentApply = false
-
-      }
-
-
-      // 后端未返回角色时，回退到登录时写入的本地角色。
-      // 仅作兜底，敏感权限始终以后端返回为准。
-      if (!role) {
-
-        role =
-          storedUser?.role || ''
-
-      }
-
-
-      authCache.token = token
-
-      authCache.role = role
-
-      authCache.canDepartmentApply = canDepartmentApply
-
-      authCache.departmentLeader = departmentLeader
-
-      authCache.archiveLeader = archiveLeader
-
-      authCache.loaded = true
-
-
-      return authCache
-
-    })()
-
+    return authCache
+  })()
 
   authCache.pending = pending
 
   authCache.pendingToken = token
 
-
   try {
-
     return await pending
-
   } finally {
-
     if (authCache.pending === pending) {
-
       authCache.pending = null
 
       authCache.pendingToken = null
-
     }
-
   }
-
 }
-
 
 // 把判定结果转换为 vue-router 守卫的返回值
 function applyDecision(decision) {
-
   if (decision.action === 'allow') {
-
     return true
-
   }
 
-
   if (decision.action === 'logout') {
-
     clearAuth()
 
     ElMessage.error('登录状态异常，请重新登录')
 
     return { path: '/login', replace: true }
-
   }
-
 
   if (decision.warning) {
-
     ElMessage.warning(decision.warning)
-
   }
 
-
   return {
-
     path: decision.path,
 
     replace: true,
-
   }
-
 }
-
 
 // =========================================================
 // 全局路由守卫（默认拒绝 + 白名单）
 // =========================================================
 
 router.beforeEach(async (to) => {
-
   /* ---------- 白名单：登录页 / 404 / 403 ---------- */
 
   if (PUBLIC_PATHS.includes(to.path)) {
-
     return true
-
   }
 
+  const token = localStorage.getItem('token')
 
-  const token =
-    localStorage.getItem('token')
-
-
-  const userStr =
-    localStorage.getItem('user')
-
+  const userStr = localStorage.getItem('user')
 
   /* ---------- 未登录：直接阻断，不调用后端 ---------- */
 
   if (!token || !userStr) {
-
     return { path: '/login', replace: true }
-
   }
-
 
   /* ---------- 解析本地用户缓存 ---------- */
 
   let storedUser
 
-
   try {
-
-    storedUser =
-      JSON.parse(userStr)
-
+    storedUser = JSON.parse(userStr)
   } catch (error) {
-
-    console.error(
-      '用户缓存解析失败：',
-      error
-    )
+    console.error('用户缓存解析失败：', error)
 
     clearAuth()
 
     return { path: '/login', replace: true }
-
   }
 
-
-  const firstLogin =
-    storedUser.firstLogin === true ||
-    storedUser.firstLogin === 1
-
+  const firstLogin = storedUser.firstLogin === true || storedUser.firstLogin === 1
 
   /* ---------- 首次登录优先处理（不调用后端） ---------- */
 
   if (firstLogin) {
-
     return applyDecision(
       decideAccess({
-
         path: to.path,
 
         role: storedUser.role,
 
         firstLogin: true,
-
-      })
+      }),
     )
-
   }
-
 
   /* ---------- 加载权威鉴权上下文（带缓存） ---------- */
 
-  const auth =
-    await loadAuthContext(storedUser)
-
+  const auth = await loadAuthContext(storedUser)
 
   /* ---------- 收集目标路由的多级敏感标记（to.matched） ---------- */
 
   const flags = {
+    requiresAdminExportPermission: to.matched.some(
+      (record) => record.meta?.requiresAdminExportPermission === true,
+    ),
 
-    requiresAdminExportPermission:
-      to.matched.some(
-        record =>
-          record.meta?.requiresAdminExportPermission === true
-      ),
+    requiresArchiveExportPermission: to.matched.some(
+      (record) => record.meta?.requiresArchiveExportPermission === true,
+    ),
 
-    requiresArchiveExportPermission:
-      to.matched.some(
-        record =>
-          record.meta?.requiresArchiveExportPermission === true
-      ),
+    requiresDepartmentLeader: to.matched.some(
+      (record) => record.meta?.requiresDepartmentLeader === true,
+    ),
 
-    requiresDepartmentLeader:
-      to.matched.some(
-        record =>
-          record.meta?.requiresDepartmentLeader === true
-      ),
+    requiresDepartmentApply: to.matched.some(
+      (record) => record.meta?.requiresDepartmentApply === true,
+    ),
 
-    requiresDepartmentApply:
-      to.matched.some(
-        record =>
-          record.meta?.requiresDepartmentApply === true
-      ),
-
-    requiresArchiveLeader:
-      to.matched.some(
-        record =>
-          record.meta?.requiresArchiveLeader === true
-      ),
-
+    requiresArchiveLeader: to.matched.some((record) => record.meta?.requiresArchiveLeader === true),
   }
 
+  const decision = decideAccess({
+    path: to.path,
 
-  const decision =
-    decideAccess({
+    flags,
 
-      path: to.path,
+    role: auth.role,
 
-      flags,
+    permissions: {
+      canDepartmentApply: auth.canDepartmentApply,
 
-      role: auth.role,
+      departmentLeader: auth.departmentLeader,
 
-      permissions: {
-
-        canDepartmentApply: auth.canDepartmentApply,
-
-        departmentLeader: auth.departmentLeader,
-
-        archiveLeader: auth.archiveLeader,
-
-      },
-
-    })
-
+      archiveLeader: auth.archiveLeader,
+    },
+  })
 
   return applyDecision(decision)
-
 })
-
 
 export default router

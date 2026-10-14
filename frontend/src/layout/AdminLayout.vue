@@ -75,6 +75,21 @@
 
 
         <el-menu-item
+          index="/admin/department"
+        >
+
+          <el-icon>
+            <OfficeBuilding />
+          </el-icon>
+
+          <span>
+            部门管理
+          </span>
+
+        </el-menu-item>
+
+
+        <el-menu-item
           index="/admin/rule"
         >
 
@@ -241,6 +256,21 @@
 
           <span>
             教师管理
+          </span>
+
+        </el-menu-item>
+
+
+        <el-menu-item
+          index="/admin/department"
+        >
+
+          <el-icon>
+            <OfficeBuilding />
+          </el-icon>
+
+          <span>
+            部门管理
           </span>
 
         </el-menu-item>
@@ -471,7 +501,8 @@ import {
   Download,
   SwitchButton,
   Lock,
-  Menu
+  Menu,
+  OfficeBuilding
 } from '@element-plus/icons-vue'
 
 
@@ -567,6 +598,17 @@ const currentPageName =
     ) {
 
       return '教师管理'
+
+    }
+
+
+    if (
+      path.startsWith(
+        '/admin/department'
+      )
+    ) {
+
+      return '部门管理'
 
     }
 
