@@ -1,0 +1,4 @@
+# 保持脚本类文件使用 LF，避免 Windows 下 Git Bash / MSYS 执行报错
+*.sh text eol=lf
+.githooks/* text eol=lf
+student-score-system/mvnw text eol=lf

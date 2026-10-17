@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+#
+# =========================================================
+# Git pre-commit 钩子：提交前做后端快速编译检查
+#
+# 安装（在仓库根目录执行一次）：
+#   git config core.hooksPath .githooks
+#
+# 跳过（仅用于本地临时场景，例如紧急修复 WIP）：
+#   SKIP_BACKEND_CHECK=1 git commit -m "..."
+#
+# 重要：本地钩子只是「尽早发现问题」的便利手段，
+#       不是安全边界，可以被 --no-verify 绕过。
+#       真正不可绕过的强制门禁在 CI（.github/workflows/deploy.yml）。
+#
+# 检查范围：
+#   仅当本次提交涉及后端文件（student-score-system/ 下任意文件，
+#   或任意 .java 文件）时，才运行后端编译检查（不跑测试，保证速度）。
+# =========================================================
+
+set -eu
+
+if [ "${SKIP_BACKEND_CHECK:-0}" = "1" ]; then
+    echo "[pre-commit] 已设置 SKIP_BACKEND_CHECK=1，跳过后端编译检查。"
+    exit 0
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+cd "$REPO_ROOT"
+
+if [ ! -d "student-score-system" ]; then
+    echo "[pre-commit] 未找到 student-score-system 目录，跳过检查。"
+    exit 0
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+backend_changed=0
+
+for f in $staged; do
+    case "$f" in
+        student-score-system/*)
+            backend_changed=1
+            ;;
+        *.java)
+            backend_changed=1
+            ;;
+    esac
+
+    if [ "$backend_changed" = "1" ]; then
+        break
+    fi
+done
+
+if [ "$backend_changed" = "0" ]; then
+    echo "[pre-commit] 本次提交未涉及后端，跳过后端编译检查。"
+    exit 0
+fi
+
+echo "[pre-commit] 检测到后端改动，执行快速编译检查（不运行测试）..."
+
+if sh "$REPO_ROOT/scripts/verify-backend.sh" --fast; then
+    echo "[pre-commit] 后端编译通过。"
+    exit 0
+fi
+
+echo "" >&2
+echo "[pre-commit] 后端编译失败，已阻止提交。" >&2
+echo "             请先修复编译错误；临时跳过：" >&2
+echo "             SKIP_BACKEND_CHECK=1 git commit ..." >&2
+exit 1
