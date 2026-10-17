@@ -6,10 +6,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.dto.BatchFinalAuditDTO;
+import com.student.studentscoresystem.dto.BatchPreliminaryAuditDTO;
 import com.student.studentscoresystem.entity.*;
 import com.student.studentscoresystem.mapper.*;
+import com.student.studentscoresystem.service.CertificateBatchAuditService;
 import com.student.studentscoresystem.service.CertificateScoreFinalizeService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.vo.BatchAuditResultVO;
 import com.student.studentscoresystem.vo.ScoreApplyVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +43,8 @@ public class ScoreApplyController {
 
     private final CertificateScoreFinalizeService certificateScoreFinalizeService;
 
+    private final CertificateBatchAuditService certificateBatchAuditService;
+
     public ScoreApplyController(
             ScoreApplyMapper scoreApplyMapper,
             SysUserMapper sysUserMapper,
@@ -46,7 +52,8 @@ public class ScoreApplyController {
             ObjectMapper objectMapper,
             SysUserDepartmentMapper userDepartmentMapper,
             DepartmentMapper departmentMapper,
-            CertificateScoreFinalizeService certificateScoreFinalizeService
+            CertificateScoreFinalizeService certificateScoreFinalizeService,
+            CertificateBatchAuditService certificateBatchAuditService
     ) {
 
         this.scoreApplyMapper =
@@ -69,6 +76,9 @@ public class ScoreApplyController {
 
         this.certificateScoreFinalizeService =
                 certificateScoreFinalizeService;
+
+        this.certificateBatchAuditService =
+                certificateBatchAuditService;
     }
 
     /**
@@ -1564,6 +1574,75 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
+     * 批量初审通过
+     *
+     * 权限：档案部干事 / 副部长 / 部长
+     *
+     * 每份证书的认定分值可能不同，必须逐条提交，
+     * 后端逐条独立事务处理，任一失败不影响其它成功记录。
+     * ========================================================
+     */
+    @PostMapping("/preliminary-audit/batch")
+    public Result<BatchAuditResultVO> preliminaryAuditBatch(
+            @RequestBody BatchPreliminaryAuditDTO request,
+            HttpServletRequest httpRequest
+    ) {
+
+        Long reviewerId;
+
+        try {
+
+            reviewerId =
+                    getCurrentUserId(
+                            httpRequest
+                    );
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * 权限：与单条初审完全一致
+         */
+        if (
+                !isArchiveDepartmentMember(
+                        reviewerId
+                )
+        ) {
+
+            return Result.fail(
+                    "你没有档案部个人证书初审权限"
+            );
+        }
+
+        if (
+                request == null
+                        || request.getItems() == null
+                        || request.getItems().isEmpty()
+        ) {
+
+            return Result.error(
+                    "请选择需要初审的证书申请"
+            );
+        }
+
+        BatchAuditResultVO batchResult =
+                certificateBatchAuditService
+                        .batchPreliminary(
+                                request.getItems(),
+                                reviewerId
+                        );
+
+        return Result.success(
+                batchResult
+        );
+    }
+
+    /**
+     * ========================================================
      * 终审待审核
      *
      * 只有档案部副部长 / 部长可以查看
@@ -1942,6 +2021,76 @@ public class ScoreApplyController {
                     "该证书已经生成正式成绩记录，不能重复审批"
             );
         }
+    }
+
+    /**
+     * ========================================================
+     * 批量终审通过
+     *
+     * 权限：档案部副部长 / 部长
+     *
+     * 逐条复用 CertificateScoreFinalizeService.finalizeApproval，
+     * 在同一事务内生成正式成绩；并发重复由唯一索引兜底，
+     * 单条冲突不影响整批其它记录。
+     * ========================================================
+     */
+    @PostMapping("/final-audit/batch")
+    public Result<BatchAuditResultVO> finalAuditBatch(
+            @RequestBody BatchFinalAuditDTO request,
+            HttpServletRequest httpRequest
+    ) {
+
+        Long reviewerId;
+
+        try {
+
+            reviewerId =
+                    getCurrentUserId(
+                            httpRequest
+                    );
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        /*
+         * 权限：与单条终审完全一致
+         */
+        if (
+                !isArchiveFinalReviewer(
+                        reviewerId
+                )
+        ) {
+
+            return Result.fail(
+                    "只有档案部副部长、部长可以进行终审"
+            );
+        }
+
+        if (
+                request == null
+                        || request.getIds() == null
+                        || request.getIds().isEmpty()
+        ) {
+
+            return Result.error(
+                    "请选择需要终审的证书申请"
+            );
+        }
+
+        BatchAuditResultVO batchResult =
+                certificateBatchAuditService
+                        .batchFinal(
+                                request.getIds(),
+                                reviewerId
+                        );
+
+        return Result.success(
+                batchResult
+        );
     }
 
     /**

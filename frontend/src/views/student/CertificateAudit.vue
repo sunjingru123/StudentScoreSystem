@@ -534,6 +534,104 @@
     </el-dialog>
 
 
+    <!-- ==================== 批量初审填写分值 ==================== -->
+
+    <el-dialog
+      v-model="batchScoreDialogVisible"
+      title="批量填写认定分值"
+      width="720px"
+      destroy-on-close
+    >
+
+      <div class="batch-tip">
+        请为每份证书填写认定分值，分值必须大于 0。
+      </div>
+
+
+      <el-table
+        :data="batchScoreRows"
+        border
+        stripe
+        max-height="360"
+      >
+
+        <el-table-column
+          type="index"
+          label="#"
+          width="60"
+          align="center"
+        />
+
+
+        <el-table-column
+          prop="studentName"
+          label="学生"
+          min-width="100"
+        />
+
+
+        <el-table-column
+          prop="studentNo"
+          label="学号"
+          min-width="120"
+        />
+
+
+        <el-table-column
+          prop="title"
+          label="证书/获奖项目"
+          min-width="160"
+          show-overflow-tooltip
+        />
+
+
+        <el-table-column
+          label="认定分值"
+          width="170"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-input-number
+              v-model="row.score"
+              :min="0"
+              :max="40"
+              :precision="2"
+              :step="0.5"
+              controls-position="right"
+              style="width: 100%"
+            />
+
+          </template>
+
+        </el-table-column>
+
+      </el-table>
+
+
+      <template #footer>
+
+        <el-button
+          @click="batchScoreDialogVisible = false"
+        >
+          取消
+        </el-button>
+
+
+        <el-button
+          type="success"
+          :loading="batchLoading"
+          @click="confirmBatchPreliminaryApprove"
+        >
+          全部通过
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
+
     <!-- ==================== 材料预览 ==================== -->
 
     <el-dialog
@@ -928,6 +1026,18 @@ const scoreValue =
   ref(null)
 
 
+// =========================================================
+// 批量初审对话框
+// =========================================================
+
+const batchScoreDialogVisible =
+  ref(false)
+
+
+const batchScoreRows =
+  ref([])
+
+
 
 function openScoreDialog(row) {
 
@@ -1229,27 +1339,252 @@ async function batchPreliminaryApprove() {
 
 
   /*
-   * 批量通过时，每个证书的分值可能不一样，
-   * 所以这里不直接提交。
-   *
-   * 先逐条打开填写流程。
-   *
-   * 为了避免一个一个点确认，
-   * 这里使用循环方式依次填写。
+   * 每份证书的认定分值可能不一样，
+   * 先弹出批量填写对话框，逐条填写后再统一提交。
    */
 
-  ElMessage.info(
-    '批量通过时需要分别填写每份证书的认定分值，请逐条处理。'
-  )
+  batchScoreRows.value =
+    selectedRows.value.map(row => ({
+
+      id:
+        row.id,
+
+      studentName:
+        row.studentName,
+
+      studentNo:
+        row.studentNo,
+
+      title:
+        row.title,
+
+      score:
+        null
+
+    }))
+
+
+  batchScoreDialogVisible.value =
+    true
+
+}
+
+
+
+// =========================================================
+// 批量审核结果提示
+// =========================================================
+
+function handleBatchResult(data, title) {
+
+  const successCount =
+    Number(data?.successCount || 0)
+
+
+  const failCount =
+    Number(data?.failCount || 0)
+
+
+  const failures =
+    Array.isArray(data?.failures)
+      ? data.failures
+      : []
+
+
+  if (successCount > 0) {
+
+    ElMessage.success(
+      `${title}成功 ${successCount} 条`
+    )
+
+  }
+
+
+  if (failCount > 0) {
+
+    const detail =
+      failures.slice(0, 3).join('；')
+
+
+    const more =
+      failures.length > 3
+        ? ` 等 ${failures.length} 条`
+        : ''
+
+
+    ElMessage.warning(
+      `${failCount} 条处理失败：${detail}${more}`
+    )
+
+  }
 
 
   if (
-    selectedRows.value.length > 0
+    successCount === 0 &&
+    failCount === 0
   ) {
 
-    openScoreDialog(
-      selectedRows.value[0]
+    ElMessage.info(
+      '没有需要处理的记录'
     )
+
+  }
+
+}
+
+
+
+// =========================================================
+// 确认批量初审通过
+// =========================================================
+
+async function confirmBatchPreliminaryApprove() {
+
+  if (
+    batchScoreRows.value.length === 0
+  ) {
+
+    return
+
+  }
+
+
+  const invalid =
+    batchScoreRows.value.find(
+      row =>
+        row.score === null ||
+        row.score === undefined ||
+        Number(row.score) <= 0
+    )
+
+
+  if (invalid) {
+
+    ElMessage.warning(
+      `请为「${
+        invalid.studentName || '该学生'
+      }」填写大于 0 的认定分值`
+    )
+
+    return
+
+  }
+
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      `确定通过选中的 ${
+        batchScoreRows.value.length
+      } 份个人证书申请吗？`,
+
+      '批量初审',
+
+      {
+
+        confirmButtonText:
+          '确定通过',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'success'
+
+      }
+
+    )
+
+  } catch {
+
+    return
+
+  }
+
+
+  batchLoading.value =
+    true
+
+
+  try {
+
+    const items =
+      batchScoreRows.value.map(
+        row => ({
+
+          id:
+            row.id,
+
+          finalScore:
+            Number(row.score)
+
+        })
+      )
+
+
+    const res =
+      await request.post(
+        '/scoreApply/preliminary-audit/batch',
+        {
+          items
+        }
+      )
+
+
+    const result =
+      getResultData(res)
+
+
+    if (
+      result?.code !== 200 &&
+      result?.code !== 0
+    ) {
+
+      ElMessage.error(
+        result?.message ||
+        '批量初审失败'
+      )
+
+      return
+
+    }
+
+
+    handleBatchResult(
+      result?.data,
+      '批量初审'
+    )
+
+
+    batchScoreDialogVisible.value =
+      false
+
+
+    batchScoreRows.value =
+      []
+
+
+    await load()
+
+  } catch (error) {
+
+    console.error(
+      '批量初审失败',
+      error
+    )
+
+
+    ElMessage.error(
+      error?.response?.data?.message ||
+      error?.response?.data?.msg ||
+      '批量初审失败'
+    )
+
+  } finally {
+
+    batchLoading.value =
+      false
 
   }
 
@@ -1557,8 +1892,9 @@ async function batchFinalApprove() {
     }
 
 
-    ElMessage.success(
-      '批量终审通过'
+    handleBatchResult(
+      result?.data,
+      '批量终审'
     )
 
 
@@ -1944,6 +2280,23 @@ onBeforeUnmount(
 
 
 .score-tip {
+
+  color:
+    #909399;
+
+  font-size:
+    13px;
+
+  line-height:
+    22px;
+
+}
+
+
+.batch-tip {
+
+  margin-bottom:
+    12px;
 
   color:
     #909399;
