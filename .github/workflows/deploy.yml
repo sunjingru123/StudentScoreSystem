@@ -10,9 +10,87 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # =========================================================
+  # 质量门禁 1：后端编译 + 测试
+  #
+  # @SpringBootTest 上下文测试需要可用的 PostgreSQL，
+  # 因此这里通过 services 拉起一个临时数据库。
+  # 任何编译或测试失败都会让本任务失败，
+  # 从而使依赖它的 build-and-push / deploy 不会执行。
+  # =========================================================
+  backend-test:
+    name: Backend Compile & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: student_score_system
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Compile & test backend
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/student_score_system
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          JWT_SECRET: ci-only-jwt-secret-0123456789abcdef0123456789
+        run: sh scripts/verify-backend.sh
+
+  # =========================================================
+  # 质量门禁 2：前端构建
+  # =========================================================
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # =========================================================
+  # 构建并推送镜像（依赖两个质量门禁，失败则不会推送）
+  # =========================================================
   build-and-push:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
+    needs:
+      - backend-test
+      - frontend-build
     permissions:
       contents: read
       packages: write
@@ -61,10 +139,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # =========================================================
+  # 部署（等待镜像构建成功后才执行，使用提交 SHA 的不可变镜像）
+  # =========================================================
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs:
+      - backend-test
+      - frontend-build
+      - build-and-push
 
     steps:
       - name: Checkout repository
