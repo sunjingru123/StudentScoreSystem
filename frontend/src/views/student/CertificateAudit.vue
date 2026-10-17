@@ -604,7 +604,8 @@
 import {
   ref,
   computed,
-  onMounted
+  onMounted,
+  onBeforeUnmount
 } from 'vue'
 
 import {
@@ -613,6 +614,11 @@ import {
 } from 'element-plus'
 
 import request from '@/utils/request'
+
+import {
+  loadProtectedFile,
+  releaseAllProtectedFileUrls
+} from '@/utils/filePreview'
 
 
 // =========================================================
@@ -1634,7 +1640,7 @@ function getFileExtension(url) {
 
 
 
-function openFile(url) {
+async function openFile(url) {
 
   if (!url) {
 
@@ -1647,45 +1653,79 @@ function openFile(url) {
   }
 
 
-  previewUrl.value =
-    url
+  /*
+   * 通过带鉴权头的请求拉取文件，
+   * 避免 <img>/<iframe> 直接访问 /api/file/view/** 丢失 token。
+   */
+
+  try {
+
+    const {
+      objectUrl,
+      blob
+    } = await loadProtectedFile(url)
 
 
-  const extension =
-    getFileExtension(url)
+    previewUrl.value =
+      objectUrl
 
 
-  if (
-    [
-      'jpg',
-      'jpeg',
-      'png',
-      'gif',
-      'webp',
-      'bmp'
-    ].includes(extension)
-  ) {
+    /*
+     * /api/file/view/{id} 地址本身不含扩展名，
+     * 优先根据响应类型判断预览方式。
+     */
 
-    previewType.value =
-      'image'
+    const mimeType =
+      blob && blob.type
+        ? blob.type.toLowerCase()
+        : ''
 
-  } else if (
-    extension === 'pdf'
-  ) {
 
-    previewType.value =
-      'pdf'
+    const extension =
+      getFileExtension(url)
 
-  } else {
 
-    previewType.value =
-      'other'
+    if (
+      mimeType.startsWith('image/') ||
+      [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'bmp'
+      ].includes(extension)
+    ) {
+
+      previewType.value =
+        'image'
+
+    } else if (
+      mimeType === 'application/pdf' ||
+      extension === 'pdf'
+    ) {
+
+      previewType.value =
+        'pdf'
+
+    } else {
+
+      previewType.value =
+        'other'
+
+    }
+
+
+    materialDialogVisible.value =
+      true
+
+  } catch (error) {
+
+    ElMessage.error(
+      '查看材料失败，请检查登录状态后重试'
+    )
 
   }
-
-
-  materialDialogVisible.value =
-    true
 
 }
 
@@ -1743,6 +1783,11 @@ onMounted(() => {
   load()
 
 })
+
+
+onBeforeUnmount(
+  releaseAllProtectedFileUrls
+)
 
 </script>
 

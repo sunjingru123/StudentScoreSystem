@@ -401,7 +401,8 @@
 import {
   reactive,
   ref,
-  watch
+  watch,
+  onBeforeUnmount
 } from 'vue'
 
 import {
@@ -411,6 +412,11 @@ import {
 import {
   addApply
 } from '@/api/apply'
+
+import {
+  openProtectedFile,
+  releaseAllProtectedFileUrls
+} from '@/utils/filePreview'
 
 
 /*
@@ -822,9 +828,33 @@ function handleUploadSuccess(
   uploadFile
 ) {
 
+  /*
+   * =====================================================
+   * 后端返回业务失败（HTTP 200 + code != 200）
+   *
+   * 例如：
+   *   文件过大 / 目录不可写 / 其他业务异常
+   * =====================================================
+   */
 
+  if (
+    response &&
+    response.code !== undefined &&
+    Number(response.code) !== 200
+  ) {
 
+    console.error(
+      '文件上传后端返回失败：',
+      response
+    )
 
+    ElMessage.error(
+      response.message ||
+      '文件上传失败，请稍后重试'
+    )
+
+    return
+  }
 
 
   /*
@@ -986,8 +1016,44 @@ function handleUploadError(
   }
 
 
+  /*
+   * 413：请求体超过服务器限制
+   */
+
+  if (
+    error?.status === 413
+  ) {
+
+    ElMessage.error(
+      '文件过大，服务器拒绝接收，请压缩后重试（不超过 10MB）'
+    )
+
+    return
+
+  }
+
+
+  /*
+   * 403：已登录但没有权限
+   */
+
+  if (
+    error?.status === 403
+  ) {
+
+    ElMessage.error(
+      '没有上传权限，请重新登录后再试'
+    )
+
+    return
+
+  }
+
+
   ElMessage.error(
-    '获奖凭证上传失败，请检查登录状态和文件大小'
+    '获奖凭证上传失败（' +
+      (error?.status || '网络异常') +
+      '），请检查网络或文件大小'
   )
 
 }
@@ -1039,39 +1105,25 @@ function previewFile() {
   }
 
 
-  let url =
-    form.materialFile
-
-
   /*
-   * 如果后端返回的是：
-   *
-   * uploads/certificate/xxx.pdf
-   *
-   * 这种路径不能直接访问。
-   *
-   * 正常情况下我们现在保存的是：
-   *
-   * /api/file/view/xxx
+   * 通过带鉴权头的请求拉取文件后打开，
+   * 避免浏览器直接访问 /api/file/view/** 丢失 token。
    */
 
-  if (
-    !url.startsWith('/')
-  ) {
-
-    url =
-      '/' +
-      url
-
-  }
-
-
-  window.open(
-    url,
-    '_blank'
+  openProtectedFile(
+    form.materialFile
   )
 
 }
+
+
+/*
+ * 组件卸载时释放对象地址
+ */
+
+onBeforeUnmount(
+  releaseAllProtectedFileUrls
+)
 
 
 /*

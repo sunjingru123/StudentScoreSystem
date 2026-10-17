@@ -24,8 +24,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -546,7 +549,19 @@ public class FileInfoController {
 
         }
 
-        if (!currentUserId.equals(fileInfo.getUploaderId()) && !isAdmin(currentUserId)) {
+        /*
+         * =====================================================
+         * 查看权限：
+         *   1. 上传者本人；
+         *   2. 管理员；
+         *   3. 参与申报审核的岗位
+         *      （辅导员、部长、副部长、干事）。
+         *
+         * 学生只能查看自己上传的文件。
+         * =====================================================
+         */
+
+        if (!canViewFile(currentUserId, fileInfo.getUploaderId())) {
             return ResponseEntity.status(403).build();
         }
 
@@ -661,12 +676,64 @@ public class FileInfoController {
 
     }
 
-    private boolean isAdmin(Long userId) {
-        SysPosition admin = positionMapper.selectOne(new LambdaQueryWrapper<SysPosition>()
-                .eq(SysPosition::getName, "管理员"));
-        return admin != null && userPositionMapper.selectCount(new LambdaQueryWrapper<SysUserPosition>()
-                .eq(SysUserPosition::getUserId, userId)
-                .eq(SysUserPosition::getPositionId, admin.getId())) > 0;
+    /**
+     * 允许查看申报材料的岗位。
+     *
+     * 取值与 sys_position.name 保持一致，
+     * 不新增角色，仅覆盖现有审核岗位。
+     */
+    private static final Set<String> REVIEWER_POSITIONS = Set.of(
+            "管理员",
+            "辅导员",
+            "部长",
+            "副部长",
+            "干事"
+    );
+
+    /**
+     * 判断当前用户是否有权查看指定文件。
+     *
+     * 规则：
+     *   1. 上传者本人可查看；
+     *   2. 拥有管理员 / 审核岗位的用户可查看。
+     */
+    private boolean canViewFile(Long currentUserId, Long uploaderId) {
+        if (currentUserId == null) {
+            return false;
+        }
+
+        if (currentUserId.equals(uploaderId)) {
+            return true;
+        }
+
+        List<SysUserPosition> userPositions = userPositionMapper.selectList(
+                new LambdaQueryWrapper<SysUserPosition>()
+                        .eq(SysUserPosition::getUserId, currentUserId)
+        );
+
+        if (userPositions == null || userPositions.isEmpty()) {
+            return false;
+        }
+
+        List<Long> positionIds = new ArrayList<>();
+
+        for (SysUserPosition userPosition : userPositions) {
+            if (userPosition != null && userPosition.getPositionId() != null) {
+                positionIds.add(userPosition.getPositionId());
+            }
+        }
+
+        if (positionIds.isEmpty()) {
+            return false;
+        }
+
+        Long count = positionMapper.selectCount(
+                new LambdaQueryWrapper<SysPosition>()
+                        .in(SysPosition::getId, positionIds)
+                        .in(SysPosition::getName, REVIEWER_POSITIONS)
+        );
+
+        return count != null && count > 0;
     }
 
 }

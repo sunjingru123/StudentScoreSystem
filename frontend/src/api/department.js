@@ -19,3 +19,15 @@ export function enableDepartment(id) {
 export function disableDepartment(id) {
   return request.put(`/department/${id}/disable`)
 }
+
+export function getDepartmentMembers(departmentId) {
+  return request.get(`/department-member/department/${departmentId}`)
+}
+
+export function addDepartmentMember(departmentId, data) {
+  return request.post(`/department-member/department/${departmentId}`, data)
+}
+
+export function removeDepartmentMember(memberId) {
+  return request.delete(`/department-member/${memberId}`)
+}

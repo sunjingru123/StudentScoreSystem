@@ -758,42 +758,6 @@
         </el-form-item>
 
 
-        <!-- 活动凭证 -->
-
-        <el-form-item
-          label="活动凭证"
-        >
-
-          <el-upload
-            action="#"
-            :auto-upload="false"
-            :limit="1"
-            :on-change="handleDepartmentFile"
-            :on-remove="removeDepartmentFile"
-          >
-
-            <el-button type="primary">
-
-              选择凭证
-
-            </el-button>
-
-
-            <template #tip>
-
-              <div class="upload-tip">
-
-                可上传活动证明、照片、文件等材料
-
-              </div>
-
-            </template>
-
-          </el-upload>
-
-        </el-form-item>
-
-
         <!-- 提交 -->
 
         <el-form-item>
@@ -1315,9 +1279,6 @@ const departmentFormRef =
 
 const departmentSubmitting =
   ref(false)
-
-const departmentFile =
-  ref(null)
 
 const departmentForm =
   reactive({
@@ -2397,26 +2358,6 @@ async function batchAuditAllPass() {
 
 
 /* =========================================================
-   部门凭证
-========================================================= */
-
-function handleDepartmentFile(file) {
-
-  departmentFile.value =
-    file?.raw || null
-
-}
-
-
-function removeDepartmentFile() {
-
-  departmentFile.value =
-    null
-
-}
-
-
-/* =========================================================
    提交部门申报
 ========================================================= */
 
@@ -2467,12 +2408,7 @@ async function submitDepartment() {
       departmentForm.title,
 
       description:
-      departmentForm.description,
-
-      evidenceUrl:
-        departmentFile.value
-          ? departmentFile.value.name
-          : null
+      departmentForm.description
 
     }
 
@@ -2560,9 +2496,6 @@ function resetDepartment() {
 
   departmentForm.description =
     ''
-
-  departmentFile.value =
-    null
 
 
   departmentFormRef.value

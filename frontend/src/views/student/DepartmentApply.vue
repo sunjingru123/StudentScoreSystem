@@ -872,41 +872,6 @@
 
 
         <!-- ================================================== -->
-        <!-- 证明材料 -->
-        <!-- ================================================== -->
-
-        <el-form-item
-          label="活动凭证"
-        >
-
-          <el-upload
-            action=""
-            :auto-upload="false"
-            :limit="1"
-            :on-change="handleDepartmentFile"
-            :on-remove="removeDepartmentFile"
-          >
-
-            <el-button type="primary">
-              选择凭证
-            </el-button>
-
-
-            <template #tip>
-
-              <div class="upload-tip">
-                可上传活动证明、照片、文件等材料
-              </div>
-
-            </template>
-
-          </el-upload>
-
-        </el-form-item>
-
-
-
-        <!-- ================================================== -->
         <!-- 提交 -->
         <!-- ================================================== -->
 
@@ -1574,8 +1539,6 @@ const departmentFormRef = ref(null)
 
 const departmentSubmitting = ref(false)
 
-const departmentFile = ref(null)
-
 const departmentTemplateList = ref([])
 
 const templateLoading = ref(false)
@@ -1609,8 +1572,6 @@ const departmentForm = reactive({
   templateId: null,
 
   studentIds: [],
-
-  evidenceUrl: '',
 
 
   /*
@@ -3465,31 +3426,6 @@ async function batchApproveAudit() {
 
 
 /* ====================================================== */
-/* 部门文件选择 */
-/* ====================================================== */
-
-function handleDepartmentFile(file) {
-
-  departmentFile.value =
-    file.raw || null
-
-}
-
-
-
-/* ====================================================== */
-/* 删除部门文件 */
-/* ====================================================== */
-
-function removeDepartmentFile() {
-
-  departmentFile.value = null
-
-}
-
-
-
-/* ====================================================== */
 /* 批量提交部门加减分申报 */
 /* ====================================================== */
 
@@ -3729,11 +3665,6 @@ async function submitOneStudent(studentId) {
       templateId:
       departmentForm.templateId,
 
-      evidenceUrl:
-        departmentFile.value
-          ? departmentFile.value.name
-          : null,
-
     }
 
 
@@ -3830,8 +3761,6 @@ function resetDepartment() {
 
   departmentForm.templateId = null
 
-  departmentForm.evidenceUrl = ''
-
 
   /*
    * 清空新活动填写内容
@@ -3853,13 +3782,6 @@ function resetDepartment() {
    */
 
   departmentTemplateList.value = []
-
-
-  /*
-   * 清空文件
-   */
-
-  departmentFile.value = null
 
 
   /*
@@ -3885,10 +3807,6 @@ function resetDepartment() {
 function resetDepartmentAfterSubmit() {
 
   departmentForm.studentIds = []
-
-  departmentForm.evidenceUrl = ''
-
-  departmentFile.value = null
 
   departmentForm.newScoreType = 1
 

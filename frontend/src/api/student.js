@@ -9,6 +9,15 @@ export function getStudentList() {
   })
 }
 
+// 获取全部学生（部门成员选择等场景使用）
+export function getAllStudents() {
+  return request({
+    url: '/user/student/all',
+
+    method: 'GET',
+  })
+}
+
 // 禁用学生
 export function disableStudent(id) {
   return request({

@@ -19,6 +19,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.service.DepartmentMemberManageService;
 import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +52,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     private final DepartmentTemplateSyncService departmentTemplateSyncService;
 
+    private final DepartmentMemberManageService departmentMemberManageService;
+
     private final BCryptPasswordEncoder passwordEncoder =
             new BCryptPasswordEncoder();
 
@@ -61,7 +65,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             SysUserPositionMapper sysUserPositionMapper,
             SysPositionMapper sysPositionMapper,
             ScoreRuleMapper scoreRuleMapper,
-            DepartmentTemplateSyncService departmentTemplateSyncService
+            DepartmentTemplateSyncService departmentTemplateSyncService,
+            DepartmentMemberManageService departmentMemberManageService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.departmentMapper = departmentMapper;
@@ -71,6 +76,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         this.sysPositionMapper = sysPositionMapper;
         this.scoreRuleMapper = scoreRuleMapper;
         this.departmentTemplateSyncService = departmentTemplateSyncService;
+        this.departmentMemberManageService = departmentMemberManageService;
     }
 
     /**
@@ -522,6 +528,17 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         /*
          * =========================================================
+         * 部门成员“覆盖”同步
+         *
+         * 记录 Excel 中出现的部门、行数以及成功导入的成员，
+         * 导入结束后，把该部门内不在 Excel 名单中的在编成员软移出。
+         * =========================================================
+         */
+        Map<String, DepartmentRoster> rosters =
+                new LinkedHashMap<>();
+
+        /*
+         * =========================================================
          * 当前部门
          *
          * 用于支持：
@@ -596,6 +613,18 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
                 continue;
             }
+
+            /*
+             * 记录该部门在 Excel 中的行数，
+             * 用于判断该部门是否存在失败行。
+             */
+            DepartmentRoster roster =
+                    rosters.computeIfAbsent(
+                            departmentName,
+                            DepartmentRoster::new
+                    );
+
+            roster.incrementRowCount();
 
             /*
              * =====================================================
@@ -1137,19 +1166,83 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
 
             /*
+             * 记录部门 ID，供导入结束后的覆盖同步使用。
+             */
+            roster.setDepartmentId(
+                    department.getId()
+            );
+
+            /*
              * =====================================================
              * 13. 成功
              * =====================================================
              */
+            roster.getKeptUserIds().add(
+                    user.getId()
+            );
+
             successCount++;
         }
 
-        return buildResult(
-                successCount,
-                failCount,
-                errors,
-                "部门成员导入完成"
+        /*
+         * =========================================================
+         * 覆盖同步：
+         *
+         * 对 Excel 中出现、且每一行都导入成功的部门，
+         * 以 Excel 名单为准，把不在名单中的在编成员移出。
+         *
+         * 只要该部门存在任何失败行，就跳过覆盖，
+         * 避免因学号 / 姓名写错而误删成员。
+         * =========================================================
+         */
+        int removedCount = 0;
+
+        List<String> skippedDepartments =
+                new ArrayList<>();
+
+        for (DepartmentRoster item : rosters.values()) {
+
+            if (item.getDepartmentId() == null) {
+
+                continue;
+            }
+
+            if (item.getRowCount()
+                    != item.getKeptUserIds().size()) {
+
+                skippedDepartments.add(
+                        item.getDepartmentName()
+                );
+
+                continue;
+            }
+
+            removedCount +=
+                    departmentMemberManageService.syncRoster(
+                            item.getDepartmentId(),
+                            item.getKeptUserIds()
+                    );
+        }
+
+        Map<String, Object> result =
+                buildResult(
+                        successCount,
+                        failCount,
+                        errors,
+                        "部门成员导入完成"
+                );
+
+        result.put(
+                "removedCount",
+                removedCount
         );
+
+        result.put(
+                "skippedDepartments",
+                skippedDepartments
+        );
+
+        return result;
     }
 
     /**
@@ -1829,5 +1922,63 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
         return value == null
                 || value.trim().isEmpty();
+    }
+
+    /**
+     * =========================================================
+     * 部门成员覆盖同步的临时上下文
+     * =========================================================
+     */
+    private static final class DepartmentRoster {
+
+        private final String departmentName;
+
+        private Long departmentId;
+
+        private int rowCount;
+
+        private final Set<Long> keptUserIds =
+                new LinkedHashSet<>();
+
+        private DepartmentRoster(
+                String departmentName
+        ) {
+
+            this.departmentName =
+                    departmentName;
+        }
+
+        private String getDepartmentName() {
+
+            return departmentName;
+        }
+
+        private Long getDepartmentId() {
+
+            return departmentId;
+        }
+
+        private void setDepartmentId(
+                Long departmentId
+        ) {
+
+            this.departmentId =
+                    departmentId;
+        }
+
+        private int getRowCount() {
+
+            return rowCount;
+        }
+
+        private void incrementRowCount() {
+
+            this.rowCount++;
+        }
+
+        private Set<Long> getKeptUserIds() {
+
+            return keptUserIds;
+        }
     }
 }

@@ -491,7 +491,8 @@
 import {
   ref,
   computed,
-  onMounted
+  onMounted,
+  onBeforeUnmount
 } from 'vue'
 
 import {
@@ -509,6 +510,11 @@ import {
 } from '@element-plus/icons-vue'
 
 import request from '@/utils/request'
+
+import {
+  openProtectedFile,
+  releaseAllProtectedFileUrls
+} from '@/utils/filePreview'
 
 
 /* =========================================================
@@ -792,9 +798,13 @@ function openEvidence(url) {
   }
 
 
-  window.open(
-    url,
-    '_blank'
+  /*
+   * 通过带鉴权头的请求拉取文件后打开，
+   * 避免浏览器直接访问 /api/file/view/** 丢失 token。
+   */
+
+  openProtectedFile(
+    url
   )
 
 }
@@ -1412,6 +1422,11 @@ onMounted(() => {
   loadList()
 
 })
+
+
+onBeforeUnmount(
+  releaseAllProtectedFileUrls
+)
 
 </script>
 

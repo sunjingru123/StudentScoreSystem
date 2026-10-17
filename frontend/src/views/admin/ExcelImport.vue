@@ -109,8 +109,10 @@
           <h3>部门成员名单导入</h3>
 
           <p>
+            以 Excel 名单为准覆盖部门成员：
             批量设置学生所属部门以及
-            干事、副部长、部长身份。
+            干事、副部长、部长身份，
+            名单中未出现的成员会被移出该部门。
           </p>
         </div>
 
@@ -149,6 +151,12 @@
           <p>
             部门可以只在第一行填写，
             后续空白部门会自动继承上一行部门。
+          </p>
+
+          <p>
+            导入为“覆盖”模式：
+            Excel 中出现的部门，
+            不在名单内的原有成员会被移出。
           </p>
 
           <p>
@@ -259,6 +267,16 @@
           </b>
         </div>
 
+        <div
+          v-if="lastImportResult.removedCount > 0"
+          class="result-item warning"
+        >
+          <span>移出</span>
+          <b>
+            {{ lastImportResult.removedCount }}
+          </b>
+        </div>
+
       </div>
 
       <!-- 失败明细 -->
@@ -329,23 +347,33 @@
         </p>
 
         <p>
-          ④ Excel 中不存在的部门会自动创建。
+          ④ 部门成员导入为“覆盖”模式：
+          Excel 中出现的部门，不在名单内的原有成员会被移出。
         </p>
 
         <p>
-          ⑤ 空白部门自动继承上一行部门。
+          ⑤ Excel 中不存在的部门会自动创建。
         </p>
 
         <p>
-          ⑥ 一个学生可以属于多个部门。
+          ⑥ 空白部门自动继承上一行部门。
         </p>
 
         <p>
-          ⑦ 部长、副部长可以进行部门申报审核。
+          ⑦ 一个学生可以属于多个部门。
         </p>
 
         <p>
-          ⑧ 干事、副部长、部长都可以进行个人证书申报。
+          ⑧ 某部门的任何一行导入失败时，
+          该部门会跳过覆盖，保留原有成员，避免误删。
+        </p>
+
+        <p>
+          ⑨ 部长、副部长可以进行部门申报审核。
+        </p>
+
+        <p>
+          ⑩ 干事、副部长、部长都可以进行个人证书申报。
         </p>
 
       </div>
@@ -358,7 +386,7 @@
 <script setup>
 
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
@@ -533,6 +561,25 @@ async function importDepartmentMembers() {
     return
   }
 
+  /*
+   * 覆盖模式确认，避免误操作导致成员被移出。
+   */
+  try {
+    await ElMessageBox.confirm(
+      '导入为“覆盖”模式：Excel 中出现的部门，其名单外的原有成员会被移出。确定继续吗？',
+      '部门成员覆盖导入',
+      {
+        type: 'warning',
+        confirmButtonText: '确定覆盖',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+  }
+
   departmentImporting.value = true
 
   lastImportResult.value = null
@@ -577,13 +624,44 @@ async function importDepartmentMembers() {
       const failCount =
         result.failCount || 0
 
+      const removedCount =
+        result.removedCount || 0
+
+      const skippedDepartments =
+        Array.isArray(
+          result.skippedDepartments
+        )
+          ? result.skippedDepartments
+          : []
+
+      const summaryParts = [
+        `成功 ${successCount} 条`
+      ]
+
+      if (removedCount > 0) {
+
+        summaryParts.push(
+          `移出 ${removedCount} 条`
+        )
+      }
+
+      if (failCount > 0) {
+
+        summaryParts.push(
+          `失败 ${failCount} 条`
+        )
+      }
+
+      const summary =
+        summaryParts.join('，')
+
       /*
        * 全部成功
        */
       if (failCount === 0) {
 
         ElMessage.success(
-          `部门成员导入成功：共 ${successCount} 条`
+          `部门成员导入成功：${summary}`
         )
 
       } else {
@@ -592,7 +670,14 @@ async function importDepartmentMembers() {
          * 部分成功
          */
         ElMessage.warning(
-          `部门成员导入完成：成功 ${successCount} 条，失败 ${failCount} 条`
+          `部门成员导入完成：${summary}`
+        )
+      }
+
+      if (skippedDepartments.length > 0) {
+
+        ElMessage.warning(
+          `以下部门因存在失败行已跳过覆盖（保留原有成员）：${skippedDepartments.join('、')}`
         )
       }
 
@@ -787,6 +872,10 @@ async function importDepartmentMembers() {
 
 .result-item.error b {
   color: #f56c6c;
+}
+
+.result-item.warning b {
+  color: #e6a23c;
 }
 
 .error-detail {
