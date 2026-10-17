@@ -8,10 +8,14 @@ import com.student.studentscoresystem.dto.ScoreAddDTO;
 import com.student.studentscoresystem.entity.Course;
 import com.student.studentscoresystem.entity.Score;
 import com.student.studentscoresystem.entity.ScoreRecord;
+import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
+import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.CourseMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
+import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.IScoreService;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.utils.JwtUtil;
@@ -40,19 +44,25 @@ public class ScoreController {
     private final CourseMapper courseMapper;
     private final ScoreRecordMapper scoreRecordMapper;
     private final ScoreProjectNameResolver scoreProjectNameResolver;
+    private final SysPositionMapper sysPositionMapper;
+    private final SysUserPositionMapper sysUserPositionMapper;
 
     public ScoreController(
             IScoreService scoreService,
             SysUserMapper sysUserMapper,
             CourseMapper courseMapper,
             ScoreRecordMapper scoreRecordMapper,
-            ScoreProjectNameResolver scoreProjectNameResolver
+            ScoreProjectNameResolver scoreProjectNameResolver,
+            SysPositionMapper sysPositionMapper,
+            SysUserPositionMapper sysUserPositionMapper
     ) {
         this.scoreService = scoreService;
         this.sysUserMapper = sysUserMapper;
         this.courseMapper = courseMapper;
         this.scoreRecordMapper = scoreRecordMapper;
         this.scoreProjectNameResolver = scoreProjectNameResolver;
+        this.sysPositionMapper = sysPositionMapper;
+        this.sysUserPositionMapper = sysUserPositionMapper;
     }
 
 
@@ -224,8 +234,36 @@ public class ScoreController {
             HttpServletRequest request
     ) {
 
-        Object current = request.getAttribute("userId");
-        if (current == null || !String.valueOf(studentId).equals(String.valueOf(current))) {
+        /*
+         * =====================================================
+         * 访问权限
+         *
+         * 与 ScoreRecordController#student 保持一致：
+         *
+         * 1. 学生只能查看本人成绩流水；
+         * 2. 管理员 / 教师 / 辅导员可以查看所负责学生的成绩流水
+         *    （教师端「学生综合测评 → 查看详情」依赖本接口）。
+         * =====================================================
+         */
+
+        Long currentUserId =
+                parseCurrentUserId(request);
+
+        if (currentUserId == null) {
+
+            return Result.error("请先登录");
+        }
+
+        boolean self =
+                currentUserId.equals(studentId);
+
+        if (
+                !self
+                        && !canViewOtherStudentRecords(
+                        currentUserId
+                )
+        ) {
+
             return Result.error("无权访问该学生成绩流水");
         }
 
@@ -834,6 +872,141 @@ public class ScoreController {
 
             return null;
         }
+    }
+
+
+    /**
+     * =========================================================
+     * 解析拦截器写入的当前登录用户 ID
+     * =========================================================
+     */
+    private Long parseCurrentUserId(
+            HttpServletRequest request
+    ) {
+
+        Object value =
+                request.getAttribute(
+                        "userId"
+                );
+
+        if (value == null) {
+
+            return null;
+        }
+
+        try {
+
+            return Long.valueOf(
+                    value.toString()
+            );
+
+        } catch (NumberFormatException e) {
+
+            return null;
+        }
+    }
+
+
+    /**
+     * =========================================================
+     * 是否允许查看「非本人」的成绩流水
+     *
+     * 与 ScoreRecordController#student 的放行口径一致：
+     * 管理员 / 教师 / 辅导员可以查看学生成绩，
+     * 普通学生（及其他无相关岗位的用户）只能查看本人。
+     * =========================================================
+     */
+    private boolean canViewOtherStudentRecords(
+            Long userId
+    ) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+        return hasAnyPosition(
+                userId,
+                "管理员",
+                "教师",
+                "辅导员"
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 判断用户是否拥有任一指定岗位
+     *
+     * 同一用户可能同时拥有多个岗位（例如「学生」+「部长」），
+     * 因此逐个岗位判断，避免 selectOne 抛异常。
+     * =========================================================
+     */
+    private boolean hasAnyPosition(
+            Long userId,
+            String... positionNames
+    ) {
+
+        List<SysUserPosition> userPositions =
+                sysUserPositionMapper.selectList(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getUserId,
+                                        userId
+                                )
+                );
+
+        if (
+                userPositions == null
+                        || userPositions.isEmpty()
+        ) {
+
+            return false;
+        }
+
+        for (
+                SysUserPosition userPosition
+                : userPositions
+        ) {
+
+            if (
+                    userPosition == null
+                            || userPosition.getPositionId() == null
+            ) {
+
+                continue;
+            }
+
+            SysPosition position =
+                    sysPositionMapper.selectById(
+                            userPosition.getPositionId()
+                    );
+
+            if (
+                    position == null
+                            || position.getName() == null
+            ) {
+
+                continue;
+            }
+
+            for (
+                    String positionName
+                    : positionNames
+            ) {
+
+                if (
+                        positionName.equals(
+                                position.getName()
+                        )
+                ) {
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
 
