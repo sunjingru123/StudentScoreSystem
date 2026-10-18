@@ -2,7 +2,7 @@
   <div class="rule-page">
     <div class="page-header">
       <div>
-        <h2>规则管理</h2>
+        <h2>评分项目管理</h2>
         <p>仅管理部门加减分的固定评分项目；新增 / 编辑后会同步到该部门的加减分模板，学生端可直接选择</p>
       </div>
 
@@ -31,7 +31,7 @@
             {{ getDepartmentName(row.departmentId) }}
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="规则名称" min-width="180" />
+        <el-table-column prop="name" label="评分项目名称" min-width="180" />
         <el-table-column label="类型" width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="Number(row.scoreType) === -1 ? 'danger' : 'success'">

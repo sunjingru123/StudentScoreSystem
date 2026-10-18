@@ -184,7 +184,8 @@
 
             <el-table-column
               label="操作"
-              width="220"
+              :width="isMobile ? 74 : 220"
+              class-name="audit-actions"
               fixed="right"
               align="center"
             >
@@ -196,7 +197,7 @@
                   link
                   @click="preliminaryApprove(row)"
                 >
-                  通过并填写分值
+                  {{ isMobile ? '通过' : '通过并填写分值' }}
                 </el-button>
 
 
@@ -389,7 +390,8 @@
 
             <el-table-column
               label="操作"
-              width="180"
+              :width="isMobile ? 64 : 180"
+              class-name="audit-actions"
               fixed="right"
               align="center"
             >
@@ -401,7 +403,7 @@
                   link
                   @click="finalApprove(row)"
                 >
-                  一键通过
+                  {{ isMobile ? '通过' : '一键通过' }}
                 </el-button>
 
 
@@ -710,6 +712,13 @@ import {
   ElMessage,
   ElMessageBox
 } from 'element-plus'
+
+const isMobile = ref(false)
+let mobileQuery
+
+function updateMobileLayout() {
+  isMobile.value = mobileQuery.matches
+}
 
 import request from '@/utils/request'
 
@@ -2114,6 +2123,10 @@ function formatScore(score) {
 
 onMounted(() => {
 
+  mobileQuery = window.matchMedia('(max-width: 768px)')
+  updateMobileLayout()
+  mobileQuery.addEventListener('change', updateMobileLayout)
+
   loadCurrentUser()
 
   load()
@@ -2121,14 +2134,29 @@ onMounted(() => {
 })
 
 
-onBeforeUnmount(
-  releaseAllProtectedFileUrls
-)
+onBeforeUnmount(() => {
+  mobileQuery?.removeEventListener('change', updateMobileLayout)
+  releaseAllProtectedFileUrls()
+})
 
 </script>
 
 
 <style scoped>
+
+@media (max-width: 768px) {
+  :deep(.audit-actions .cell) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+  }
+
+  :deep(.audit-actions .el-button + .el-button) {
+    margin-left: 0;
+  }
+}
 
 .certificate-page {
 
