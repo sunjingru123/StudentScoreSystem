@@ -13,7 +13,6 @@
 
     <el-card shadow="never">
       <el-table v-loading="loading" :data="departments" stripe>
-        <el-table-column prop="id" label="ID" width="90" />
         <el-table-column prop="name" label="部门名称" min-width="220" />
         <el-table-column label="状态" width="110">
           <template #default="scope">
