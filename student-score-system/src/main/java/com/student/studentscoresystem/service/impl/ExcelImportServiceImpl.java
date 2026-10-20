@@ -1519,6 +1519,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             /*
              * =================================================
              * 6. 新增 / 更新
+             *
+             * 规则身份是 部门 + 名称 + 加分/减分类型 + 分值：
+             * 只有四者全部一致才视为同一条规则并更新，
+             * 同名但类型/分值不同的行会新增为独立规则。
              * =================================================
              */
             ScoreRule exist =
@@ -1531,6 +1535,14 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                     .eq(
                                             ScoreRule::getName,
                                             ruleName
+                                    )
+                                    .eq(
+                                            ScoreRule::getScoreType,
+                                            scoreType
+                                    )
+                                    .eq(
+                                            ScoreRule::getScore,
+                                            score
                                     )
                                     .last("LIMIT 1")
                     );

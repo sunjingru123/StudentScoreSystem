@@ -700,14 +700,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_score_record_source
     WHERE source_id IS NOT NULL;
 
 -- ==========================================
--- 5.7 同部门规则名称唯一约束
+-- 5.7 同部门评分规则唯一约束
 --
--- 同一个部门下不允许出现同名评分规则，
--- 从数据库层面防止并发插入产生重复规则，
--- 保证终审时按 部门 + 名称 匹配规则不会漂移。
+-- 规则的业务身份是「部门 + 名称 + 加分/减分类型 + 分值」，
+-- 与 department_score_template 的身份定义保持一致。
+-- 因此同一部门允许存在同名但类型/分值不同的规则，
+-- 例如「教室卫生检查：卫生优良」可以同时有 +0.5 / +1 / +1.5。
+--
+-- 旧索引 uk_score_rule_dept_name 只按 部门 + 名称 唯一，
+-- 会阻止同名不同分值的规则落库，这里做幂等替换。
+-- 只删除索引，不改动任何规则数据。
 --
 -- 使用局部唯一索引：department_id 为空的记录不受影响。
+-- （score_type 为空的历史数据在 PostgreSQL 唯一索引中互不冲突）
 -- ==========================================
-CREATE UNIQUE INDEX IF NOT EXISTS uk_score_rule_dept_name
-    ON public.score_rule(department_id, name)
+DROP INDEX IF EXISTS public.uk_score_rule_dept_name;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_score_rule_dept_name_score
+    ON public.score_rule(department_id, name, score_type, score)
     WHERE department_id IS NOT NULL;

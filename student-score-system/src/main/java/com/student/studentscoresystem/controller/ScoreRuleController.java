@@ -122,11 +122,11 @@ public class ScoreRuleController {
         } catch (DuplicateKeyException e) {
 
             /*
-             * 并发下同一部门同名规则同时落库，
-             * 由数据库唯一索引 uk_score_rule_dept_name 拦截。
+             * 并发下同一部门、同名、同类型、同分值的规则同时落库，
+             * 由数据库唯一索引 uk_score_rule_dept_name_score 拦截。
              */
             return Result.fail(
-                    "该部门下已经存在同名规则，请勿重复添加"
+                    "该部门下已经存在同名、同类型且同分值的规则，请勿重复添加"
             );
         }
     }
@@ -162,11 +162,11 @@ public class ScoreRuleController {
         } catch (DuplicateKeyException e) {
 
             /*
-             * 修改后与同部门其他规则重名，
-             * 由数据库唯一索引 uk_score_rule_dept_name 拦截。
+             * 修改后与同部门其他规则的身份（名称 + 类型 + 分值）重复，
+             * 由数据库唯一索引 uk_score_rule_dept_name_score 拦截。
              */
             return Result.fail(
-                    "该部门下已经存在同名规则，请更换名称"
+                    "该部门下已经存在同名、同类型且同分值的规则，请更换名称或分值"
             );
         }
     }

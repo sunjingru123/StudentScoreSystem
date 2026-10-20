@@ -130,10 +130,13 @@ public class ScoreRuleManageService {
         }
 
         /*
-         * 记下修改前的部门 / 名称，用于同步模板改名。
+         * 记下修改前的完整身份（部门 / 名称 / 类型 / 分值），
+         * 用于同步模板。必须先备份，下面会原地修改 oldRule。
          */
         Long oldDepartmentId = oldRule.getDepartmentId();
         String oldName = oldRule.getName();
+        Short oldScoreType = oldRule.getScoreType();
+        BigDecimal oldScore = oldRule.getScore();
 
         oldRule.setDepartmentId(rule.getDepartmentId());
         oldRule.setName(rule.getName().trim());
@@ -154,6 +157,8 @@ public class ScoreRuleManageService {
         departmentTemplateSyncService.syncRename(
                 oldDepartmentId,
                 oldName,
+                oldScoreType,
+                oldScore,
                 oldRule
         );
 
@@ -268,19 +273,24 @@ public class ScoreRuleManageService {
             return "分值必须大于 0";
         }
 
+        BigDecimal score = scaleScore(rule.getScore());
+
         /*
-         * 同一个部门下不允许出现同名规则，
-         * 因为部门申报终审时是按 部门 + 规则名称 匹配正式规则的。
+         * 规则身份是 部门 + 名称 + 加分/减分类型 + 分值：
+         * 同一部门允许同名但分值/类型不同的规则共存，
+         * 只拦截四者完全相同的重复规则。
          */
         Long count = scoreRuleService.count(
                 new LambdaQueryWrapper<ScoreRule>()
                         .eq(ScoreRule::getDepartmentId, rule.getDepartmentId())
                         .eq(ScoreRule::getName, name)
+                        .eq(ScoreRule::getScoreType, rule.getScoreType())
+                        .eq(ScoreRule::getScore, score)
                         .ne(excludeId != null, ScoreRule::getId, excludeId)
         );
 
         if (count != null && count > 0) {
-            return "该部门下已经存在同名规则：" + name;
+            return "该部门下已经存在同名、同类型且同分值的规则：" + name;
         }
 
         return null;

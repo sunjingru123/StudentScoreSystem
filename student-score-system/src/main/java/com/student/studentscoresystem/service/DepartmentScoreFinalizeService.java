@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * =========================================================
@@ -141,14 +142,20 @@ public class DepartmentScoreFinalizeService {
          * =====================================================
          * 查找正式成绩规则
          *
+         * 规则身份是 部门 + 名称 + 加分/减分类型 + 分值，
+         * 同一部门下可能存在同名但分值不同的规则，
+         * 因此必须先按部门 + 名称取出全部候选规则，
+         * 再挑选与申报分值/类型完全一致的那一条，
+         * 不能只取第一条，否则会因同名规则导致分值匹配漂移。
+         *
          * 有正式规则（固定加减分项目）时要求申报分值与规则一致；
          * 没有正式规则说明是部门自己的非固定活动，
          * 分值以申报单上填写的为准。
          * =====================================================
          */
 
-        ScoreRule scoreRule =
-                scoreRuleMapper.selectOne(
+        List<ScoreRule> candidates =
+                scoreRuleMapper.selectList(
                         new LambdaQueryWrapper<ScoreRule>()
                                 .eq(
                                         ScoreRule::getDepartmentId,
@@ -162,19 +169,44 @@ public class DepartmentScoreFinalizeService {
                                         ScoreRule::getStatus,
                                         (short) 1
                                 )
-                                /*
-                                 * 同一部门规则名称已由唯一索引保证唯一，
-                                 * 这里再固定主键排序，避免匹配漂移。
-                                 */
                                 .orderByAsc(
                                         ScoreRule::getId
                                 )
-                                .last(
-                                        "LIMIT 1"
-                                )
                 );
 
-        if (scoreRule != null) {
+        ScoreRule scoreRule = null;
+
+        if (candidates != null
+                && !candidates.isEmpty()) {
+
+            for (ScoreRule candidate : candidates) {
+
+                if (matchesApply(
+                        candidate,
+                        apply
+                )) {
+
+                    scoreRule = candidate;
+
+                    break;
+                }
+            }
+
+            if (scoreRule == null) {
+
+                return "部门申报分值与正式加减分规则不一致：" +
+                        "申报分值=" +
+                        apply.getScore() +
+                        "（" +
+                        scoreTypeLabel(
+                                apply.getScoreType()
+                        ) +
+                        "）" +
+                        "，该部门同名正式规则：" +
+                        describeCandidates(
+                                candidates
+                        );
+            }
 
             if (scoreRule.getScore() == null
                     || scoreRule.getScore()
@@ -184,19 +216,6 @@ public class DepartmentScoreFinalizeService {
 
                 return "正式加减分规则分值配置错误：" +
                         scoreRule.getName();
-            }
-
-            if (apply.getScore() == null
-                    || scoreRule.getScore()
-                    .compareTo(
-                            apply.getScore()
-                    ) != 0) {
-
-                return "部门申报分值与正式加减分规则分值不一致：" +
-                        "申报分值=" +
-                        apply.getScore() +
-                        "，正式规则分值=" +
-                        scoreRule.getScore();
             }
         }
 
@@ -297,6 +316,109 @@ public class DepartmentScoreFinalizeService {
         }
 
         return null;
+    }
+
+    /**
+     * =========================================================
+     * 判断正式规则是否与申报分值 / 类型一致
+     *
+     * 历史申报可能没有 score_type，
+     * 或者历史规则 score_type 为空，
+     * 此时退化为只比较分值，保持向后兼容。
+     * =========================================================
+     */
+    private boolean matchesApply(
+            ScoreRule rule,
+            DepartmentScoreApply apply
+    ) {
+
+        if (rule == null
+                || apply == null
+                || rule.getScore() == null
+                || apply.getScore() == null) {
+
+            return false;
+        }
+
+        if (rule.getScore().compareTo(
+                apply.getScore()
+        ) != 0) {
+
+            return false;
+        }
+
+        if (apply.getScoreType() == null
+                || rule.getScoreType() == null) {
+
+            return true;
+        }
+
+        return apply.getScoreType().equals(
+                rule.getScoreType()
+        );
+    }
+
+    /**
+     * =========================================================
+     * 候选规则描述，仅用于业务错误提示
+     * =========================================================
+     */
+    private String describeCandidates(
+            List<ScoreRule> candidates
+    ) {
+
+        StringBuilder builder =
+                new StringBuilder();
+
+        for (ScoreRule candidate : candidates) {
+
+            if (builder.length() > 0) {
+
+                builder.append(" / ");
+            }
+
+            builder.append(
+                    scoreTypeLabel(
+                            candidate.getScoreType()
+                    )
+            );
+
+            builder.append(" ");
+
+            builder.append(
+                    candidate.getScore() == null
+                            ? "未配置"
+                            : candidate.getScore()
+                            .stripTrailingZeros()
+                            .toPlainString()
+            );
+        }
+
+        return builder.toString();
+    }
+
+    /**
+     * =========================================================
+     * 加分 / 减分文案
+     * =========================================================
+     */
+    private String scoreTypeLabel(
+            Short scoreType
+    ) {
+
+        if (Short.valueOf((short) -1)
+                .equals(scoreType)) {
+
+            return "减分";
+        }
+
+        if (Short.valueOf((short) 1)
+                .equals(scoreType)) {
+
+            return "加分";
+        }
+
+        return "未标注类型";
     }
 
     /**

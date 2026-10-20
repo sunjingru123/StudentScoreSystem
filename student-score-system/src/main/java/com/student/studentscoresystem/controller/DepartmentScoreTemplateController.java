@@ -151,10 +151,11 @@ public class DepartmentScoreTemplateController {
      * 说明：
      *
      * 1. 必须是该部门在职成员
-     * 2. 同部门同名活动已存在时直接复用，
-     *    分值 / 类型以本次填写的为准
+     * 2. 同部门、同名称、同类型、同分值的活动已存在时直接复用
      *    （已经提交的申报不受影响，
      *    申报单里保存的是提交当时的分值）
+     * 3. 同名但分值/类型不同的活动会保存为独立模板，
+     *    不会覆盖管理员维护的同名固定项目
      * =========================================================
      */
     @PostMapping("/add")
@@ -271,8 +272,11 @@ public class DepartmentScoreTemplateController {
                 LocalDateTime.now();
 
         /*
-         * 同部门同名活动：直接复用，
-         * 分值 / 类型以本次填写的为准
+         * 活动模板身份：部门 + 名称 + 类型 + 分值。
+         *
+         * 只有四者完全一致才复用并刷新描述，
+         * 同名但分值/类型不同的活动会各自保存为独立模板，
+         * 避免把管理员维护的同名固定模板分值覆盖掉。
          */
         DepartmentScoreTemplate exist =
                 templateService.getOne(
@@ -285,14 +289,19 @@ public class DepartmentScoreTemplateController {
                                         DepartmentScoreTemplate::getName,
                                         name
                                 )
-                                .last("LIMIT 1")
+                                .eq(
+                                        DepartmentScoreTemplate::getScoreType,
+                                        scoreType
+                                )
+                                .eq(
+                                        DepartmentScoreTemplate::getScore,
+                                        score
+                                )
+                                .last("LIMIT 1"),
+                        false
                 );
 
         if (exist != null) {
-
-            exist.setScoreType(scoreType);
-
-            exist.setScore(score);
 
             if (description != null) {
 
