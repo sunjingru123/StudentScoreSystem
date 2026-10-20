@@ -240,6 +240,12 @@ public class ScoreExportServiceImpl
                     );
 
 
+            CellStyle detailStyle =
+                    createDetailStyle(
+                            workbook
+                    );
+
+
             /*
              * =================================================
              * 6. 创建表头
@@ -783,6 +789,8 @@ public class ScoreExportServiceImpl
                  *
                  * 空字符串
                  *
+                 * 单元格开启自动换行，
+                 * 内容较长时会在列宽内自动折行，不会被截断
                  * =================================================
                  */
 
@@ -799,7 +807,7 @@ public class ScoreExportServiceImpl
 
 
                 detailCell.setCellStyle(
-                        normalStyle
+                        detailStyle
                 );
             }
 
@@ -1092,6 +1100,42 @@ public class ScoreExportServiceImpl
 
         style.setAlignment(
                 HorizontalAlignment.CENTER
+        );
+
+
+        return style;
+    }
+
+
+    /* =========================================================
+       明细样式（自动换行）
+       ========================================================= */
+
+    private CellStyle createDetailStyle(
+            Workbook workbook) {
+
+        CellStyle style =
+                createNormalStyle(
+                        workbook
+                );
+
+
+        /*
+         * 加减分具体情况通常较长，
+         * 必须开启自动换行，否则内容会溢出列宽或被截断。
+         */
+
+        style.setWrapText(
+                true
+        );
+
+
+        /*
+         * 多行内容顶部对齐，阅读更自然
+         */
+
+        style.setVerticalAlignment(
+                VerticalAlignment.TOP
         );
 
 
