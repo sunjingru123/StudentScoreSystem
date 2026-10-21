@@ -392,7 +392,7 @@
       width="500px"
     >
 
-      <el-form>
+      <el-form @submit.prevent>
 
         <el-form-item label="审核意见">
 

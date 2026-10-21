@@ -51,7 +51,10 @@
       class="search-card"
     >
 
-      <el-form :inline="true">
+      <el-form
+        :inline="true"
+        @submit.prevent
+      >
 
         <el-form-item label="搜索">
 
@@ -567,6 +570,7 @@
         :model="addForm"
         :rules="addRules"
         label-width="96px"
+        @submit.prevent
       >
 
         <el-form-item

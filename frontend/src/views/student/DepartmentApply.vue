@@ -513,6 +513,7 @@
         :rules="departmentRules"
         label-width="110px"
         class="apply-form"
+        @submit.prevent
       >
 
 

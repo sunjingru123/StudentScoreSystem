@@ -136,6 +136,7 @@
       <el-form
         :model="form"
         label-width="100px"
+        @submit.prevent
       >
 
         <!-- 学生 -->

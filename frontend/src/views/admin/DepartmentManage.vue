@@ -121,7 +121,13 @@
       width="460px"
       destroy-on-close
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="90px"
+        @submit.prevent
+      >
         <el-form-item label="部门名称" prop="name">
           <el-input
             v-model="form.name"

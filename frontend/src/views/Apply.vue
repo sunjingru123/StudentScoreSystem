@@ -17,6 +17,7 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        @submit.prevent
       >
 
         <!-- 获奖类别 -->

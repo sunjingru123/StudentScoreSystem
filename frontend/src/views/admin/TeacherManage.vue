@@ -15,7 +15,10 @@
 
     <!-- 搜索区域 -->
     <el-card class="search-card" shadow="never">
-      <el-form :inline="true">
+      <el-form
+        :inline="true"
+        @submit.prevent
+      >
         <el-form-item label="教师姓名">
           <el-input
             v-model="search.realName"
@@ -210,6 +213,7 @@
         :model="form"
         :rules="rules"
         label-width="90px"
+        @submit.prevent
       >
 
         <el-form-item label="教师姓名" prop="realName">

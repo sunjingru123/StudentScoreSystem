@@ -219,6 +219,7 @@
         :model="form"
         :rules="rules"
         label-width="90px"
+        @submit.prevent
       >
 
         <!-- 学期名称 -->

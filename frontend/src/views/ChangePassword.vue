@@ -38,6 +38,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        @submit.prevent
       >
 
         <el-form-item

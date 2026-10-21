@@ -19,6 +19,7 @@
       <el-form
         :model="form"
         label-width="90px"
+        @submit.prevent
       >
 
         <!-- 学期 -->

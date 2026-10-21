@@ -25,7 +25,10 @@
       class="search-card"
     >
 
-      <el-form :inline="true">
+      <el-form
+        :inline="true"
+        @submit.prevent
+      >
 
         <el-form-item label="搜索">
 
@@ -447,7 +450,10 @@
 
     <el-dialog v-model="correctionVisible" title="成绩更正" width="520px">
       <p>成绩更正会记录操作人、原成绩、新成绩及更正原因。</p>
-      <el-form label-width="90px">
+      <el-form
+        label-width="90px"
+        @submit.prevent
+      >
         <el-form-item label="学生">
           <el-input :model-value="correctionRow?.studentName || currentStudent?.realName" disabled />
         </el-form-item>

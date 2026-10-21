@@ -488,7 +488,7 @@
         </div>
 
 
-        <el-form>
+        <el-form @submit.prevent>
 
           <el-form-item label="审核加分">
 

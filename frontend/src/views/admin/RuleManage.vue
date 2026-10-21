@@ -84,6 +84,7 @@
         :model="form"
         :rules="formRules"
         label-width="90px"
+        @submit.prevent
       >
         <el-form-item label="所属部门" prop="departmentId">
           <el-select
