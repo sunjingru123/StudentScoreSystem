@@ -13,6 +13,7 @@ import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.StudentVO;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -981,6 +982,7 @@ public class SysUserController {
      */
     @PostMapping("/student/add")
     @RequireRole("管理员")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> addStudent(
             @RequestBody StudentAddDTO dto
     ) {
@@ -989,6 +991,95 @@ public class SysUserController {
 
             return Result.error(
                     "参数不能为空"
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 0. 参数校验
+         * =====================================================
+         */
+
+        String studentNo =
+                trimToNull(
+                        dto.getStudentNo()
+                );
+
+        String username =
+                trimToNull(
+                        dto.getUsername()
+                );
+
+        String realName =
+                trimToNull(
+                        dto.getRealName()
+                );
+
+
+        if (studentNo == null) {
+
+            return Result.fail(
+                    "学号不能为空"
+            );
+        }
+
+
+        if (username == null) {
+
+            return Result.fail(
+                    "用户名不能为空"
+            );
+        }
+
+
+        if (realName == null) {
+
+            return Result.fail(
+                    "姓名不能为空"
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 0.1 重复校验
+         *
+         * sys_user.student_no / username 均有唯一约束，
+         * 这里先查一次，避免直接抛数据库异常。
+         * =====================================================
+         */
+
+        Long sameStudentNo =
+                sysUserMapper.selectCount(
+                        new LambdaQueryWrapper<SysUser>()
+                                .eq(
+                                        SysUser::getStudentNo,
+                                        studentNo
+                                )
+                );
+
+        if (sameStudentNo != null && sameStudentNo > 0) {
+
+            return Result.fail(
+                    "学号已存在"
+            );
+        }
+
+
+        Long sameUsername =
+                sysUserMapper.selectCount(
+                        new LambdaQueryWrapper<SysUser>()
+                                .eq(
+                                        SysUser::getUsername,
+                                        username
+                                )
+                );
+
+        if (sameUsername != null && sameUsername > 0) {
+
+            return Result.fail(
+                    "用户名已存在"
             );
         }
 
@@ -1004,11 +1095,11 @@ public class SysUserController {
 
 
         user.setStudentNo(
-                dto.getStudentNo()
+                studentNo
         );
 
         user.setUsername(
-                dto.getUsername()
+                username
         );
 
 
@@ -1042,7 +1133,7 @@ public class SysUserController {
 
 
         user.setRealName(
-                dto.getRealName()
+                realName
         );
 
         user.setGender(
@@ -1050,15 +1141,21 @@ public class SysUserController {
         );
 
         user.setPhone(
-                dto.getPhone()
+                trimToNull(
+                        dto.getPhone()
+                )
         );
 
         user.setEmail(
-                dto.getEmail()
+                trimToNull(
+                        dto.getEmail()
+                )
         );
 
         user.setClassName(
-                dto.getClassName()
+                trimToNull(
+                        dto.getClassName()
+                )
         );
 
         user.setStatus(
@@ -1382,5 +1479,30 @@ public class SysUserController {
 
 
         return vo;
+    }
+
+
+    /**
+     * =========================================================
+     * 去除首尾空白，空白字符串返回 null
+     * =========================================================
+     */
+    private String trimToNull(
+            String value
+    ) {
+
+        if (value == null) {
+
+            return null;
+        }
+
+
+        String trimmed =
+                value.trim();
+
+
+        return trimmed.isEmpty()
+                ? null
+                : trimmed;
     }
 }

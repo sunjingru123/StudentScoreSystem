@@ -235,6 +235,27 @@ const router = createRouter({
         },
 
         // ===================================================
+        // 学生成绩管理
+        //
+        // 仅档案部部长 / 副部长
+        // 可查看全部学生成绩并删除对应加减分
+        // ===================================================
+
+        {
+          path: 'student-scores',
+
+          name: 'ArchiveStudentScores',
+
+          component: () => import('@/views/admin/StudentManage.vue'),
+
+          meta: {
+            title: '学生成绩管理',
+
+            requiresArchiveScoreManager: true,
+          },
+        },
+
+        // ===================================================
         // 加减分汇总导出
         //
         // 档案部负责人 / 副负责人
@@ -518,6 +539,8 @@ const authCache = {
 
   archiveLeader: false,
 
+  archiveScoreManager: false,
+
   loaded: false,
 
   pending: null,
@@ -540,6 +563,8 @@ function clearAuth() {
   authCache.departmentLeader = false
 
   authCache.archiveLeader = false
+
+  authCache.archiveScoreManager = false
 
   authCache.loaded = false
 }
@@ -564,6 +589,8 @@ async function loadAuthContext(storedUser) {
       departmentLeader: false,
 
       archiveLeader: false,
+
+      archiveScoreManager: false,
     }
   }
 
@@ -583,6 +610,8 @@ async function loadAuthContext(storedUser) {
     let departmentLeader = false
 
     let archiveLeader = false
+
+    let archiveScoreManager = false
 
     try {
       const infoRes = await request.get('/user/info')
@@ -612,12 +641,25 @@ async function loadAuthContext(storedUser) {
             department.position === '副部长' ||
             department.position === '部长'),
       )
+
+      /*
+       * 学生成绩管理：
+       * 仅档案部部长 / 副部长（干事不能维护学生成绩）
+       */
+      archiveScoreManager = departments.some(
+        (department) =>
+          department &&
+          department.departmentName === '档案部' &&
+          (department.position === '副部长' || department.position === '部长'),
+      )
     } catch (error) {
       console.error('获取部门权限失败：', error)
 
       departmentLeader = false
 
       archiveLeader = false
+
+      archiveScoreManager = false
 
       canDepartmentApply = false
     }
@@ -637,6 +679,8 @@ async function loadAuthContext(storedUser) {
     authCache.departmentLeader = departmentLeader
 
     authCache.archiveLeader = archiveLeader
+
+    authCache.archiveScoreManager = archiveScoreManager
 
     authCache.loaded = true
 
@@ -758,6 +802,10 @@ router.beforeEach(async (to) => {
     ),
 
     requiresArchiveLeader: to.matched.some((record) => record.meta?.requiresArchiveLeader === true),
+
+    requiresArchiveScoreManager: to.matched.some(
+      (record) => record.meta?.requiresArchiveScoreManager === true,
+    ),
   }
 
   const decision = decideAccess({
@@ -773,6 +821,8 @@ router.beforeEach(async (to) => {
       departmentLeader: auth.departmentLeader,
 
       archiveLeader: auth.archiveLeader,
+
+      archiveScoreManager: auth.archiveScoreManager,
     },
   })
 

@@ -108,3 +108,48 @@ export function showScore(id) {
 export function correctScore(recordId, data) {
   return request.put(`/admin/score/correction/${recordId}`, data)
 }
+
+
+/**
+ * =========================================================
+ * 6. 删除成绩（管理员 / 档案部部长、副部长）
+ *
+ * DELETE /admin/score/record/{id}
+ *
+ * 后端为逻辑删除：
+ * status = 0、admin_hidden = 1，
+ * 学生端 / 辅导员端 / 统计 / 导出都不再包含该记录。
+ * =========================================================
+ */
+
+export function deleteScoreRecord(id, reason) {
+
+  return request.delete(
+    `/admin/score/record/${id}`,
+    {
+      params: reason ? { reason } : undefined,
+    },
+  )
+
+}
+
+
+/**
+ * =========================================================
+ * 7. 恢复被删除 / 隐藏的成绩
+ *
+ * PUT /admin/score/record/{id}/restore
+ * =========================================================
+ */
+
+export function restoreScoreRecord(id, reason) {
+
+  return request.put(
+    `/admin/score/record/${id}/restore`,
+    null,
+    {
+      params: reason ? { reason } : undefined,
+    },
+  )
+
+}

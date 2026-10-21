@@ -10,12 +10,32 @@
       <div>
 
         <h2>
-          学生管理
+          {{ pageTitle }}
         </h2>
 
         <p>
-          查看学生信息及综合测评成绩
+          {{ pageDescription }}
         </p>
+
+      </div>
+
+
+      <!-- =================================================
+           管理员：添加单个学生
+           （档案部正副部长只维护成绩，不新建账号）
+           ================================================== -->
+
+      <div
+        v-if="isAdmin"
+        class="page-header-actions"
+      >
+
+        <el-button
+          type="primary"
+          @click="openAddDialog"
+        >
+          添加学生
+        </el-button>
 
       </div>
 
@@ -202,6 +222,7 @@
             </el-button>
 
             <el-button
+              v-if="isAdmin"
               type="warning"
               link
               @click="handleResetPassword(row)"
@@ -442,9 +463,21 @@
 
           <template #default="{ row }">
 
+            <!-- 已删除 / 已作废 -->
+
             <el-tag
-              v-if="Number(row.adminHidden) === 1"
+              v-if="Number(row.status) === 0"
               type="danger"
+            >
+              已删除
+            </el-tag>
+
+
+            <!-- 管理员隐藏（历史数据） -->
+
+            <el-tag
+              v-else-if="Number(row.adminHidden) === 1"
+              type="warning"
             >
               已隐藏
             </el-tag>
@@ -472,27 +505,28 @@
 
           <template #default="{ row }">
 
-            <!-- 正常成绩 -->
+            <!--
+              已删除 / 已隐藏的记录可以恢复，
+              正常记录可以删除
+            -->
 
             <el-button
-              v-if="Number(row.adminHidden) === 0"
-              type="danger"
+              v-if="isRemoved(row)"
+              type="success"
               link
-              @click="handleHide(row)"
+              @click="handleRestore(row)"
             >
-              隐藏
+              恢复
             </el-button>
 
 
-            <!-- 已隐藏成绩 -->
-
             <el-button
               v-else
-              type="success"
+              type="danger"
               link
-              @click="handleShow(row)"
+              @click="handleDelete(row)"
             >
-              恢复
+              删除
             </el-button>
 
           </template>
@@ -516,6 +550,154 @@
 
     </el-drawer>
 
+
+    <!-- =====================================================
+         添加学生
+         ===================================================== -->
+
+    <el-dialog
+      v-model="addDialogVisible"
+      title="添加学生"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+
+      <el-form
+        ref="addFormRef"
+        :model="addForm"
+        :rules="addRules"
+        label-width="96px"
+      >
+
+        <el-form-item
+          label="学号"
+          prop="studentNo"
+        >
+
+          <el-input
+            v-model="addForm.studentNo"
+            maxlength="20"
+            placeholder="必填，系统内唯一"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="姓名"
+          prop="realName"
+        >
+
+          <el-input
+            v-model="addForm.realName"
+            maxlength="50"
+            placeholder="必填"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="用户名"
+          prop="username"
+        >
+
+          <el-input
+            v-model="addForm.username"
+            maxlength="50"
+            placeholder="必填，用于登录，系统内唯一"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="班级"
+          prop="className"
+        >
+
+          <el-input
+            v-model="addForm.className"
+            maxlength="100"
+            placeholder="选填，例如：25级7班"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="手机号"
+          prop="phone"
+        >
+
+          <el-input
+            v-model="addForm.phone"
+            maxlength="20"
+            placeholder="选填"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="邮箱"
+          prop="email"
+        >
+
+          <el-input
+            v-model="addForm.email"
+            maxlength="100"
+            placeholder="选填"
+          />
+
+        </el-form-item>
+
+
+        <el-form-item
+          label="初始密码"
+          prop="password"
+        >
+
+          <el-input
+            v-model="addForm.password"
+            type="password"
+            show-password
+            maxlength="50"
+            placeholder="留空则使用默认密码 123456"
+          />
+
+        </el-form-item>
+
+      </el-form>
+
+
+      <div class="form-tip">
+
+        新建学生首次登录时必须修改密码。
+
+      </div>
+
+
+      <template #footer>
+
+        <el-button
+          @click="addDialogVisible = false"
+        >
+          取消
+        </el-button>
+
+        <el-button
+          type="primary"
+          :loading="addSubmitting"
+          @click="submitAddStudent"
+        >
+          确定
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -524,6 +706,8 @@
 
 import {
   ref,
+  computed,
+  nextTick,
   onMounted,
 } from 'vue'
 
@@ -537,15 +721,69 @@ import {
 import {
   getAdminStudentScores,
   getAdminStudentTotal,
-  hideScore,
-  showScore,
+  deleteScoreRecord,
+  restoreScoreRecord,
 } from '@/api/adminScore'
 
 
 import request from '@/api/request'
 import {
+  addStudent,
   resetStudentPassword,
 } from '@/api/student'
+
+
+/* =========================================================
+ * 当前登录用户
+ *
+ * 仅用于控制“添加学生 / 重置密码”等管理员专属入口的显示，
+ * 真正的权限校验始终在后端。
+ * ========================================================= */
+
+function readStoredUser() {
+
+  try {
+
+    return JSON.parse(
+      localStorage.getItem('user') || '{}',
+    ) || {}
+
+  }
+  catch (error) {
+
+    return {}
+
+  }
+
+}
+
+
+const storedUser =
+  readStoredUser()
+
+
+const isAdmin =
+  computed(
+    () => storedUser.role === '管理员',
+  )
+
+
+const pageTitle =
+  computed(
+    () =>
+      isAdmin.value
+        ? '学生管理'
+        : '学生成绩管理',
+  )
+
+
+const pageDescription =
+  computed(
+    () =>
+      isAdmin.value
+        ? '查看学生信息及综合测评成绩'
+        : '查看全部学生成绩，删除或恢复对应的加减分记录',
+  )
 
 
 /* =========================================================
@@ -1224,41 +1462,66 @@ function formatSource(sourceType) {
 
 
 /* =========================================================
- * 隐藏成绩
+ * 是否为已删除 / 已隐藏记录
  * ========================================================= */
 
-async function handleHide(row) {
+function isRemoved(row) {
+
+  return (
+    Number(row?.status) === 0
+    ||
+    Number(row?.adminHidden) === 1
+  )
+
+}
+
+
+/* =========================================================
+ * 删除一条成绩记录
+ *
+ * 权限：管理员 / 档案部部长、副部长（后端校验）
+ * ========================================================= */
+
+async function handleDelete(row) {
 
   try {
 
     await ElMessageBox.confirm(
-      '确定隐藏这条成绩吗？',
-      '提示',
+      `确定删除「${row.ruleName || '该条'}」这条加减分吗？\n\n删除后该记录不再计入学生成绩，可由管理员或档案部正副部长恢复。`,
+      '删除成绩',
       {
         type: 'warning',
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
       },
     )
 
 
-    /*
-     * 调用管理员隐藏接口
-     */
+    const res =
+      await deleteScoreRecord(
+        row.id,
+      )
 
-    await hideScore(
-      row.id,
-    )
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '删除成绩失败',
+      )
+
+      return
+
+    }
 
 
     ElMessage.success(
-      '隐藏成功',
+      '删除成功',
     )
 
 
     /*
      * 重新加载成绩
-     *
-     * 后端仍然会返回这条记录，
-     * 只是 adminHidden 变成 1。
      */
 
     await loadScoreDetail()
@@ -1290,12 +1553,13 @@ async function handleHide(row) {
     ) {
 
       console.error(
-        '隐藏成绩失败：',
+        '删除成绩失败：',
         error,
       )
 
       ElMessage.error(
-        '隐藏成绩失败',
+        error?.response?.data?.message
+        || '删除成绩失败',
       )
 
     }
@@ -1306,29 +1570,42 @@ async function handleHide(row) {
 
 
 /* =========================================================
- * 恢复成绩
+ * 恢复一条被删除 / 隐藏的成绩
+ *
+ * 权限：管理员 / 档案部部长、副部长（后端校验）
  * ========================================================= */
 
-async function handleShow(row) {
+async function handleRestore(row) {
 
   try {
 
     await ElMessageBox.confirm(
-      '确定恢复这条成绩吗？',
-      '提示',
+      '确定恢复这条成绩吗？恢复后会重新计入学生成绩。',
+      '恢复成绩',
       {
         type: 'warning',
+        confirmButtonText: '确定恢复',
+        cancelButtonText: '取消',
       },
     )
 
 
-    /*
-     * 调用管理员恢复接口
-     */
+    const res =
+      await restoreScoreRecord(
+        row.id,
+      )
 
-    await showScore(
-      row.id,
-    )
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '恢复成绩失败',
+      )
+
+      return
+
+    }
 
 
     ElMessage.success(
@@ -1374,7 +1651,8 @@ async function handleShow(row) {
       )
 
       ElMessage.error(
-        '恢复成绩失败',
+        error?.response?.data?.message
+        || '恢复成绩失败',
       )
 
     }
@@ -1434,6 +1712,226 @@ async function handleResetPassword(row) {
 
 
 /* =========================================================
+ * 添加学生
+ * ========================================================= */
+
+const addDialogVisible =
+  ref(false)
+
+
+const addSubmitting =
+  ref(false)
+
+
+const addFormRef =
+  ref(null)
+
+
+function createEmptyAddForm() {
+
+  return {
+
+    studentNo: '',
+
+    realName: '',
+
+    username: '',
+
+    className: '',
+
+    phone: '',
+
+    email: '',
+
+    password: '',
+
+  }
+
+}
+
+
+const addForm =
+  ref(createEmptyAddForm())
+
+
+const addRules = {
+
+  studentNo: [
+    {
+      required: true,
+      message: '请输入学号',
+      trigger: 'blur',
+    },
+  ],
+
+  realName: [
+    {
+      required: true,
+      message: '请输入姓名',
+      trigger: 'blur',
+    },
+  ],
+
+  username: [
+    {
+      required: true,
+      message: '请输入用户名',
+      trigger: 'blur',
+    },
+  ],
+
+  email: [
+    {
+      type: 'email',
+      message: '邮箱格式不正确',
+      trigger: 'blur',
+    },
+  ],
+
+}
+
+
+function openAddDialog() {
+
+  addForm.value =
+    createEmptyAddForm()
+
+  addDialogVisible.value =
+    true
+
+  nextTick(
+    () => addFormRef.value?.clearValidate(),
+  )
+
+}
+
+
+async function submitAddStudent() {
+
+  if (!addFormRef.value) {
+
+    return
+
+  }
+
+
+  try {
+
+    await addFormRef.value.validate()
+
+  }
+  catch (error) {
+
+    /*
+     * 表单校验未通过
+     */
+
+    return
+
+  }
+
+
+  addSubmitting.value =
+    true
+
+  try {
+
+    const form =
+      addForm.value
+
+
+    /*
+     * 只提交有值的可选字段
+     */
+
+    const payload = {
+
+      studentNo:
+        form.studentNo.trim(),
+
+      realName:
+        form.realName.trim(),
+
+      username:
+        form.username.trim(),
+
+      className:
+        form.className.trim()
+        || undefined,
+
+      phone:
+        form.phone.trim()
+        || undefined,
+
+      email:
+        form.email.trim()
+        || undefined,
+
+      password:
+        form.password.trim()
+        || undefined,
+
+    }
+
+
+    const res =
+      await addStudent(payload)
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '添加学生失败',
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      payload.password
+        ? '学生添加成功'
+        : '学生添加成功，初始密码为 123456（首次登录需修改）',
+    )
+
+
+    addDialogVisible.value =
+      false
+
+
+    pageNum.value =
+      1
+
+
+    await loadStudents()
+
+  }
+  catch (error) {
+
+    console.error(
+      '添加学生失败：',
+      error,
+    )
+
+    ElMessage.error(
+      error?.response?.data?.message
+      || '添加学生失败',
+    )
+
+  }
+  finally {
+
+    addSubmitting.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
  * 初始化
  * ========================================================= */
 
@@ -1461,6 +1959,10 @@ onMounted(() => {
 
 .page-header {
   margin-bottom: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .page-header h2 {
@@ -1472,6 +1974,19 @@ onMounted(() => {
 .page-header p {
   margin: 0;
   color: #909399;
+}
+
+
+.page-header-actions {
+  flex-shrink: 0;
+}
+
+
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
 }
 
 

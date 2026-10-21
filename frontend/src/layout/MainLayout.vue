@@ -137,6 +137,27 @@
 
 
 
+        <!--
+ ★ 档案部学生成绩管理
+ ★ 仅部长 / 副部长
+-->
+
+        <el-menu-item
+          v-if="archiveScoreManager"
+          index="/home/student-scores"
+        >
+
+          <el-icon>
+            <DataAnalysis />
+          </el-icon>
+
+          <span>
+            学生成绩管理
+          </span>
+
+        </el-menu-item>
+
+
         <!-- =================================================
              消息
         ================================================== -->
@@ -212,6 +233,14 @@
         >
           <el-icon><FolderChecked /></el-icon>
           <span>个人证书审核</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="archiveScoreManager"
+          index="/home/student-scores"
+        >
+          <el-icon><DataAnalysis /></el-icon>
+          <span>学生成绩管理</span>
         </el-menu-item>
 
         <el-menu-item index="/home/message">
@@ -368,6 +397,7 @@ import {
   EditPen,
   Checked,
   FolderChecked,
+  DataAnalysis,
   Download,
   Bell,
   SwitchButton,
@@ -400,6 +430,11 @@ const departmentLeader =
 
 
 const archiveLeader =
+  ref(false)
+
+
+// 档案部部长 / 副部长：可查看全部学生成绩并删除加减分
+const archiveScoreManager =
   ref(false)
 
 
@@ -482,6 +517,8 @@ async function loadPermission() {
 
       archiveLeader.value = false
 
+      archiveScoreManager.value = false
+
       return
 
     }
@@ -525,6 +562,28 @@ async function loadPermission() {
       )
 
 
+    /*
+     * 档案部成绩管理：
+     *
+     * 仅限部长 / 副部长（干事不能维护学生成绩）
+     */
+
+    archiveScoreManager.value =
+
+      Array.isArray(data.departments) &&
+
+      data.departments.some(
+        department =>
+
+          department.departmentName === '档案部' &&
+
+          (
+            department.position === '副部长' ||
+            department.position === '部长'
+          )
+      )
+
+
 
 
 
@@ -539,6 +598,8 @@ async function loadPermission() {
     departmentLeader.value = false
 
     archiveLeader.value = false
+
+    archiveScoreManager.value = false
 
   }
 

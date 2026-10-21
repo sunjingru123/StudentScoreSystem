@@ -14,6 +14,8 @@ import com.student.studentscoresystem.mapper.ScoreRecordOperationLogMapper;
 import com.student.studentscoresystem.mapper.ScoreModifyLogMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
+import com.student.studentscoresystem.service.ScoreManagerPermissionService;
+import com.student.studentscoresystem.service.ScoreRecordManageService;
 import com.student.studentscoresystem.vo.AdminScoreDetailVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +35,8 @@ public class AdminScoreController {
     private final SysUserMapper sysUserMapper;
     private final ScoreRecordOperationLogMapper operationLogMapper;
     private final ScoreModifyLogMapper scoreModifyLogMapper;
+    private final ScoreManagerPermissionService scoreManagerPermissionService;
+    private final ScoreRecordManageService scoreRecordManageService;
 
 
     public AdminScoreController(
@@ -40,13 +44,17 @@ public class AdminScoreController {
             ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper,
             ScoreRecordOperationLogMapper operationLogMapper,
-            ScoreModifyLogMapper scoreModifyLogMapper
+            ScoreModifyLogMapper scoreModifyLogMapper,
+            ScoreManagerPermissionService scoreManagerPermissionService,
+            ScoreRecordManageService scoreRecordManageService
     ) {
         this.scoreRecordMapper = scoreRecordMapper;
         this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
         this.operationLogMapper = operationLogMapper;
         this.scoreModifyLogMapper = scoreModifyLogMapper;
+        this.scoreManagerPermissionService = scoreManagerPermissionService;
+        this.scoreRecordManageService = scoreRecordManageService;
     }
 
     private Long getCurrentUserId(HttpServletRequest request) {
@@ -54,17 +62,38 @@ public class AdminScoreController {
         return userId == null ? null : Long.valueOf(userId.toString());
     }
 
+    /**
+     * 是否有权查看 / 维护全部学生成绩
+     *
+     * 管理员 或 档案部部长 / 副部长
+     */
+    private boolean canManageStudentScores(Long userId) {
+        return scoreManagerPermissionService.canManageStudentScores(userId);
+    }
+
 
     /**
      * 查询某个学生的全部成绩明细
-     * 管理员专用
-     * 注意：这里不过滤adminHidden，管理员需要看到已经隐藏的记录
+     *
+     * 管理员 / 档案部部长 / 档案部副部长可用
+     *
+     * 注意：这里不过滤adminHidden，管理员需要看到已经隐藏 / 删除的记录
      */
     @GetMapping("/student/{studentId}")
-    @RequireRole("管理员")
     public Result<List<AdminScoreDetailVO>> studentScore(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Long operatorId = getCurrentUserId(request);
+
+        if (operatorId == null) {
+            return Result.fail("请先登录");
+        }
+
+        if (!canManageStudentScores(operatorId)) {
+            return Result.fail("没有权限查看学生成绩");
+        }
 
         SysUser student = sysUserMapper.selectById(studentId);
         if (student == null) {
@@ -97,6 +126,7 @@ public class AdminScoreController {
             vo.setSourceType(record.getSourceType());
             vo.setSourceName(names.resolveSourceLabel(record));
             vo.setSourceId(record.getSourceId());
+            vo.setStatus(record.getStatus());
             vo.setAdminHidden(record.getAdminHidden());
             vo.setCreateTime(record.getCreateTime());
 
@@ -185,14 +215,113 @@ public class AdminScoreController {
 
 
     /**
+     * =========================================================
+     * 删除某一条学生成绩记录
+     * =========================================================
+     *
+     * DELETE /admin/score/record/{id}
+     *
+     * 权限：
+     *   管理员 / 档案部部长 / 档案部副部长
+     *
+     * 删除 = 逻辑删除（status = 0，admin_hidden = 1）：
+     *   学生端、辅导员端、统计、导出均不再包含该加减分记录，
+     *   同时保留审计日志与历史数据，可恢复。
+     */
+    @DeleteMapping("/record/{id}")
+    public Result<Void> deleteRecord(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason,
+            HttpServletRequest request
+    ) {
+
+        Long operatorId = getCurrentUserId(request);
+
+        try {
+
+            scoreRecordManageService.deleteRecord(
+                    id,
+                    operatorId,
+                    reason
+            );
+
+            return Result.success(null);
+
+        } catch (SecurityException | IllegalArgumentException e) {
+
+            return Result.fail(e.getMessage());
+
+        } catch (IllegalStateException e) {
+
+            return Result.error(e.getMessage());
+        }
+    }
+
+
+    /**
+     * =========================================================
+     * 恢复某一条被删除 / 隐藏的学生成绩记录
+     * =========================================================
+     *
+     * PUT /admin/score/record/{id}/restore
+     *
+     * 权限：
+     *   管理员 / 档案部部长 / 档案部副部长
+     */
+    @PutMapping("/record/{id}/restore")
+    public Result<Void> restoreRecord(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason,
+            HttpServletRequest request
+    ) {
+
+        Long operatorId = getCurrentUserId(request);
+
+        try {
+
+            scoreRecordManageService.restoreRecord(
+                    id,
+                    operatorId,
+                    reason
+            );
+
+            return Result.success(null);
+
+        } catch (SecurityException | IllegalArgumentException e) {
+
+            return Result.fail(e.getMessage());
+
+        } catch (IllegalStateException e) {
+
+            return Result.error(e.getMessage());
+        }
+    }
+
+
+    /**
      * 查询学生当前总成绩
-     * 管理员看到的是全部记录，包括已经隐藏的记录
+     *
+     * 管理员 / 档案部部长 / 档案部副部长可用
+     *
+     * 看到的是全部未隐藏记录，
+     * 已删除 / 已隐藏记录不参与统计。
      */
     @GetMapping("/student/{studentId}/total")
-    @RequireRole("管理员")
     public Result<BigDecimal> total(
-            @PathVariable Long studentId
+            @PathVariable Long studentId,
+            HttpServletRequest request
     ) {
+
+        Long operatorId = getCurrentUserId(request);
+
+        if (operatorId == null) {
+            return Result.fail("请先登录");
+        }
+
+        if (!canManageStudentScores(operatorId)) {
+            return Result.fail("没有权限查看学生成绩");
+        }
+
         List<ScoreRecord> records = scoreRecordMapper.selectList(
                 new LambdaQueryWrapper<ScoreRecord>()
                         .eq(ScoreRecord::getStudentId, studentId)

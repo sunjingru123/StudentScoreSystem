@@ -12,6 +12,7 @@ import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import jakarta.servlet.http.HttpServletRequest;
 import com.student.studentscoresystem.service.IScoreRecordService;
+import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.vo.ScoreDetailVO;
 import com.student.studentscoresystem.vo.ScoreStatisticsVO;
@@ -31,19 +32,22 @@ public class ScoreStatisticsController {
     private final SysUserMapper sysUserMapper;
     private final SysPositionMapper positionMapper;
     private final SysUserPositionMapper userPositionMapper;
+    private final ScoreManagerPermissionService scoreManagerPermissionService;
 
     public ScoreStatisticsController(
             IScoreRecordService scoreRecordService,
             ScoreProjectNameResolver scoreProjectNameResolver,
             SysUserMapper sysUserMapper,
             SysPositionMapper positionMapper,
-            SysUserPositionMapper userPositionMapper
+            SysUserPositionMapper userPositionMapper,
+            ScoreManagerPermissionService scoreManagerPermissionService
     ) {
         this.scoreRecordService = scoreRecordService;
         this.scoreProjectNameResolver = scoreProjectNameResolver;
         this.sysUserMapper = sysUserMapper;
         this.positionMapper = positionMapper;
         this.userPositionMapper = userPositionMapper;
+        this.scoreManagerPermissionService = scoreManagerPermissionService;
     }
 
 
@@ -165,8 +169,22 @@ public class ScoreStatisticsController {
             @RequestParam(
                     value = "semesterId",
                     required = false
-            ) Long semesterId
+            ) Long semesterId,
+            HttpServletRequest request
     ) {
+
+        /*
+         * 权限：管理员 或 档案部部长 / 副部长
+         */
+        Long operatorId = currentUserId(request);
+
+        if (operatorId == null) {
+            return Result.fail("请先登录");
+        }
+
+        if (!scoreManagerPermissionService.canManageStudentScores(operatorId)) {
+            return Result.fail("没有权限查看学生成绩");
+        }
 
         SysUser user =
                 sysUserMapper.selectById(studentId);

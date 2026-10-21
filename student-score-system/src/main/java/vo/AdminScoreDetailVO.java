@@ -56,6 +56,14 @@ public class AdminScoreDetailVO {
     private Long sourceId;
 
     /**
+     * 成绩状态
+     *
+     * 1 = 有效
+     * 0 = 已删除 / 作废
+     */
+    private Short status;
+
+    /**
      * 管理员隐藏状态
      *
      * 0 = 正常

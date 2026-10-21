@@ -254,6 +254,25 @@ export function decideAccess({
   }
 
 
+  if (flags.requiresArchiveScoreManager) {
+
+    if (role !== '管理员' && !permissions.archiveScoreManager) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '只有档案部部长 / 副部长可以维护学生成绩',
+
+      }
+
+    }
+
+  }
+
+
   if (flags.requiresDepartmentLeader) {
 
     if (!permissions.departmentLeader) {
