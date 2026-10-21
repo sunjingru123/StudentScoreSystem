@@ -13,17 +13,23 @@ import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.service.DepartmentScoreApplyImportService;
 import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -48,6 +54,8 @@ public class DepartmentScoreApplyController {
 
     private final DepartmentScoreFinalizeService departmentScoreFinalizeService;
 
+    private final DepartmentScoreApplyImportService departmentScoreApplyImportService;
+
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
@@ -55,7 +63,8 @@ public class DepartmentScoreApplyController {
             SysUserDepartmentMapper userDepartmentMapper,
             DepartmentMapper departmentMapper,
             SysUserMapper sysUserMapper,
-            DepartmentScoreFinalizeService departmentScoreFinalizeService) {
+            DepartmentScoreFinalizeService departmentScoreFinalizeService,
+            DepartmentScoreApplyImportService departmentScoreApplyImportService) {
 
         this.applyService = applyService;
 
@@ -72,6 +81,9 @@ public class DepartmentScoreApplyController {
 
         this.departmentScoreFinalizeService =
                 departmentScoreFinalizeService;
+
+        this.departmentScoreApplyImportService =
+                departmentScoreApplyImportService;
     }
 
 
@@ -707,6 +719,167 @@ public class DepartmentScoreApplyController {
                 dto,
                 request
         );
+    }
+
+
+    /*
+     * =========================================================
+     * 下载部门申报导入模板
+     *
+     * 表头固定：学号 | 姓名 | 日期 | 项目 | 分值 | 备注
+     * 其中「项目」列是下拉选择，只能选该部门已启用的项目。
+     * =========================================================
+     */
+    @GetMapping("/import/template")
+    public void importTemplate(
+            @RequestParam("departmentId") Long departmentId,
+            HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+
+        Long currentUserId;
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            writeDownloadError(
+                    response,
+                    e.getMessage()
+            );
+
+            return;
+        }
+
+        byte[] content;
+
+        try {
+
+            content =
+                    departmentScoreApplyImportService
+                            .buildTemplateWorkbook(
+                                    departmentId,
+                                    currentUserId
+                            );
+
+        } catch (IllegalArgumentException e) {
+
+            writeDownloadError(
+                    response,
+                    e.getMessage()
+            );
+
+            return;
+        }
+
+        String fileName =
+                URLEncoder.encode(
+                        "部门加减分申报导入模板.xlsx",
+                        StandardCharsets.UTF_8
+                ).replace("+", "%20");
+
+        response.setContentType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+
+        response.setCharacterEncoding(
+                StandardCharsets.UTF_8.name()
+        );
+
+        response.setHeader(
+                "Content-Disposition",
+                "attachment;filename*=UTF-8''" + fileName
+        );
+
+        response.setContentLength(content.length);
+
+        response.getOutputStream().write(content);
+
+        response.flushBuffer();
+    }
+
+
+    /*
+     * =========================================================
+     * 导入部门加减分申报
+     *
+     * 只有该部门在职的干事 / 副部长 / 部长可以导入，
+     * 权限最终由 Service 层校验。
+     * =========================================================
+     */
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importApplies(
+            @RequestParam("departmentId") Long departmentId,
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
+
+        Long currentUserId;
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+        try {
+
+            return Result.success(
+                    departmentScoreApplyImportService
+                            .importApplies(
+                                    departmentId,
+                                    currentUserId,
+                                    file
+                            )
+            );
+
+        } catch (IllegalArgumentException e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+    }
+
+
+    /*
+     * 下载失败时返回 JSON，前端 blob 请求可以提示真实原因
+     */
+    private void writeDownloadError(
+            HttpServletResponse response,
+            String message) throws IOException {
+
+        response.reset();
+
+        response.setCharacterEncoding(
+                StandardCharsets.UTF_8.name()
+        );
+
+        response.setContentType(
+                "application/json;charset=UTF-8"
+        );
+
+        String safeMessage =
+                message == null
+                        ? "下载导入模板失败"
+                        : message
+                        .replace("\\", "\\\\")
+                        .replace("\"", "\\\"");
+
+        response.getWriter().write(
+                "{\"code\":400,\"message\":\""
+                        + safeMessage
+                        + "\",\"data\":null}"
+        );
+
+        response.flushBuffer();
     }
 
 

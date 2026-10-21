@@ -687,6 +687,10 @@ ALTER TABLE public.department_score_apply
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS final_review_time TIMESTAMP WITHOUT TIME ZONE;
 
+-- 活动日期：Excel 批量导入部门申报时写入；单条申报可以为空
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS activity_date DATE;
+
 -- ==========================================
 -- 5.6 成绩记录来源唯一约束
 --

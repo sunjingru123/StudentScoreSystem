@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -75,6 +76,14 @@ public class DepartmentScoreApply {
      * 说明
      */
     private String description;
+
+    /**
+     * 活动日期
+     *
+     * 单条申报可以为空；
+     * Excel 批量导入时由导入模板的「日期」列写入。
+     */
+    private LocalDate activityDate;
 
     /**
      * 证明材料

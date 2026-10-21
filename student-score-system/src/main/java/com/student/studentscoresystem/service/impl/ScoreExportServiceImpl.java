@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -683,21 +685,32 @@ public class ScoreExportServiceImpl
                      * =================================================
                      * 20. 生成明细字符串
                      *
-                     * ★★★ 不要括号
+                     * ★★★ 分值不要加括号
                      *
                      * 加分：
                      *
-                     * 志愿服务+2
+                     * 志愿服务+2（第3周）
                      *
                      * 减分：
                      *
-                     * 无故缺席-1
+                     * 无故缺席-1（第5周）
+                     *
+                     * 第 X 周以当前学期的开始日期为第 1 周起点，
+                     * 按成绩记录时间动态计算，
+                     * 学期配置（开始 / 结束日期）更新后，
+                     * 再次导出的第 X 周会自动跟着更新。
                      * =================================================
                      */
 
                     if (
                             !title.isEmpty()
                     ) {
+
+                        String weekText =
+                                formatWeek(
+                                        semester,
+                                        record
+                                );
 
                         String detail;
 
@@ -713,7 +726,8 @@ public class ScoreExportServiceImpl
                                             + "+"
                                             + formatScore(
                                             score
-                                    );
+                                    )
+                                            + weekText;
 
                         } else {
 
@@ -722,7 +736,8 @@ public class ScoreExportServiceImpl
                                             + "-"
                                             + formatScore(
                                             score.abs()
-                                    );
+                                    )
+                                            + weekText;
                         }
 
 
@@ -1140,6 +1155,126 @@ public class ScoreExportServiceImpl
 
 
         return style;
+    }
+
+
+    /* =========================================================
+       第 X 周文案
+
+       学期未配置开始日期或成绩没有记录时间时，
+       返回空字符串，不强行补周次。
+       ========================================================= */
+
+    private String formatWeek(
+            SysSemester semester,
+            ScoreRecord record) {
+
+        Integer week =
+                resolveWeek(
+                        semester,
+                        record
+                );
+
+
+        if (week == null) {
+
+            return "";
+        }
+
+
+        return "（第" + week + "周）";
+    }
+
+
+    /* =========================================================
+       计算成绩属于第几周
+
+       规则：
+
+       1. 以当前学期的开始日期为第 1 周第一天；
+       2. 每满 7 天进入下一周；
+       3. 早于学期开始的时间按第 1 周算；
+       4. 学期配置了结束日期时，不超出学期总周数；
+       5. 学期开始日期为空时无法推算，返回 null。
+
+       周次完全由学期配置动态推算，不落库，
+       因此学期开始 / 结束日期一改，
+       下次导出的第 X 周就会跟着变。
+       ========================================================= */
+
+    private Integer resolveWeek(
+            SysSemester semester,
+            ScoreRecord record) {
+
+        if (semester == null
+                || semester.getStartDate() == null) {
+
+            return null;
+        }
+
+
+        if (record == null
+                || record.getCreateTime() == null) {
+
+            return null;
+        }
+
+
+        LocalDate startDate =
+                semester.getStartDate();
+
+
+        LocalDate recordDate =
+                record.getCreateTime()
+                        .toLocalDate();
+
+
+        int week =
+                (int) (
+                        ChronoUnit.DAYS.between(
+                                startDate,
+                                recordDate
+                        ) / 7
+                ) + 1;
+
+
+        /*
+         * 早于学期开始：按第 1 周处理，
+         * 不出现 0 周 / 负周次。
+         */
+
+        if (week < 1) {
+
+            week = 1;
+        }
+
+
+        /*
+         * 不超出学期总周数
+         */
+
+        if (semester.getEndDate() != null) {
+
+            long totalDays =
+                    ChronoUnit.DAYS.between(
+                            startDate,
+                            semester.getEndDate()
+                    );
+
+
+            int totalWeeks =
+                    (int) (totalDays / 7) + 1;
+
+
+            if (totalWeeks > 0
+                    && week > totalWeeks) {
+
+                week = totalWeeks;
+            }
+        }
+
+
+        return week;
     }
 
 

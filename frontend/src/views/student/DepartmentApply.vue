@@ -872,6 +872,35 @@
 
 
         <!-- ================================================== -->
+        <!-- Excel 批量导入 -->
+        <!-- ================================================== -->
+
+        <el-form-item label="批量导入">
+
+          <el-button
+            :disabled="!departmentForm.departmentId"
+            @click="downloadImportTemplate"
+          >
+            下载导入模板
+          </el-button>
+
+          <el-button
+            type="primary"
+            :disabled="!departmentForm.departmentId"
+            @click="openImportDialog"
+          >
+            导入 Excel
+          </el-button>
+
+          <div class="form-tip">
+            模板固定六列：学号、姓名、日期、项目、分值、备注，
+            其中「项目」只能从下拉列表中选择本部门已启用的项目。
+          </div>
+
+        </el-form-item>
+
+
+        <!-- ================================================== -->
         <!-- 提交 -->
         <!-- ================================================== -->
 
@@ -1105,6 +1134,21 @@
           label="申报时间"
           width="180"
         />
+
+
+        <!-- 活动日期 -->
+
+        <el-table-column
+          label="活动日期"
+          width="120"
+          align="center"
+        >
+
+          <template #default="{ row }">
+            {{ row.activityDate || '-' }}
+          </template>
+
+        </el-table-column>
 
 
         <!-- ================================================== -->
@@ -1481,6 +1525,173 @@
 
     </el-dialog>
 
+
+
+    <!-- ====================================================== -->
+    <!-- 导入部门申报 Excel -->
+    <!-- ====================================================== -->
+
+    <el-dialog
+      v-model="importVisible"
+      title="导入部门加减分申报"
+      width="620px"
+      destroy-on-close
+    >
+
+      <div class="excel-info">
+
+        <div class="info-title">
+          Excel 格式
+        </div>
+
+        <div class="columns">
+          <el-tag>学号</el-tag>
+          <el-tag>姓名</el-tag>
+          <el-tag>日期</el-tag>
+          <el-tag type="warning">
+            项目（下拉选择）
+          </el-tag>
+          <el-tag>分值</el-tag>
+          <el-tag type="info">
+            备注
+          </el-tag>
+        </div>
+
+        <p>
+          ① 学号必须是系统中已启用的学生，姓名填写后需与学号一致。
+        </p>
+
+        <p>
+          ② 项目必须从下拉列表中选择本部门已启用的项目，不能手动输入；
+          加分 / 减分由项目决定。
+        </p>
+
+        <p>
+          ③ 分值需与所选项目一致（例如 +1 分项目填 1），留空以项目分值为准。
+        </p>
+
+        <p>
+          ④ 日期可选，支持 2024-05-01 / 2024/5/1 / 20240501。
+        </p>
+
+        <p>
+          ⑤ 同一学生的同一项目不能重复申报；导入后进入「待部门审核」。
+        </p>
+
+      </div>
+
+      <div class="upload-row">
+
+        <el-button
+          :loading="templateDownloading"
+          @click="downloadImportTemplate"
+        >
+          下载导入模板
+        </el-button>
+
+      </div>
+
+      <el-upload
+        ref="importUploadRef"
+        class="upload-area"
+        action=""
+        :auto-upload="false"
+        :limit="1"
+        accept=".xlsx,.xls"
+        :on-change="handleImportFileChange"
+        :on-remove="removeImportFile"
+      >
+
+        <el-button type="primary">
+          选择申报 Excel
+        </el-button>
+
+        <template #tip>
+          <div class="upload-tip">
+            支持 .xlsx / .xls 文件
+          </div>
+        </template>
+
+      </el-upload>
+
+      <div v-if="importFile" class="selected-file">
+
+        <span>
+          {{ importFile.name }}
+        </span>
+
+        <el-button
+          type="success"
+          :loading="importing"
+          @click="submitImport"
+        >
+          开始导入
+        </el-button>
+
+      </div>
+
+      <!-- 导入结果 -->
+
+      <div v-if="importResult" class="import-result">
+
+        <div class="result-summary">
+
+          <div class="result-item">
+            <span>总数量</span>
+            <b>{{ importResult.totalCount }}</b>
+          </div>
+
+          <div class="result-item success">
+            <span>成功</span>
+            <b>{{ importResult.successCount }}</b>
+          </div>
+
+          <div class="result-item error">
+            <span>失败</span>
+            <b>{{ importResult.failCount }}</b>
+          </div>
+
+        </div>
+
+        <div
+          v-if="importResult.errors && importResult.errors.length > 0"
+          class="error-detail"
+        >
+
+          <div class="error-title">
+            导入失败明细
+          </div>
+
+          <div
+            v-for="(item, index) in importResult.errors"
+            :key="index"
+            class="error-row"
+          >
+
+            <el-tag type="danger">
+              第 {{ item.row }} 行
+            </el-tag>
+
+            <span>
+              {{ item.message }}
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <template #footer>
+
+        <el-button @click="importVisible = false">
+          关闭
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -1562,6 +1773,21 @@ const manageLoading = ref(false)
 const manageList = ref([])
 
 const manageUpdatingId = ref(null)
+
+
+/* Excel 批量导入 */
+
+const importVisible = ref(false)
+
+const importFile = ref(null)
+
+const importing = ref(false)
+
+const importResult = ref(null)
+
+const templateDownloading = ref(false)
+
+const importUploadRef = ref(null)
 
 
 
@@ -3426,6 +3652,236 @@ async function batchApproveAudit() {
 
 
 /* ====================================================== */
+/* 部门加减分申报 Excel 导入 */
+/* ====================================================== */
+
+function openImportDialog() {
+
+  if (!departmentForm.departmentId) {
+
+    ElMessage.warning('请先选择部门')
+
+    return
+
+  }
+
+  importFile.value = null
+
+  importResult.value = null
+
+  importUploadRef.value?.clearFiles()
+
+  importVisible.value = true
+
+}
+
+
+function handleImportFileChange(file) {
+
+  importFile.value = file.raw
+
+}
+
+
+function removeImportFile() {
+
+  importFile.value = null
+
+}
+
+
+async function downloadImportTemplate() {
+
+  if (!departmentForm.departmentId) {
+
+    ElMessage.warning('请先选择部门')
+
+    return
+
+  }
+
+  templateDownloading.value = true
+
+  try {
+
+    const response =
+      await request.get(
+        '/departmentScoreApply/import/template',
+        {
+          params: {
+            departmentId: departmentForm.departmentId,
+          },
+          responseType: 'blob',
+        }
+      )
+
+    /*
+     * 下载失败时后端返回的是 JSON，
+     * 这里要提示真实原因，而不是当成 xlsx 保存。
+     */
+    if (
+      response instanceof Blob
+      && (response.type || '').includes('json')
+    ) {
+
+      let message = '下载导入模板失败'
+
+      try {
+
+        const data = JSON.parse(await response.text())
+
+        message = data?.message || message
+
+      } catch (e) {
+
+        // 保持默认提示
+
+      }
+
+      ElMessage.error(message)
+
+      return
+
+    }
+
+    const blob = new Blob(
+      [response?.data || response],
+      {
+        type:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+    )
+
+    const url = window.URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+
+    link.href = url
+
+    link.download = '部门加减分申报导入模板.xlsx'
+
+    document.body.appendChild(link)
+
+    link.click()
+
+    document.body.removeChild(link)
+
+    window.URL.revokeObjectURL(url)
+
+  } catch (error) {
+
+    ElMessage.error(
+
+      error?.message || '下载导入模板失败'
+
+    )
+
+  } finally {
+
+    templateDownloading.value = false
+
+  }
+
+}
+
+
+async function submitImport() {
+
+  if (!importFile.value) {
+
+    ElMessage.warning('请先选择申报 Excel')
+
+    return
+
+  }
+
+  if (!departmentForm.departmentId) {
+
+    ElMessage.warning('请先选择部门')
+
+    return
+
+  }
+
+  importing.value = true
+
+  importResult.value = null
+
+  try {
+
+    const formData = new FormData()
+
+    formData.append('file', importFile.value)
+
+    formData.append(
+      'departmentId',
+      departmentForm.departmentId
+    )
+
+    const res =
+      await request.post(
+        '/departmentScoreApply/import',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+    if (res?.code !== 200) {
+
+      ElMessage.error(res?.message || '导入失败')
+
+      return
+
+    }
+
+    const result = res.data || {}
+
+    importResult.value = result
+
+    const successCount = result.successCount || 0
+
+    const failCount = result.failCount || 0
+
+    if (failCount === 0) {
+
+      ElMessage.success(`导入成功：共 ${successCount} 条`)
+
+    } else {
+
+      ElMessage.warning(
+        `导入完成：成功 ${successCount} 条，失败 ${failCount} 条`
+
+      )
+
+    }
+
+    importFile.value = null
+
+    importUploadRef.value?.clearFiles()
+
+    await loadMyApply()
+
+  } catch (error) {
+
+    ElMessage.error(
+
+      error?.message || '导入失败'
+
+    )
+
+  } finally {
+
+    importing.value = false
+
+  }
+
+}
+
+
+/* ====================================================== */
 /* 批量提交部门加减分申报 */
 /* ====================================================== */
 
@@ -4453,6 +4909,243 @@ onMounted(async () => {
 
   line-height:
     1.5;
+
+}
+
+
+
+/* ====================================================== */
+/* 导入 Excel */
+/* ====================================================== */
+
+.excel-info {
+
+  padding:
+    16px;
+
+  margin-bottom:
+    18px;
+
+  background:
+    #f8f9fb;
+
+  border-radius:
+    8px;
+
+}
+
+.info-title {
+
+  margin-bottom:
+    12px;
+
+  font-weight:
+    bold;
+
+  color:
+    #303133;
+
+}
+
+.columns {
+
+  display:
+    flex;
+
+  gap:
+    10px;
+
+  margin-bottom:
+    12px;
+
+  flex-wrap:
+    wrap;
+
+}
+
+.excel-info p {
+
+  margin:
+    7px 0;
+
+  color:
+    #606266;
+
+  font-size:
+    14px;
+
+}
+
+.upload-row {
+
+  margin-bottom:
+    12px;
+
+}
+
+.upload-area {
+
+  margin-bottom:
+    16px;
+
+}
+
+.selected-file {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+
+  padding:
+    14px 16px;
+
+  border:
+    1px solid #ebeef5;
+
+  border-radius:
+    8px;
+
+  background:
+    #fff;
+
+}
+
+.selected-file span {
+
+  flex:
+    1;
+
+  color:
+    #606266;
+
+  word-break:
+    break-all;
+
+}
+
+.import-result {
+
+  margin-top:
+    18px;
+
+  padding-top:
+    18px;
+
+  border-top:
+    1px solid #ebeef5;
+
+}
+
+.result-summary {
+
+  display:
+    flex;
+
+  gap:
+    50px;
+
+  padding-bottom:
+    10px;
+
+}
+
+.result-item {
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+
+}
+
+.result-item span {
+
+  color:
+    #909399;
+
+  font-size:
+    14px;
+
+}
+
+.result-item b {
+
+  font-size:
+    24px;
+
+  color:
+    #303133;
+
+}
+
+.result-item.success b {
+
+  color:
+    #67c23a;
+
+}
+
+.result-item.error b {
+
+  color:
+    #f56c6c;
+
+}
+
+.error-detail {
+
+  margin-top:
+    10px;
+
+}
+
+.error-title {
+
+  margin-bottom:
+    12px;
+
+  font-weight:
+    bold;
+
+  color:
+    #f56c6c;
+
+}
+
+.error-row {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+
+  padding:
+    10px 12px;
+
+  margin-bottom:
+    8px;
+
+  background:
+    #fff5f5;
+
+  border-radius:
+    6px;
+
+  color:
+    #606266;
 
 }
 
