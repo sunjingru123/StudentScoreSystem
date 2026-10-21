@@ -387,6 +387,15 @@ public class ScoreController {
 
 
             /*
+             * 部门申报备注
+             */
+
+            vo.setRemark(
+                    names.resolveRemark(record)
+            );
+
+
+            /*
              * 来源 ID
              */
 
@@ -665,6 +674,12 @@ public class ScoreController {
 
                             d.setRuleName(
                                     names.resolve(
+                                            r
+                                    )
+                            );
+
+                            d.setRemark(
+                                    names.resolveRemark(
                                             r
                                     )
                             );

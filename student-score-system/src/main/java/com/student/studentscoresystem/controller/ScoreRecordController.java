@@ -533,6 +533,14 @@ public class ScoreRecordController {
                     );
 
 
+                    /*
+                     * 部门申报备注
+                     */
+                    vo.setRemark(
+                            names.resolveRemark(record)
+                    );
+
+
                     return vo;
 
                 })

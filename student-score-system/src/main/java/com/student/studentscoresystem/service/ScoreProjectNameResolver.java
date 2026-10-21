@@ -206,13 +206,17 @@ public class ScoreProjectNameResolver {
         Map<String, String> sourceLabels =
                 new HashMap<>();
 
+        Map<String, String> remarks =
+                new HashMap<>();
+
         if (records == null || records.isEmpty()) {
 
             return new PreloadedNames(
                     ruleNames,
                     shortNames,
                     detailNames,
-                    sourceLabels
+                    sourceLabels,
+                    remarks
             );
         }
 
@@ -481,6 +485,27 @@ public class ScoreProjectNameResolver {
                             departmentName
                     );
                 }
+
+                /*
+                 * 部门申报备注
+                 *
+                 * 单条申报保存的是模板说明，
+                 * Excel 导入保存的是表格中的「备注」列，
+                 * 统一放在 description，学生成绩明细需要展示。
+                 */
+                String remark =
+                        blankToNull(
+                                apply.getDescription()
+                        );
+
+                if (remark != null
+                        && key != null) {
+
+                    remarks.put(
+                            key,
+                            remark
+                    );
+                }
             }
         }
 
@@ -527,7 +552,8 @@ public class ScoreProjectNameResolver {
                 ruleNames,
                 shortNames,
                 detailNames,
-                sourceLabels
+                sourceLabels,
+                remarks
         );
     }
 
@@ -868,16 +894,49 @@ public class ScoreProjectNameResolver {
 
         private final Map<String, String> sourceLabels;
 
+        private final Map<String, String> remarks;
+
         PreloadedNames(
                 Map<Long, String> ruleNames,
                 Map<String, String> shortNames,
                 Map<String, String> detailNames,
-                Map<String, String> sourceLabels
+                Map<String, String> sourceLabels,
+                Map<String, String> remarks
         ) {
             this.ruleNames = ruleNames;
             this.shortNames = shortNames;
             this.detailNames = detailNames;
             this.sourceLabels = sourceLabels;
+            this.remarks = remarks;
+        }
+
+        /**
+         * 部门申报备注。
+         *
+         * 只有部门申报来源才有备注，其余来源返回 null。
+         */
+        public String resolveRemark(ScoreRecord record) {
+
+            if (record == null
+                    || !TYPE_DEPARTMENT.equals(record.getSourceType())) {
+
+                return null;
+            }
+
+            String key =
+                    sourceKey(
+                            record.getSourceType(),
+                            record.getSourceId()
+                    );
+
+            if (key == null) {
+
+                return null;
+            }
+
+            return remarks.get(
+                    key
+            );
         }
 
         public String resolve(

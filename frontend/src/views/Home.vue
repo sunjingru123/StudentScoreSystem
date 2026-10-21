@@ -324,6 +324,16 @@
           </template>
         </el-table-column>
 
+        <!--
+          部门申报填写的备注
+        -->
+        <el-table-column
+          prop="remark"
+          label="备注"
+          min-width="160"
+          show-overflow-tooltip
+        />
+
         <el-table-column
           prop="createTime"
           label="时间"

@@ -42,6 +42,14 @@ public class ScoreDetailVO {
     private String sourceName;
 
     /**
+     * 备注
+     *
+     * 部门申报（部长 / 副部长 / 干事）填写或 Excel 导入时写入的备注，
+     * 其余来源没有备注，返回 null。
+     */
+    private String remark;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;
@@ -125,6 +133,19 @@ public class ScoreDetailVO {
 
     public void setSourceName(String sourceName) {
         this.sourceName = sourceName;
+    }
+
+
+    // =========================================================
+    // remark
+    // =========================================================
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
     }
 
 

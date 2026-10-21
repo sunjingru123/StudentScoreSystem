@@ -151,6 +151,13 @@
                 {{ formatDate(item.createTime) }}
               </span>
             </div>
+
+            <!--
+              部门申报（部长 / 副部长 / 干事）填写的备注
+            -->
+            <div v-if="item.remark" class="detail-remark">
+              {{ item.remark }}
+            </div>
           </div>
 
           <!-- 分值 -->
@@ -717,6 +724,17 @@ onMounted(() => {
   margin-top: 6px;
   color: #909399;
   font-size: 12px;
+}
+
+/* 部门申报备注 */
+
+.detail-remark {
+  margin-top: 6px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .dot {

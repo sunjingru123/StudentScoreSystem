@@ -335,6 +335,14 @@ public class ScoreStatisticsController {
 
 
                             /*
+                             * 部门申报备注
+                             */
+                            d.setRemark(
+                                    names.resolveRemark(record)
+                            );
+
+
+                            /*
                              * 创建时间
                              */
                             d.setCreateTime(
@@ -597,6 +605,14 @@ public class ScoreStatisticsController {
 
                             d.setSourceName(
                                     names.resolveSourceLabel(record)
+                            );
+
+
+                            /*
+                             * 部门申报备注
+                             */
+                            d.setRemark(
+                                    names.resolveRemark(record)
                             );
 
 
