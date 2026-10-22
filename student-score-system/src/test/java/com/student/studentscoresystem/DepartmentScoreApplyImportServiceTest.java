@@ -14,6 +14,7 @@ import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,10 @@ import static org.mockito.Mockito.verify;
  * 3. 学号不存在、姓名不匹配、项目不在列表、分值不一致、重复申报
  *    都必须按行失败，不能静默写入；
  * 4. 同名不同分值项目按分值精确匹配，避免分值漂移；
- * 5. 非本部门干部不能导入。
+ * 5. 非本部门干部不能导入；
+ * 6. 同一个学生多条记录时，把「学号」「姓名」单元格纵向合并
+ *    也能正确导入（合并区域自动补值）；
+ * 7. 部门干部可以给自己申报加减分。
  */
 @ExtendWith(MockitoExtension.class)
 class DepartmentScoreApplyImportServiceTest {
@@ -456,6 +460,138 @@ class DepartmentScoreApplyImportServiceTest {
         assertEquals(0, saved.size());
     }
 
+    @Test
+    void mergedStudentCellsAreFilledDown() throws Exception {
+
+        /*
+         * 同一个学生多次旷课：使用者把「学号」「姓名」纵向合并，
+         * 只有第一行有值，后面几行落在合并区域里读出来是空的。
+         */
+        DepartmentScoreTemplate deduct =
+                template(3L, "旷课", (short) -1, "1.00");
+
+        templates.add(deduct);
+
+        Map<String, Object> result =
+                service.importApplies(
+                        DEPARTMENT_ID,
+                        APPLICANT_ID,
+                        excelWithMergedStudentCells(
+                                STUDENT_NO,
+                                STUDENT_NAME,
+                                new String[][]{
+                                        {"2024-05-01", PROJECT_NAME, "1", "第一次"},
+                                        {"2024-05-08", "旷课", "1", "第二次"}
+                                }
+                        )
+                );
+
+        assertEquals(
+                0,
+                result.get("failCount"),
+                String.valueOf(result.get("errors"))
+        );
+
+        assertEquals(
+                2,
+                result.get("successCount")
+        );
+
+        assertEquals(
+                2,
+                saved.size()
+        );
+
+        /*
+         * 第二行没有独立学号 / 姓名，
+         * 补值后必须落到同一个学生身上。
+         */
+        assertEquals(
+                STUDENT_ID,
+                saved.get(1).getStudentId()
+        );
+    }
+
+    @Test
+    void unmergedBlankStudentNoStillFails() throws Exception {
+
+        /*
+         * 补值只作用于真正的合并区域：
+         * 使用者自己漏填的学号仍要报错，
+         * 不能被静默算到上一位同学身上。
+         */
+        Map<String, Object> result =
+                service.importApplies(
+                        DEPARTMENT_ID,
+                        APPLICANT_ID,
+                        excel(
+                                new String[][]{
+                                        {STUDENT_NO, STUDENT_NAME, "2024-05-01", PROJECT_NAME, "1", ""},
+                                        {"", "", "2024-05-08", PROJECT_NAME, "1", ""}
+                                }
+                        )
+                );
+
+        assertEquals(
+                1,
+                result.get("successCount")
+        );
+
+        assertEquals(
+                1,
+                result.get("failCount")
+        );
+
+        assertTrue(
+                firstErrorMessage(result)
+                        .contains("学号不能为空")
+        );
+    }
+
+    @Test
+    void applicantCanImportForHimself() throws Exception {
+
+        /*
+         * 部门干事 / 副部长 / 部长 也可以给自己申报加减分。
+         */
+        Map<String, Object> result =
+                service.importApplies(
+                        DEPARTMENT_ID,
+                        STUDENT_ID,
+                        excel(
+                                new String[][]{
+                                        {STUDENT_NO, STUDENT_NAME, "2024-05-01", PROJECT_NAME, "1", ""}
+                                }
+                        )
+                );
+
+        assertEquals(
+                0,
+                result.get("failCount")
+        );
+
+        assertEquals(
+                1,
+                result.get("successCount")
+        );
+
+        assertEquals(
+                1,
+                saved.size()
+        );
+
+        assertEquals(
+                STUDENT_ID,
+                saved.get(0).getApplicantId()
+        );
+
+        assertEquals(
+                STUDENT_ID,
+                saved.get(0).getStudentId()
+        );
+    }
+
+
     /* ======================================================
      * 辅助
      * ====================================================== */
@@ -522,6 +658,75 @@ class DepartmentScoreApplyImportServiceTest {
                     }
                 }
             }
+
+            workbook.write(out);
+
+            return new MockMultipartFile(
+                    "file",
+                    "apply.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    out.toByteArray()
+            );
+        }
+    }
+
+    /**
+     * 生成「学号 / 姓名 纵向合并」的导入文件，
+     * 模拟同一个学生多条记录时使用者合并单元格的写法：
+     * 只有合并区域左上角写学号 / 姓名，其余行为空。
+     */
+    private MockMultipartFile excelWithMergedStudentCells(
+            String studentNo,
+            String name,
+            String[][] dataRows) throws Exception {
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            Sheet sheet = workbook.createSheet("申报");
+
+            Row header = sheet.createRow(0);
+
+            for (int i = 0; i < HEADERS.length; i++) {
+
+                header.createCell(i).setCellValue(HEADERS[i]);
+            }
+
+            int firstRow = 1;
+
+            int lastRow = dataRows.length;
+
+            for (int r = 0; r < dataRows.length; r++) {
+
+                Row row = sheet.createRow(firstRow + r);
+
+                if (r == 0) {
+
+                    row.createCell(0).setCellValue(studentNo);
+
+                    row.createCell(1).setCellValue(name);
+                }
+
+                for (int c = 0; c < dataRows[r].length; c++) {
+
+                    if (dataRows[r][c] != null) {
+
+                        /*
+                         * 前两列（学号 / 姓名）留给合并区域
+                         */
+                        row.createCell(c + 2)
+                                .setCellValue(dataRows[r][c]);
+                    }
+                }
+            }
+
+            sheet.addMergedRegion(
+                    new CellRangeAddress(firstRow, lastRow, 0, 0)
+            );
+
+            sheet.addMergedRegion(
+                    new CellRangeAddress(firstRow, lastRow, 1, 1)
+            );
 
             workbook.write(out);
 

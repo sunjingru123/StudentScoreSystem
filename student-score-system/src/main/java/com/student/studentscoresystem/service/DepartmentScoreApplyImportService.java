@@ -14,6 +14,7 @@ import com.student.studentscoresystem.mapper.SysUserMapper;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DataValidation;
 import org.apache.poi.ss.usermodel.DataValidationConstraint;
@@ -27,6 +28,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFName;
 import org.apache.poi.xssf.usermodel.XSSFRow;
@@ -252,6 +254,15 @@ public class DepartmentScoreApplyImportService {
 
         validateTemplateHeader(content);
 
+        /*
+         * 合并单元格补值：
+         * 同一个学生多次旷课时，使用者常常会把「学号」「姓名」
+         * 单元格纵向合并后填写多行，而合并区域只有左上角有值。
+         * 先补全合并区域的值，再交给 EasyExcel 解析，
+         * 否则从第二行开始会报「学号不能为空」。
+         */
+        content = expandMergedCells(content);
+
         try (InputStream in = new ByteArrayInputStream(content)) {
 
             /*
@@ -476,6 +487,189 @@ public class DepartmentScoreApplyImportService {
         }
     }
 
+
+    /**
+     * =========================================================
+     * 展开合并单元格
+     *
+     * Excel 的合并区域只有左上角单元格保存值，
+     * 其余单元格读出来都是空的（POI / EasyExcel 行为一致）。
+     *
+     * 部门干部在填写申报表时，经常把同一个学生的「学号」
+     * 「姓名」单元格纵向合并后填写多行（例如多次旷课），
+     * 不补值就会从第二行开始报「学号不能为空」。
+     *
+     * 这里严格按「合并区域」补值，而不是整列向下填充：
+     *
+     * 1. 只有位于合并区域内的空单元格才会被补齐，
+     *    使用者自己漏填的普通空单元格依然会照常报错，
+     *    不会被静默地算到上一位同学身上；
+     * 2. 只把左上角的值往下补到同一列，
+     *    所以纵向合并「学号」「姓名」都能正确识别；
+     *    即使使用者把学号 + 姓名合并成一个两列的大单元格，
+     *    也只补学号、不动姓名（姓名本身是可选的）。
+     * =========================================================
+     */
+    private byte[] expandMergedCells(
+            byte[] content) {
+
+        try (Workbook workbook =
+                     WorkbookFactory.create(
+                             new ByteArrayInputStream(content)
+                     )) {
+
+            if (workbook.getNumberOfSheets() <= 0) {
+
+                return content;
+            }
+
+            Sheet sheet =
+                    workbook.getSheetAt(0);
+
+            List<CellRangeAddress> regions =
+                    new ArrayList<>(
+                            sheet.getMergedRegions()
+                    );
+
+            if (regions.isEmpty()) {
+
+                return content;
+            }
+
+            DataFormatter formatter =
+                    new DataFormatter();
+
+            boolean changed =
+                    false;
+
+            for (CellRangeAddress region : regions) {
+
+                Row sourceRow =
+                        sheet.getRow(
+                                region.getFirstRow()
+                        );
+
+                if (sourceRow == null) {
+
+                    continue;
+                }
+
+                Cell source =
+                        sourceRow.getCell(
+                                region.getFirstColumn()
+                        );
+
+                if (source == null) {
+
+                    continue;
+                }
+
+                String value =
+                        formatter
+                                .formatCellValue(source)
+                                .trim();
+
+                if (isEmpty(value)) {
+
+                    continue;
+                }
+
+                for (int rowIndex =
+                     region.getFirstRow() + 1;
+                     rowIndex <= region.getLastRow();
+                     rowIndex++) {
+
+                    Row targetRow =
+                            sheet.getRow(rowIndex);
+
+                    if (targetRow == null) {
+
+                        targetRow =
+                                sheet.createRow(rowIndex);
+                    }
+
+                    Cell target =
+                            targetRow.getCell(
+                                    region.getFirstColumn()
+                            );
+
+                    /*
+                     * 合并区域里本来就写了值的不覆盖
+                     */
+                    if (target != null
+                            && !isBlankCell(target)) {
+
+                        continue;
+                    }
+
+                    if (target == null) {
+
+                        target =
+                                targetRow.createCell(
+                                        region.getFirstColumn()
+                                );
+                    }
+
+                    target.setCellValue(value);
+
+                    changed = true;
+                }
+            }
+
+            if (!changed) {
+
+                return content;
+            }
+
+            ByteArrayOutputStream out =
+                    new ByteArrayOutputStream();
+
+            workbook.write(out);
+
+            return out.toByteArray();
+
+        } catch (Exception e) {
+
+            /*
+             * 补值只是兼容性增强：
+             * 失败时保持原文件，让表头校验 / 行校验
+             * 给出更明确的提示，不在这里吞掉业务校验。
+             */
+            return content;
+        }
+    }
+
+
+    /**
+     * 单元格是否为空
+     */
+    private boolean isBlankCell(
+            Cell cell) {
+
+        if (cell == null) {
+
+            return true;
+        }
+
+        CellType type =
+                cell.getCellType();
+
+        if (type == CellType.BLANK) {
+
+            return true;
+        }
+
+        if (type == CellType.STRING) {
+
+            return isEmpty(
+                    cell.getStringCellValue()
+            );
+        }
+
+        return false;
+    }
+
+
     /**
      * =========================================================
      * 单行解析与校验
@@ -532,7 +726,11 @@ public class DepartmentScoreApplyImportService {
          */
         if (isEmpty(studentNo)) {
 
-            throw new IllegalArgumentException("学号不能为空");
+            throw new IllegalArgumentException(
+                    "学号不能为空"
+                            + "（如果是同一个学生的多行记录，"
+                            + "请把「学号」「姓名」单元格纵向合并）"
+            );
         }
 
         SysUser student =
@@ -571,13 +769,18 @@ public class DepartmentScoreApplyImportService {
             }
         }
 
-        if (applicantId != null
-                && applicantId.equals(student.getId())) {
-
-            throw new IllegalArgumentException(
-                    "不能给自己提交部门加减分申报"
-            );
-        }
+        /*
+         * =====================================================
+         * 2.1 允许给自己申报
+         *
+         * 部门干事 / 副部长 / 部长 也可以给自己申报加减分，
+         * 与单条申报 /departmentScoreApply/add 保持同一口径。
+         *
+         * 自己的申报不会出现在本人的待审核列表，
+         * 需要由部门其他负责人初审、辅导员终审；
+         * 审核侧「不能审核自己的申报」的约束保持不变。
+         * =====================================================
+         */
 
         /*
          * =====================================================
@@ -1556,7 +1759,9 @@ public class DepartmentScoreApplyImportService {
                 "4. 分值需与所选项目的分值一致（例如 +1 分项目填 1）；留空表示以项目分值为准。",
                 "5. 日期可选，支持 2024-05-01 / 2024/5/1 / 20240501 格式。",
                 "6. 备注可选，将作为申报说明；同一学生的同一项目不能重复申报。",
-                "7. 导入后申报单进入「待部门审核」状态，仍需按原有流程审核。",
+                "7. 同一个学生填写多行（例如多次旷课）时，可以把「学号」「姓名」单元格纵向合并，系统会自动识别。",
+                "8. 也可以给自己申报加减分；自己的申报不能由本人审核，需由部门其他负责人初审、辅导员终审。",
+                "9. 导入后申报单进入「待部门审核」状态，仍需按原有流程审核。",
         };
 
         for (int i = 0; i < lines.length; i++) {
