@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.student.studentscoresystem.common.ScoreConstants;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
@@ -751,8 +752,18 @@ public class ScoreExportServiceImpl
                 /*
                  * =================================================
                  * 21. 写入加分
+                 *
+                 * 汇总表的「加分」列不超过综合测评基础上限，
+                 * 例如累计加分 59 分时只写 40 分。
+                 * 具体情况列仍按每条原始分值展示。
                  * =================================================
                  */
+
+                BigDecimal summaryAddScore =
+                        addScore.min(
+                                ScoreConstants.MAX_SCORE
+                        );
+
 
                 Cell addCell =
                         row.createCell(2);
@@ -760,7 +771,7 @@ public class ScoreExportServiceImpl
 
                 addCell.setCellValue(
                         formatScore(
-                                addScore
+                                summaryAddScore
                         )
                 );
 

@@ -215,6 +215,85 @@ class ScoreExportServiceImplTest {
     }
 
     /**
+     * 累计加分超过综合测评上限（40）时，
+     * 汇总表的「加分」列只写 40。
+     */
+    @Test
+    void bonusColumnIsCappedAtMaxScore()
+            throws Exception {
+
+        stubExportData(
+                LocalDate.of(2025, 9, 1),
+                LocalDate.of(2026, 1, 11)
+        );
+
+        /*
+         * 覆盖成绩记录：30 + 29 = 59 分
+         */
+        lenient()
+                .when(scoreRecordMapper.selectList(any()))
+                .thenReturn(
+                        List.of(
+                                record(
+                                        1L,
+                                        new BigDecimal("30")
+                                ),
+                                record(
+                                        2L,
+                                        new BigDecimal("29")
+                                )
+                        )
+                );
+
+        Sheet sheet = exportCurrent();
+
+        assertEquals(
+                "40",
+                sheet.getRow(1)
+                        .getCell(2)
+                        .getStringCellValue(),
+                "累计加分 59 分时只写 40"
+        );
+    }
+
+    /**
+     * 未超过上限时保持真实累计值，不能被误截断。
+     */
+    @Test
+    void bonusColumnKeepsValueBelowMaxScore()
+            throws Exception {
+
+        stubExportData(
+                LocalDate.of(2025, 9, 1),
+                LocalDate.of(2026, 1, 11)
+        );
+
+        lenient()
+                .when(scoreRecordMapper.selectList(any()))
+                .thenReturn(
+                        List.of(
+                                record(
+                                        1L,
+                                        new BigDecimal("20.5")
+                                ),
+                                record(
+                                        2L,
+                                        new BigDecimal("18")
+                                )
+                        )
+                );
+
+        Sheet sheet = exportCurrent();
+
+        assertEquals(
+                "38.5",
+                sheet.getRow(1)
+                        .getCell(2)
+                        .getStringCellValue()
+        );
+    }
+
+    /**
      * 执行一次导出并返回解析后的工作表
      */
     private Sheet exportSheet(
@@ -223,6 +302,14 @@ class ScoreExportServiceImplTest {
     ) throws Exception {
 
         stubExportData(semesterStart, semesterEnd);
+
+        return exportCurrent();
+    }
+
+    /**
+     * 使用当前已准备好的 mock 数据执行一次导出，并解析工作表。
+     */
+    private Sheet exportCurrent() throws Exception {
 
         service.export(
                 SEMESTER_ID,
@@ -237,6 +324,24 @@ class ScoreExportServiceImplTest {
         );
 
         return workbook.getSheetAt(0);
+    }
+
+    private static ScoreRecord record(
+            Long id,
+            BigDecimal score
+    ) {
+
+        ScoreRecord record = new ScoreRecord();
+
+        record.setId(id);
+        record.setStudentId(STUDENT_ID);
+        record.setScore(score);
+        record.setCreateTime(RECORD_TIME);
+        record.setSourceType(
+                ScoreProjectNameResolver.TYPE_DEPARTMENT
+        );
+
+        return record;
     }
 
     private void stubExportData(
