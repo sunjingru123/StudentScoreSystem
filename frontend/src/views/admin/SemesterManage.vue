@@ -129,6 +129,7 @@
             <el-tag
               v-if="Number(scope.row.status) === 1"
               type="success"
+              class="status-tag"
             >
               当前学期
             </el-tag>
@@ -136,6 +137,7 @@
             <el-tag
               v-else
               type="info"
+              class="status-tag"
             >
               非当前
             </el-tag>
@@ -156,32 +158,37 @@
 
           <template #default="scope">
 
-            <el-button
-              link
-              type="primary"
-              @click="openEditDialog(scope.row)"
-            >
-              编辑
-            </el-button>
+            <div class="action-cell">
+
+              <el-button
+                link
+                type="primary"
+                @click="openEditDialog(scope.row)"
+              >
+                编辑
+              </el-button>
 
 
-            <el-button
-              v-if="Number(scope.row.status) !== 1"
-              link
-              type="success"
-              @click="handleSetCurrent(scope.row)"
-            >
-              设为当前
-            </el-button>
+              <el-button
+                v-if="Number(scope.row.status) !== 1"
+                link
+                type="success"
+                @click="handleSetCurrent(scope.row)"
+              >
+                设为当前
+              </el-button>
 
 
-            <el-tag
-              v-else
-              type="success"
-              effect="plain"
-            >
-              正在使用
-            </el-tag>
+              <el-tag
+                v-else
+                type="success"
+                effect="plain"
+                class="status-tag"
+              >
+                正在使用
+              </el-tag>
+
+            </div>
 
           </template>
 
@@ -956,6 +963,52 @@ onMounted(() => {
 /* =========================================================
    表格
 ========================================================= */
+
+/*
+ * 状态标签统一宽度：
+ * 「当前学期」比「非当前」多一个字，宽度不一致会造成左对齐错位，
+ * 固定最小宽度并居中文字后，两种状态的标签左右边缘完全对齐。
+ */
+
+.status-tag {
+
+  min-width:
+    76px;
+
+  justify-content:
+    center;
+
+}
+
+
+/*
+ * 操作列：
+ * 链接按钮之间有 Element Plus 默认的 12px 左边距，而标签没有，
+ * 导致「设为当前」与「正在使用」起点不一致（标签显得太靠左）。
+ * 改用 flex + gap 统一间距后，两者起点与垂直居中一致。
+ */
+
+.action-cell {
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+
+}
+
+
+.action-cell :deep(.el-button + .el-button) {
+
+  margin-left:
+    0;
+
+}
+
 
 .table-card {
 
