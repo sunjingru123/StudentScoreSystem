@@ -65,8 +65,9 @@ import java.util.Set;
  * 2. 项目必须来自本部门已启用的 department_score_template；
  * 3. 加分 / 减分类型和分值以项目模板为准，
  *    导入文件里的「分值」仅用于交叉校验，不会覆盖模板；
- * 4. 同一申报人 + 同一学生 + 同一部门 + 同一项目
- *    不允许重复申报（与单条申报同一判重口径）；
+ * 4. 同一个学生的同一个项目允许出现多行（例如一周内多次旷课），
+ *    只有「同一学生 + 同一部门 + 同一项目 + 同一天（日期非空）
+ *    + 同一备注」完全一致时才判为重复；
  * 5. 导入后申报单状态为「待部门审核」。
  * =========================================================
  */
@@ -113,18 +114,22 @@ public class DepartmentScoreApplyImportService {
 
     private final IDepartmentScoreApplyService applyService;
 
+    private final DepartmentScoreApplyDuplicateChecker duplicateChecker;
+
     public DepartmentScoreApplyImportService(
             DepartmentMapper departmentMapper,
             SysUserMapper sysUserMapper,
             SysUserDepartmentMapper userDepartmentMapper,
             IDepartmentScoreTemplateService templateService,
-            IDepartmentScoreApplyService applyService) {
+            IDepartmentScoreApplyService applyService,
+            DepartmentScoreApplyDuplicateChecker duplicateChecker) {
 
         this.departmentMapper = departmentMapper;
         this.sysUserMapper = sysUserMapper;
         this.userDepartmentMapper = userDepartmentMapper;
         this.templateService = templateService;
         this.applyService = applyService;
+        this.duplicateChecker = duplicateChecker;
     }
 
     /**
@@ -321,11 +326,11 @@ public class DepartmentScoreApplyImportService {
                 new HashSet<>();
 
         /*
-         * 本次导入中已经创建过的 学生 + 项目，
-         * 用于拦截同一个文件里重复申报同一项目。
+         * 本文件里已经出现过的「学生 + 部门 + 项目 + 日期 + 备注」，
+         * key -> 第一次出现的行号，用于提示重复的是哪一行。
          */
-        Set<String> createdKeys =
-                new HashSet<>();
+        Map<String, Integer> seenRows =
+                new HashMap<>();
 
         int rowNumber = 1;
 
@@ -353,7 +358,8 @@ public class DepartmentScoreApplyImportService {
                                 templatesByName,
                                 studentCache,
                                 studentNotUsable,
-                                createdKeys
+                                seenRows,
+                                rowNumber
                         );
 
                 /*
@@ -686,7 +692,8 @@ public class DepartmentScoreApplyImportService {
             Map<String, List<DepartmentScoreTemplate>> templatesByName,
             Map<String, SysUser> studentCache,
             Set<String> studentNotUsable,
-            Set<String> createdKeys) {
+            Map<String, Integer> seenRows,
+            int rowNumber) {
 
         String studentNo =
                 normalizeStudentNo(row.getStudentNo());
@@ -856,33 +863,60 @@ public class DepartmentScoreApplyImportService {
 
         /*
          * =====================================================
-         * 7. 重复申报（与单条申报同一口径）
+         * 7. 窄口径判重
+         *
+         * 同一个学生的同一个项目允许出现多行（例如多次旷课），
+         * 只有「同一学生 + 同一部门 + 同一项目 + 同一天（日期非空）
+         * + 同一备注」完全一致时才算重复，
+         * 用来拦截同一个文件重复导入 / 同一条记录重复提交。
+         * 日期留空的行不判重。
          * =====================================================
          */
-        String key =
-                student.getId() + ":" + template.getId();
+        if (activityDate != null) {
 
-        if (createdKeys.contains(key)) {
+            String duplicateKey =
+                    student.getId()
+                            + ":"
+                            + departmentId
+                            + ":"
+                            + template.getId()
+                            + ":"
+                            + activityDate
+                            + ":"
+                            + (description == null
+                            ? ""
+                            : description.trim());
 
-            throw new IllegalArgumentException(
-                    "本次导入文件中同一学生的该项目重复出现："
-                            + template.getName()
-            );
+            Integer seenRow =
+                    seenRows.get(duplicateKey);
+
+            if (seenRow != null) {
+
+                throw new IllegalArgumentException(
+                        "本文件第 "
+                                + seenRow
+                                + " 行与本行完全相同（同一学生、同一项目、同一天、同一备注），"
+                                + "请确认是否重复填写"
+                );
+            }
+
+            if (duplicateChecker.isDuplicate(
+                    student.getId(),
+                    departmentId,
+                    template.getId(),
+                    activityDate,
+                    description
+            )) {
+
+                throw new IllegalArgumentException(
+                        "该学生该项目在 "
+                                + activityDate
+                                + " 已有相同备注的申报，请勿重复提交"
+                );
+            }
+
+            seenRows.put(duplicateKey, rowNumber);
         }
-
-        if (existsDuplicate(
-                applicantId,
-                student.getId(),
-                departmentId,
-                template.getId()
-        )) {
-
-            throw new IllegalArgumentException(
-                    "该学生的该加减分项目已经申报，请勿重复提交"
-            );
-        }
-
-        createdKeys.add(key);
 
         /*
          * =====================================================
@@ -1312,68 +1346,6 @@ public class DepartmentScoreApplyImportService {
     }
 
     /**
-     * 重复申报判定，与单条申报保持一致
-     */
-    private boolean existsDuplicate(
-            Long applicantId,
-            Long studentId,
-            Long departmentId,
-            Long templateId) {
-
-        LambdaQueryWrapper<DepartmentScoreApply> wrapper =
-                new LambdaQueryWrapper<>();
-
-        wrapper
-                .eq(
-                        DepartmentScoreApply::getApplicantId,
-                        applicantId
-                )
-                .eq(
-                        DepartmentScoreApply::getStudentId,
-                        studentId
-                )
-                .eq(
-                        DepartmentScoreApply::getDepartmentId,
-                        departmentId
-                )
-                .eq(
-                        DepartmentScoreApply::getTemplateId,
-                        templateId
-                )
-                .and(w -> w
-                        .eq(
-                                DepartmentScoreApply::getStatus,
-                                (short) 0
-                        )
-                        .or()
-                        .and(inner -> inner
-                                .eq(
-                                        DepartmentScoreApply::getStatus,
-                                        (short) 1
-                                )
-                                .eq(
-                                        DepartmentScoreApply::getFinalStatus,
-                                        (short) 0
-                                ))
-                        .or()
-                        .and(inner -> inner
-                                .eq(
-                                        DepartmentScoreApply::getStatus,
-                                        (short) 1
-                                )
-                                .eq(
-                                        DepartmentScoreApply::getFinalStatus,
-                                        (short) 1
-                                ))
-                );
-
-        Long count =
-                applyService.count(wrapper);
-
-        return count != null && count > 0;
-    }
-
-    /**
      * 项目标签：项目名（+1分） / 项目名（-0.5分）
      */
     private String buildTemplateLabel(
@@ -1758,10 +1730,11 @@ public class DepartmentScoreApplyImportService {
                 "3. 项目必须从下拉列表中选择，不能手动输入；加分/减分类型由所选项目决定。",
                 "4. 分值需与所选项目的分值一致（例如 +1 分项目填 1）；留空表示以项目分值为准。",
                 "5. 日期可选，支持 2024-05-01 / 2024/5/1 / 20240501 格式。",
-                "6. 备注可选，将作为申报说明；同一学生的同一项目不能重复申报。",
-                "7. 同一个学生填写多行（例如多次旷课）时，可以把「学号」「姓名」单元格纵向合并，系统会自动识别。",
-                "8. 也可以给自己申报加减分；自己的申报不能由本人审核，需由部门其他负责人初审、辅导员终审。",
-                "9. 导入后申报单进入「待部门审核」状态，仍需按原有流程审核。",
+                "6. 备注可选，将作为申报说明；同一个学生的同一个项目可以填写多行（如多次旷课）。",
+                "7. 只有同一学生、同一项目、同一天（日期非空）且备注完全相同时才会被判为重复；日期留空的行不做判重。",
+                "8. 同一个学生填写多行（例如多次旷课）时，可以把「学号」「姓名」单元格纵向合并，系统会自动识别。",
+                "9. 也可以给自己申报加减分；自己的申报不能由本人审核，需由部门其他负责人初审、辅导员终审。",
+                "10. 导入后申报单进入「待部门审核」状态，仍需按原有流程审核。",
         };
 
         for (int i = 0; i < lines.length; i++) {

@@ -8,6 +8,7 @@ import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.service.DepartmentScoreApplyDuplicateChecker;
 import com.student.studentscoresystem.service.DepartmentScoreApplyImportService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
@@ -39,8 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 /**
  * 部门加减分申报 Excel 导入测试。
@@ -49,13 +48,16 @@ import static org.mockito.Mockito.verify;
  *
  * 1. 模板「项目」列只取该部门已启用项目，并带下拉有效性；
  * 2. 正常行入库（分值/类型取自项目，日期写入 activity_date）；
- * 3. 学号不存在、姓名不匹配、项目不在列表、分值不一致、重复申报
+ * 3. 学号不存在、姓名不匹配、项目不在列表、分值不一致
  *    都必须按行失败，不能静默写入；
  * 4. 同名不同分值项目按分值精确匹配，避免分值漂移；
  * 5. 非本部门干部不能导入；
  * 6. 同一个学生多条记录时，把「学号」「姓名」单元格纵向合并
  *    也能正确导入（合并区域自动补值）；
- * 7. 部门干部可以给自己申报加减分。
+ * 7. 部门干部可以给自己申报加减分；
+ * 8. 同一个学生的同一个项目可以出现多行（例如多次旷课）；
+ *    只有「同一学生 + 同一部门 + 同一项目 + 同一天（日期非空）
+ *    + 同一备注」完全一致时才判为重复，日期留空不判重。
  */
 @ExtendWith(MockitoExtension.class)
 class DepartmentScoreApplyImportServiceTest {
@@ -109,7 +111,8 @@ class DepartmentScoreApplyImportServiceTest {
                 sysUserMapper,
                 userDepartmentMapper,
                 templateService,
-                applyService
+                applyService,
+                new DepartmentScoreApplyDuplicateChecker(applyService)
         );
 
         saved.clear();
@@ -137,10 +140,6 @@ class DepartmentScoreApplyImportServiceTest {
         lenient()
                 .when(templateService.list(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
                 .thenAnswer(invocation -> new ArrayList<>(templates));
-
-        lenient()
-                .when(applyService.count(any()))
-                .thenReturn(0L);
 
         AtomicLong nextId = new AtomicLong(1000L);
 
@@ -325,27 +324,120 @@ class DepartmentScoreApplyImportServiceTest {
     }
 
     @Test
-    void duplicateApplyFails() throws Exception {
+    void repeatedSameProjectRowsAllImported() throws Exception {
+
+        /*
+         * 同一个学生的同一个项目可以多次发生：
+         * 不同日期、或者同一天不同备注，都各自生成一条申报。
+         */
+        Map<String, Object> result = importRows(
+                new String[][]{
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "旷课-上午"},
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "旷课-下午"},
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-08", PROJECT_NAME, "1", "旷课-上午"}
+                }
+        );
+
+        assertEquals(3, result.get("successCount"));
+        assertEquals(0, result.get("failCount"));
+        assertEquals(3, saved.size());
+
+        for (DepartmentScoreApply apply : saved) {
+
+            assertEquals(STUDENT_ID, apply.getStudentId());
+            assertEquals(bonusOne.getId(), apply.getTemplateId());
+            assertEquals((short) 1, apply.getScoreType());
+        }
+    }
+
+    @Test
+    void identicalRowsInSameFileRejected() throws Exception {
+
+        /*
+         * 同一天 + 同一备注完全相同，视为同一个文件里重复填写。
+         */
+        Map<String, Object> result = importRows(
+                new String[][]{
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "旷课"},
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "旷课"}
+                }
+        );
+
+        assertEquals(1, result.get("successCount"));
+        assertEquals(1, result.get("failCount"));
+        assertEquals(1, saved.size());
+
+        assertTrue(
+                firstErrorMessage(result).contains("完全相同")
+        );
+    }
+
+    @Test
+    void rowsWithoutDateAreNotDeduped() throws Exception {
+
+        /*
+         * 日期留空不做判重：没有日期就没有区分重复的依据。
+         */
+        Map<String, Object> result = importRows(
+                new String[][]{
+                        {STUDENT_NO, STUDENT_NAME, "", PROJECT_NAME, "1", "旷课"},
+                        {STUDENT_NO, STUDENT_NAME, "", PROJECT_NAME, "1", "旷课"}
+                }
+        );
+
+        assertEquals(2, result.get("successCount"));
+        assertEquals(0, result.get("failCount"));
+        assertEquals(2, saved.size());
+    }
+
+    @Test
+    void existingSameDayApplyRejected() throws Exception {
 
         lenient()
-                .when(applyService.count(any()))
-                .thenReturn(1L);
+                .when(applyService.list(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+                .thenReturn(List.of(
+                        existingApply(
+                                LocalDate.of(2024, 5, 6),
+                                "旷课"
+                        )
+                ));
 
         Map<String, Object> result = importRows(
                 new String[][]{
-                        {STUDENT_NO, STUDENT_NAME, "", PROJECT_NAME, "", ""}
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "旷课"}
                 }
         );
 
         assertEquals(0, result.get("successCount"));
         assertEquals(1, result.get("failCount"));
+        assertEquals(0, saved.size());
 
         assertTrue(
-                firstErrorMessage(result).contains("已经申报")
+                firstErrorMessage(result).contains("已有相同备注的申报")
+        );
+    }
+
+    @Test
+    void existingSameDayDifferentRemarkAllowed() throws Exception {
+
+        lenient()
+                .when(applyService.list(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+                .thenReturn(List.of(
+                        existingApply(
+                                LocalDate.of(2024, 5, 6),
+                                "旷课"
+                        )
+                ));
+
+        Map<String, Object> result = importRows(
+                new String[][]{
+                        {STUDENT_NO, STUDENT_NAME, "2024-05-06", PROJECT_NAME, "1", "迟到"}
+                }
         );
 
-        verify(applyService, never())
-                .save(any(DepartmentScoreApply.class));
+        assertEquals(1, result.get("successCount"));
+        assertEquals(0, result.get("failCount"));
+        assertEquals(1, saved.size());
     }
 
     @Test
@@ -782,6 +874,27 @@ class DepartmentScoreApplyImportServiceTest {
         student.setStatus((short) 1);
 
         return student;
+    }
+
+    /**
+     * 已经存在的申报，用于验证数据库层面的窄口径判重
+     */
+    private DepartmentScoreApply existingApply(
+            LocalDate activityDate,
+            String description) {
+
+        DepartmentScoreApply apply =
+                new DepartmentScoreApply();
+
+        apply.setStudentId(STUDENT_ID);
+        apply.setDepartmentId(DEPARTMENT_ID);
+        apply.setTemplateId(bonusOne.getId());
+        apply.setActivityDate(activityDate);
+        apply.setDescription(description);
+        apply.setStatus((short) 0);
+        apply.setFinalStatus((short) 0);
+
+        return apply;
     }
 
     private SysUserDepartment relation(

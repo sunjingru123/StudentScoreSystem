@@ -457,89 +457,12 @@ public class DepartmentScoreApplyController {
 
 
         /*
-         * 防止重复申报
+         * 这里不做「同一学生 + 同一项目」判重：
+         * 一个加减分项目（例如「课堂考勤旷课」）
+         * 在同一学期内可以发生多次，每次都应各成一条申报。
+         * 是否采纳由部门初审 / 辅导员终审决定。
+         * 与 Excel 批量导入 /departmentScoreApply/import 保持同一口径。
          */
-        LambdaQueryWrapper<DepartmentScoreApply>
-                duplicateWrapper =
-                new LambdaQueryWrapper<>();
-
-
-        duplicateWrapper
-
-                .eq(
-                        DepartmentScoreApply::getApplicantId,
-                        applicantId
-                )
-
-                .eq(
-                        DepartmentScoreApply::getStudentId,
-                        dto.getStudentId()
-                )
-
-                .eq(
-                        DepartmentScoreApply::getDepartmentId,
-                        dto.getDepartmentId()
-                )
-
-                .eq(
-                        DepartmentScoreApply::getTemplateId,
-                        dto.getTemplateId()
-                )
-
-                .and(wrapper ->
-
-                        wrapper
-
-                                .eq(
-                                        DepartmentScoreApply::getStatus,
-                                        (short) 0
-                                )
-
-                                .or()
-
-                                .and(w ->
-
-                                        w.eq(
-                                                        DepartmentScoreApply::getStatus,
-                                                        (short) 1
-                                                )
-
-                                                .eq(
-                                                        DepartmentScoreApply::getFinalStatus,
-                                                        (short) 0
-                                                )
-                                )
-
-                                .or()
-
-                                .and(w ->
-
-                                        w.eq(
-                                                        DepartmentScoreApply::getStatus,
-                                                        (short) 1
-                                                )
-
-                                                .eq(
-                                                        DepartmentScoreApply::getFinalStatus,
-                                                        (short) 1
-                                                )
-                                )
-                );
-
-
-        Long duplicateCount =
-                applyService.count(
-                        duplicateWrapper
-                );
-
-
-        if (duplicateCount != null
-                && duplicateCount > 0) {
-
-            return Result.fail(
-                    "该学生的该加减分项目已经申报，请勿重复提交"
-            );
-        }
 
 
         /*
