@@ -258,12 +258,7 @@
           </div>
         </el-form-item>
 
-        <el-form-item
-          :label="isSeniorCounselorForm
-            ? '管理部门（可选）'
-            : '管理部门'"
-          prop="departmentId"
-        >
+        <el-form-item label="管理部门" prop="departmentId">
           <el-select
             v-model="form.departmentId"
             placeholder="请选择管理部门"
@@ -365,10 +360,6 @@ const form = ref({
   username: '',
   password: '123456'
 })
-
-const isSeniorCounselorForm = computed(
-  () => form.value.positionName === '高级辅导员'
-)
 
 /*
  * 切换岗位后，重新校验「管理部门」：
