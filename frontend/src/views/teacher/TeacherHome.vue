@@ -74,6 +74,45 @@
 
 
       <!-- =========================
+           待审核删除申请
+           仅档案部负责辅导员 / 高级辅导员 / 管理员可见
+      ========================== -->
+      <el-card
+        v-if="canReviewScoreDeleteApply"
+        class="stat-card clickable"
+        @click="$router.push('/teacher/score-delete-audit')"
+      >
+
+        <div class="stat-content">
+
+          <div class="stat-icon danger">
+            <el-icon>
+              <Delete />
+            </el-icon>
+          </div>
+
+          <div class="stat-info">
+
+            <div class="stat-label">
+              待审核删除申请
+            </div>
+
+            <div class="stat-number">
+              {{ pendingDeleteCount }}
+            </div>
+
+            <div class="stat-desc">
+              成绩删除申请待处理
+            </div>
+
+          </div>
+
+        </div>
+
+      </el-card>
+
+
+      <!-- =========================
            今日申请
       ========================== -->
       <el-card
@@ -463,6 +502,7 @@ import { ElMessage } from 'element-plus'
 import {
   Clock,
   Document,
+  Delete,
   CircleCheck,
   User,
   Checked,
@@ -497,6 +537,19 @@ const auditedCount =
 
 const studentCount =
   ref(0)
+
+/*
+ * 待审核删除申请数量。
+ *
+ * 仅档案部负责辅导员 / 高级辅导员 / 管理员可见，
+ * 判定与路由守卫同源（后端 canReviewScoreDeleteApply）。
+ */
+
+const pendingDeleteCount =
+  ref(0)
+
+const canReviewScoreDeleteApply =
+  ref(false)
 
 const detailVisible = ref(false)
 const detailTitle = ref('申请明细')
@@ -838,6 +891,69 @@ async function loadStudentCount() {
 }
 
 /* ============================================================
+   待审核删除申请数量
+============================================================ */
+
+async function loadDeleteApplyCount() {
+
+  try {
+
+    const permissionRes =
+      await request.get(
+        '/departmentScoreApply/my-permissions'
+      )
+
+    const permissionData =
+      permissionRes?.data || {}
+
+    const canReview =
+      permissionData.canReviewScoreDeleteApply === true ||
+      Number(
+        permissionData.canReviewScoreDeleteApply
+      ) === 1
+
+    canReviewScoreDeleteApply.value = canReview
+
+    /*
+     * 无审核权限（如普通辅导员）不发列表请求，
+     * 后端本身也会拒绝，这里只是避免多余调用。
+     */
+
+    if (!canReview) {
+
+      pendingDeleteCount.value = 0
+
+      return
+
+    }
+
+    const res =
+      await request.get(
+        '/scoreDeleteApply/pending'
+      )
+
+    pendingDeleteCount.value =
+      Array.isArray(res?.data)
+        ? res.data.length
+        : 0
+
+  } catch (error) {
+
+    console.error(
+      '获取待审核删除申请数量失败：',
+      error
+    )
+
+    canReviewScoreDeleteApply.value = false
+
+    pendingDeleteCount.value = 0
+
+  }
+
+}
+
+
+/* ============================================================
    页面加载
 ============================================================ */
 
@@ -852,6 +968,8 @@ onMounted(() => {
   loadAuditedCount()
 
   loadStudentCount()
+
+  loadDeleteApplyCount()
 
 })
 
@@ -946,8 +1064,13 @@ onMounted(() => {
 .statistics {
   display: grid;
 
+  /*
+   * 卡片数量随权限变化（可能 4 张，也可能 5 张），
+   * auto-fit 会自动折叠多余轨道，始终保持一行等宽排列。
+   */
+
   grid-template-columns:
-    repeat(4, 1fr);
+    repeat(auto-fit, minmax(220px, 1fr));
 
   gap: 20px;
 
@@ -1034,6 +1157,13 @@ onMounted(() => {
   background: #f4f4f5;
 
   color: #909399;
+}
+
+
+.stat-icon.danger {
+  background: #fef0f0;
+
+  color: #f56c6c;
 }
 
 
