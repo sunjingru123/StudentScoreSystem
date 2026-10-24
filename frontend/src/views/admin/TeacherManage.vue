@@ -91,6 +91,23 @@
         />
 
         <el-table-column
+          prop="positionName"
+          label="岗位"
+          width="130"
+          align="center"
+        >
+          <template #default="{ row }">
+            <el-tag
+              :type="row.positionName === '高级辅导员'
+                ? 'warning'
+                : 'primary'"
+            >
+              {{ row.positionName || '辅导员' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column
           prop="departmentName"
           label="管理部门"
           min-width="160"
@@ -223,10 +240,34 @@
           />
         </el-form-item>
 
-        <el-form-item label="管理部门" prop="departmentId">
+        <el-form-item label="岗位" prop="positionName">
+          <el-select
+            v-model="form.positionName"
+            placeholder="请选择岗位"
+            style="width: 100%"
+            @change="handlePositionChange"
+          >
+            <el-option label="辅导员" value="辅导员" />
+
+            <el-option label="高级辅导员" value="高级辅导员" />
+          </el-select>
+
+          <div class="form-tip">
+            高级辅导员可导出全年级 / 各部门 / 各班加减分，
+            并审核成绩删除申请；无需绑定管理部门
+          </div>
+        </el-form-item>
+
+        <el-form-item
+          :label="isSeniorCounselorForm
+            ? '管理部门（可选）'
+            : '管理部门'"
+          prop="departmentId"
+        >
           <el-select
             v-model="form.departmentId"
             placeholder="请选择管理部门"
+            clearable
             style="width: 100%"
           >
             <el-option
@@ -319,10 +360,23 @@ const search = ref({
 const form = ref({
   id: null,
   realName: '',
+  positionName: '辅导员',
   departmentId: null,
   username: '',
   password: '123456'
 })
+
+const isSeniorCounselorForm = computed(
+  () => form.value.positionName === '高级辅导员'
+)
+
+/*
+ * 切换岗位后，重新校验「管理部门」：
+ * 高级辅导员不需要管理部门，清理掉旧的必填报错。
+ */
+function handlePositionChange() {
+  formRef.value?.clearValidate('departmentId')
+}
 
 // =========================================================
 // 表单验证
@@ -337,10 +391,34 @@ const rules = {
     }
   ],
 
-  departmentId: [
+  positionName: [
     {
       required: true,
-      message: '请选择管理部门',
+      message: '请选择岗位',
+      trigger: 'change'
+    }
+  ],
+
+  departmentId: [
+    {
+      validator: (rule, value, callback) => {
+
+        /*
+         * 高级辅导员不绑定具体业务部门，管理部门可选。
+         */
+        if (form.value.positionName === '高级辅导员') {
+          callback()
+          return
+        }
+
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请选择管理部门'))
+          return
+        }
+
+        callback()
+
+      },
       trigger: 'change'
     }
   ],
@@ -458,6 +536,7 @@ function openAddDialog() {
   form.value = {
     id: null,
     realName: '',
+    positionName: '辅导员',
     departmentId: null,
     username: '',
     password: '123456'
@@ -476,6 +555,7 @@ function openEditDialog(row) {
   form.value = {
     id: row.id,
     realName: row.realName || '',
+    positionName: row.positionName || '辅导员',
     departmentId: row.departmentId || null,
     username: row.username || '',
     password: ''
@@ -506,6 +586,7 @@ async function submitTeacher() {
       if (isEdit.value) {
         res = await updateTeacher(form.value.id, {
           realName: form.value.realName,
+          positionName: form.value.positionName,
           departmentId: form.value.departmentId,
           username: form.value.username,
           password: form.value.password
@@ -513,6 +594,7 @@ async function submitTeacher() {
       } else {
         res = await addTeacher({
           realName: form.value.realName,
+          positionName: form.value.positionName,
           departmentId: form.value.departmentId,
           username: form.value.username,
           password: form.value.password || '123456'

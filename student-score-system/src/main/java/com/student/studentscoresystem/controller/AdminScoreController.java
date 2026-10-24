@@ -65,7 +65,8 @@ public class AdminScoreController {
     /**
      * 是否有权查看 / 维护全部学生成绩
      *
-     * 管理员 或 档案部部长 / 副部长
+     * 管理员 / 档案部部长 / 副部长 /
+     * 档案部负责辅导员 / 高级辅导员
      */
     private boolean canManageStudentScores(Long userId) {
         return scoreManagerPermissionService.canManageStudentScores(userId);
@@ -227,6 +228,13 @@ public class AdminScoreController {
      * 删除 = 逻辑删除（status = 0，admin_hidden = 1）：
      *   学生端、辅导员端、统计、导出均不再包含该加减分记录，
      *   同时保留审计日志与历史数据，可恢复。
+     *
+     * 直接删除权限：
+     *   管理员 / 高级辅导员 / 档案部负责辅导员。
+     *
+     * 档案部部长 / 副部长不再直接删除，
+     * 需通过 /scoreDeleteApply/submit 提交删除申请，
+     * 由上述辅导员审核通过后执行。
      */
     @DeleteMapping("/record/{id}")
     public Result<Void> deleteRecord(
@@ -236,6 +244,16 @@ public class AdminScoreController {
     ) {
 
         Long operatorId = getCurrentUserId(request);
+
+        if (operatorId == null) {
+            return Result.fail("请先登录");
+        }
+
+        if (!scoreManagerPermissionService.canDeleteScoreDirectly(operatorId)) {
+            return Result.fail(
+                    "档案部成员删除学生成绩需要提交删除申请，经辅导员审核通过后执行"
+            );
+        }
 
         try {
 

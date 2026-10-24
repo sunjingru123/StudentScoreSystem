@@ -39,6 +39,26 @@
 
       </div>
 
+
+      <!-- =================================================
+           档案部正副部长：我的删除申请入口
+           ================================================== -->
+
+      <div
+        v-else
+        class="page-header-actions"
+      >
+
+        <el-button
+          type="primary"
+          plain
+          @click="goMyDeleteApplies"
+        >
+          我的删除申请
+        </el-button>
+
+      </div>
+
     </div>
 
 
@@ -529,7 +549,7 @@
               link
               @click="handleDelete(row)"
             >
-              删除
+              {{ isAdmin ? '删除' : '申请删除' }}
             </el-button>
 
           </template>
@@ -717,6 +737,11 @@ import {
 
 
 import {
+  useRouter,
+} from 'vue-router'
+
+
+import {
   ElMessage,
   ElMessageBox,
 } from 'element-plus'
@@ -728,6 +753,11 @@ import {
   deleteScoreRecord,
   restoreScoreRecord,
 } from '@/api/adminScore'
+
+
+import {
+  submitDeleteApply,
+} from '@/api/scoreDeleteApply'
 
 
 import request from '@/api/request'
@@ -766,6 +796,19 @@ const storedUser =
   readStoredUser()
 
 
+const router =
+  useRouter()
+
+
+function goMyDeleteApplies() {
+
+  router.push(
+    '/home/score-delete-apply',
+  )
+
+}
+
+
 const isAdmin =
   computed(
     () => storedUser.role === '管理员',
@@ -786,7 +829,7 @@ const pageDescription =
     () =>
       isAdmin.value
         ? '查看学生信息及综合测评成绩'
-        : '查看全部学生成绩，删除或恢复对应的加减分记录',
+        : '查看全部学生成绩；删除加减分需提交删除申请，经辅导员审核通过后执行',
   )
 
 
@@ -1483,15 +1526,36 @@ function isRemoved(row) {
 /* =========================================================
  * 删除一条成绩记录
  *
- * 权限：管理员 / 档案部部长、副部长（后端校验）
+ * 管理员：直接删除
+ * 档案部部长 / 副部长：提交删除申请，经辅导员审核后执行
  * ========================================================= */
 
 async function handleDelete(row) {
 
+  if (isAdmin.value) {
+
+    await directDeleteRecord(row)
+
+    return
+
+  }
+
+
+  await submitDeleteRecordApply(row)
+
+}
+
+
+/* =========================================================
+ * 管理员直接删除
+ * ========================================================= */
+
+async function directDeleteRecord(row) {
+
   try {
 
     await ElMessageBox.confirm(
-      `确定删除「${row.ruleName || '该条'}」这条加减分吗？\n\n删除后该记录不再计入学生成绩，可由管理员或档案部正副部长恢复。`,
+      `确定删除「${row.ruleName || '该条'}」这条加减分吗？\n\n删除后该记录不再计入学生成绩，可由管理员恢复。`,
       '删除成绩',
       {
         type: 'warning',
@@ -1564,6 +1628,76 @@ async function handleDelete(row) {
       ElMessage.error(
         error?.response?.data?.message
         || '删除成绩失败',
+      )
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+ * 档案部正副部长：提交删除申请
+ * ========================================================= */
+
+async function submitDeleteRecordApply(row) {
+
+  try {
+
+    const { value } =
+      await ElMessageBox.prompt(
+        `确定删除「${row.ruleName || '该条'}」这条加减分吗？\n\n提交后需经辅导员（高级辅导员 / 档案部负责辅导员）审核通过后才会真正删除。`,
+        '申请删除成绩',
+        {
+          type: 'warning',
+          confirmButtonText: '提交申请',
+          cancelButtonText: '取消',
+          inputPlaceholder: '删除原因（建议填写）',
+          inputValue: '',
+        },
+      )
+
+
+    const res =
+      await submitDeleteApply({
+        recordId: row.id,
+        reason: value || '',
+      })
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '提交删除申请失败',
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      '删除申请已提交，请等待辅导员审核',
+    )
+
+  }
+  catch (error) {
+
+    if (
+      error !== 'cancel' &&
+      error !== 'close'
+    ) {
+
+      console.error(
+        '提交删除申请失败：',
+        error,
+      )
+
+      ElMessage.error(
+        error?.response?.data?.message
+        || '提交删除申请失败',
       )
 
     }

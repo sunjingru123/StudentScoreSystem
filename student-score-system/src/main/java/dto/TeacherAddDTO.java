@@ -24,4 +24,13 @@ public class TeacherAddDTO {
      * 管理部门
      */
     private Long departmentId;
+
+    /**
+     * 岗位名称
+     *
+     * 默认「辅导员」；
+     * 传入「高级辅导员」时创建高级辅导员账号，
+     * 此时管理部门可以为空。
+     */
+    private String positionName;
 }

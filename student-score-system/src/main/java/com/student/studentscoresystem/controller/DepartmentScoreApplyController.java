@@ -17,6 +17,7 @@ import com.student.studentscoresystem.service.DepartmentScoreApplyImportService;
 import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
+import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,6 +57,8 @@ public class DepartmentScoreApplyController {
 
     private final DepartmentScoreApplyImportService departmentScoreApplyImportService;
 
+    private final ScoreManagerPermissionService scoreManagerPermissionService;
+
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
@@ -64,7 +67,8 @@ public class DepartmentScoreApplyController {
             DepartmentMapper departmentMapper,
             SysUserMapper sysUserMapper,
             DepartmentScoreFinalizeService departmentScoreFinalizeService,
-            DepartmentScoreApplyImportService departmentScoreApplyImportService) {
+            DepartmentScoreApplyImportService departmentScoreApplyImportService,
+            ScoreManagerPermissionService scoreManagerPermissionService) {
 
         this.applyService = applyService;
 
@@ -84,6 +88,9 @@ public class DepartmentScoreApplyController {
 
         this.departmentScoreApplyImportService =
                 departmentScoreApplyImportService;
+
+        this.scoreManagerPermissionService =
+                scoreManagerPermissionService;
     }
 
 
@@ -1103,6 +1110,61 @@ public class DepartmentScoreApplyController {
         data.put(
                 "canDepartmentAudit",
                 canDepartmentAudit
+        );
+
+
+    /* ========================================================
+       10.1 辅导员端成绩删除相关权限
+
+       高级辅导员 / 档案部负责辅导员可以直接删除学生成绩，
+       也可以审核档案部成员提交的删除申请；
+       档案部部长 / 副部长只能提交删除申请。
+
+       前端路由守卫与布局菜单直接复用这里的返回值，
+       避免额外网络请求。
+       ======================================================== */
+
+        boolean seniorCounselor =
+                scoreManagerPermissionService
+                        .isSeniorCounselor(currentUserId);
+
+
+        boolean canExportAllScopes =
+                scoreManagerPermissionService
+                        .isAdmin(currentUserId)
+                        || seniorCounselor;
+
+
+        data.put(
+                "seniorCounselor",
+                seniorCounselor
+        );
+
+
+        data.put(
+                "canExportAllScopes",
+                canExportAllScopes
+        );
+
+
+        data.put(
+                "canDeleteScoreDirectly",
+                scoreManagerPermissionService
+                        .canDeleteScoreDirectly(currentUserId)
+        );
+
+
+        data.put(
+                "canReviewScoreDeleteApply",
+                scoreManagerPermissionService
+                        .canReviewScoreDeleteApply(currentUserId)
+        );
+
+
+        data.put(
+                "canSubmitScoreDeleteApply",
+                scoreManagerPermissionService
+                        .canSubmitScoreDeleteApply(currentUserId)
         );
 
 

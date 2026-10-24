@@ -30,6 +30,8 @@ export const ROLE_AREA = {
 
   辅导员: '/teacher',
 
+  高级辅导员: '/teacher',
+
   学生: '/home',
 
   部长: '/home',
@@ -113,7 +115,11 @@ export function areaOfPath(path) {
  *   path        - 目标路径（to.path）
  *   flags       - 目标路由敏感标记（来自 to.matched 多级 meta 继承）
  *   role        - 权威角色
- *   permissions - 后端权限 { canDepartmentApply, departmentLeader, archiveLeader }
+ *   permissions - 后端权限
+ *                 { canDepartmentApply, departmentLeader, archiveLeader,
+ *                   archiveScoreManager, seniorCounselor, canExportAllScopes,
+ *                   canDeleteScoreDirectly, canReviewScoreDeleteApply,
+ *                   canSubmitScoreDeleteApply }
  *   firstLogin  - 是否首次登录需强制改密
  *
  * 返回：
@@ -311,7 +317,70 @@ export function decideAccess({
   }
 
 
-  /* ---------- 8. 放行 ---------- */
+  /* ---------- 辅导员端：全年级 / 各部门 / 各班导出 ---------- */
+
+  if (flags.requiresSeniorExport) {
+
+    if (role !== '管理员' && !permissions.canExportAllScopes) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '只有高级辅导员可以按年级 / 部门 / 班级导出',
+
+      }
+
+    }
+
+  }
+
+
+  /* ---------- 辅导员端：成绩删除申请审核 ---------- */
+
+  if (flags.requiresScoreDeleteAudit) {
+
+    if (role !== '管理员' && !permissions.canReviewScoreDeleteApply) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '你没有审核成绩删除申请的权限',
+
+      }
+
+    }
+
+  }
+
+
+  /* ---------- 学生端：提交成绩删除申请（档案部部长 / 副部长） ---------- */
+
+  if (flags.requiresScoreDeleteApply) {
+
+    if (role !== '管理员' && !permissions.canSubmitScoreDeleteApply) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '只有档案部部长 / 副部长可以提交成绩删除申请',
+
+      }
+
+    }
+
+  }
+
+
+  /* ---------- 放行 ---------- */
 
   return { action: 'allow' }
 

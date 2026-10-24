@@ -127,6 +127,46 @@
 
         </el-menu-item>
 
+
+        <!-- =========================
+             高级辅导员：加减分汇总导出
+             （全年级 / 各部门 / 各班）
+        ========================== -->
+        <el-menu-item
+          v-if="canExportAllScopes"
+          index="/teacher/score-export"
+        >
+
+          <el-icon>
+            <Download />
+          </el-icon>
+
+          <span>
+            加减分汇总导出
+          </span>
+
+        </el-menu-item>
+
+
+        <!-- =========================
+             成绩删除申请审核
+             （高级辅导员 / 档案部负责辅导员）
+        ========================== -->
+        <el-menu-item
+          v-if="canReviewScoreDeleteApply"
+          index="/teacher/score-delete-audit"
+        >
+
+          <el-icon>
+            <Delete />
+          </el-icon>
+
+          <span>
+            删除申请审核
+          </span>
+
+        </el-menu-item>
+
       </el-menu>
 
     </el-aside>
@@ -183,6 +223,22 @@
         <el-menu-item index="/teacher/message">
           <el-icon><Bell /></el-icon>
           <span>消息通知</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="canExportAllScopes"
+          index="/teacher/score-export"
+        >
+          <el-icon><Download /></el-icon>
+          <span>加减分汇总导出</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="canReviewScoreDeleteApply"
+          index="/teacher/score-delete-audit"
+        >
+          <el-icon><Delete /></el-icon>
+          <span>删除申请审核</span>
         </el-menu-item>
 
       </el-menu>
@@ -302,12 +358,16 @@ import {
   useRouter
 } from 'vue-router'
 
+import request from '@/utils/request'
+
 import {
   House,
   Checked,
   Calendar,
   Trophy,
   Bell,
+  Download,
+  Delete,
   SwitchButton,
   Lock,
   Menu
@@ -324,6 +384,54 @@ const router =
 
 const teacherName =
   ref('辅导员')
+
+
+// ============================================================
+// 敏感菜单可见性（高级导出 / 删除申请审核）
+//
+// 以后端 /departmentScoreApply/my-permissions 返回为准，
+// 前端仅控制菜单展示，真实校验始终在后端接口。
+// ============================================================
+
+const canExportAllScopes =
+  ref(false)
+
+const canReviewScoreDeleteApply =
+  ref(false)
+
+
+async function loadPermissions() {
+
+  try {
+
+    const res =
+      await request.get('/departmentScoreApply/my-permissions')
+
+    const data =
+      res?.data || {}
+
+    canExportAllScopes.value =
+      data.canExportAllScopes === true ||
+      Number(data.canExportAllScopes) === 1
+
+    canReviewScoreDeleteApply.value =
+      data.canReviewScoreDeleteApply === true ||
+      Number(data.canReviewScoreDeleteApply) === 1
+
+  } catch (error) {
+
+    console.error(
+      '读取辅导员权限失败：',
+      error
+    )
+
+    canExportAllScopes.value = false
+
+    canReviewScoreDeleteApply.value = false
+
+  }
+
+}
 
 
 // ============================================================
@@ -418,6 +526,8 @@ function logout() {
 onMounted(() => {
 
   loadTeacher()
+
+  loadPermissions()
 
 })
 

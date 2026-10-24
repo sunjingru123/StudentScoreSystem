@@ -56,6 +56,12 @@ public class ScoreManagerPermissionService {
     private static final List<String> ARCHIVE_LEADER_POSITIONS =
             List.of("部长", "副部长");
 
+    /**
+     * 高级辅导员岗位名称
+     */
+    private static final String SENIOR_COUNSELOR_POSITION_NAME =
+            "高级辅导员";
+
 
     private final SysUserPositionMapper userPositionMapper;
 
@@ -260,6 +266,207 @@ public class ScoreManagerPermissionService {
             return true;
         }
 
+
+        if (isArchiveLeader(userId)) {
+
+            return true;
+        }
+
+
+        /*
+         * 高级辅导员 / 档案部负责辅导员同样需要查看学生成绩，
+         * 以便审核档案部提交的成绩删除申请。
+         */
+        if (isSeniorCounselor(userId)) {
+
+            return true;
+        }
+
+
+        return isArchiveDepartmentCounselor(userId);
+    }
+
+
+    /**
+     * =====================================================
+     * 是否为「高级辅导员」
+     * =====================================================
+     *
+     * 高级辅导员是辅导员端的一个岗位：
+     *   1. 可以导出全年级 / 各部门 / 各班的加减分汇总；
+     *   2. 可以审核档案部成员提交的成绩删除申请，
+     *      并直接执行删除。
+     *
+     * 判定依据完全复用现有 sys_user_position + sys_position，
+     * 不新增任何角色表或字段。
+     */
+    public boolean isSeniorCounselor(Long userId) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        List<SysUserPosition> relations =
+                userPositionMapper.selectList(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getUserId,
+                                        userId
+                                )
+                );
+
+
+        if (relations == null || relations.isEmpty()) {
+
+            return false;
+        }
+
+
+        for (SysUserPosition relation : relations) {
+
+            if (relation == null || relation.getPositionId() == null) {
+
+                continue;
+            }
+
+
+            SysPosition position =
+                    positionMapper.selectById(
+                            relation.getPositionId()
+                    );
+
+
+            if (position == null || position.getName() == null) {
+
+                continue;
+            }
+
+
+            if (position.getStatus() != null && position.getStatus() != 1) {
+
+                continue;
+            }
+
+
+            if (SENIOR_COUNSELOR_POSITION_NAME.equals(
+                    position.getName().trim()
+            )) {
+
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+
+
+    /**
+     * =====================================================
+     * 是否为「档案部负责辅导员」
+     * =====================================================
+     *
+     * 判定依据：department.teacher_id = 当前用户，
+     * 且部门名称为「档案部」且已启用。
+     *
+     * 与「高级辅导员」一起构成成绩删除申请的审核人集合，
+     * 这些审核人同时可以直接删除学生成绩。
+     */
+    public boolean isArchiveDepartmentCounselor(Long userId) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        List<Department> departments =
+                departmentMapper.selectList(
+                        new LambdaQueryWrapper<Department>()
+                                .eq(
+                                        Department::getTeacherId,
+                                        userId
+                                )
+                                .eq(
+                                        Department::getName,
+                                        ARCHIVE_DEPARTMENT_NAME
+                                )
+                );
+
+
+        if (departments == null || departments.isEmpty()) {
+
+            return false;
+        }
+
+
+        for (Department department : departments) {
+
+            if (department == null) {
+
+                continue;
+            }
+
+
+            if (Short.valueOf((short) 1).equals(department.getStatus())) {
+
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+
+
+    /**
+     * =====================================================
+     * 是否可以直接删除学生成绩（无需审核）
+     * =====================================================
+     *
+     * 管理员 / 高级辅导员 / 档案部负责辅导员。
+     *
+     * 档案部部长 / 副部长不再直接删除，
+     * 而是通过「提交删除申请 -> 审核通过」流程执行。
+     */
+    public boolean canDeleteScoreDirectly(Long userId) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        return isAdmin(userId)
+                || isSeniorCounselor(userId)
+                || isArchiveDepartmentCounselor(userId);
+    }
+
+
+    /**
+     * =====================================================
+     * 是否可以审核成绩删除申请
+     * =====================================================
+     *
+     * 与 canDeleteScoreDirectly 保持一致：
+     * 审核人即可以直接删除的辅导员 / 管理员。
+     */
+    public boolean canReviewScoreDeleteApply(Long userId) {
+
+        return canDeleteScoreDirectly(userId);
+    }
+
+
+    /**
+     * =====================================================
+     * 是否可以提交成绩删除申请
+     * =====================================================
+     *
+     * 仅档案部部长 / 副部长（干事不能提交）。
+     */
+    public boolean canSubmitScoreDeleteApply(Long userId) {
 
         return isArchiveLeader(userId);
     }

@@ -256,6 +256,26 @@ const router = createRouter({
         },
 
         // ===================================================
+        // 我的成绩删除申请
+        //
+        // 档案部部长 / 副部长提交删除申请后查看进度
+        // ===================================================
+
+        {
+          path: 'score-delete-apply',
+
+          name: 'ArchiveScoreDeleteApply',
+
+          component: () => import('@/views/student/ScoreDeleteApply.vue'),
+
+          meta: {
+            title: '我的删除申请',
+
+            requiresScoreDeleteApply: true,
+          },
+        },
+
+        // ===================================================
         // 加减分汇总导出
         //
         // 档案部负责人 / 副负责人
@@ -509,6 +529,44 @@ const router = createRouter({
 
           component: TeacherMessage,
         },
+
+        // ---------------------------------------------------
+        // 高级辅导员：全年级 / 各部门 / 各班 加减分导出
+        //
+        // 仅高级辅导员（后端口径：canExportAllScopes）
+        // ---------------------------------------------------
+
+        {
+          path: 'score-export',
+
+          name: 'TeacherScoreExport',
+
+          component: () => import('@/views/teacher/SeniorScoreExport.vue'),
+
+          meta: {
+            title: '加减分汇总导出',
+
+            requiresSeniorExport: true,
+          },
+        },
+
+        // ---------------------------------------------------
+        // 高级辅导员 / 档案部负责辅导员：成绩删除申请审核
+        // ---------------------------------------------------
+
+        {
+          path: 'score-delete-audit',
+
+          name: 'TeacherScoreDeleteAudit',
+
+          component: () => import('@/views/teacher/ScoreDeleteAudit.vue'),
+
+          meta: {
+            title: '成绩删除申请审核',
+
+            requiresScoreDeleteAudit: true,
+          },
+        },
       ],
     },
   ],
@@ -541,6 +599,16 @@ const authCache = {
 
   archiveScoreManager: false,
 
+  seniorCounselor: false,
+
+  canExportAllScopes: false,
+
+  canDeleteScoreDirectly: false,
+
+  canReviewScoreDeleteApply: false,
+
+  canSubmitScoreDeleteApply: false,
+
   loaded: false,
 
   pending: null,
@@ -565,6 +633,16 @@ function clearAuth() {
   authCache.archiveLeader = false
 
   authCache.archiveScoreManager = false
+
+  authCache.seniorCounselor = false
+
+  authCache.canExportAllScopes = false
+
+  authCache.canDeleteScoreDirectly = false
+
+  authCache.canReviewScoreDeleteApply = false
+
+  authCache.canSubmitScoreDeleteApply = false
 
   authCache.loaded = false
 }
@@ -591,6 +669,16 @@ async function loadAuthContext(storedUser) {
       archiveLeader: false,
 
       archiveScoreManager: false,
+
+      seniorCounselor: false,
+
+      canExportAllScopes: false,
+
+      canDeleteScoreDirectly: false,
+
+      canReviewScoreDeleteApply: false,
+
+      canSubmitScoreDeleteApply: false,
     }
   }
 
@@ -612,6 +700,16 @@ async function loadAuthContext(storedUser) {
     let archiveLeader = false
 
     let archiveScoreManager = false
+
+    let seniorCounselor = false
+
+    let canExportAllScopes = false
+
+    let canDeleteScoreDirectly = false
+
+    let canReviewScoreDeleteApply = false
+
+    let canSubmitScoreDeleteApply = false
 
     try {
       const infoRes = await request.get('/user/info')
@@ -652,6 +750,25 @@ async function loadAuthContext(storedUser) {
           department.departmentName === '档案部' &&
           (department.position === '副部长' || department.position === '部长'),
       )
+
+      /*
+       * 辅导员端敏感权限：
+       * 高级辅导员导出、成绩删除申请审核与提交。
+       * 以后端返回为准，不在前端自行推导。
+       */
+      seniorCounselor = data.seniorCounselor === true || Number(data.seniorCounselor) === 1
+
+      canExportAllScopes =
+        data.canExportAllScopes === true || Number(data.canExportAllScopes) === 1
+
+      canDeleteScoreDirectly =
+        data.canDeleteScoreDirectly === true || Number(data.canDeleteScoreDirectly) === 1
+
+      canReviewScoreDeleteApply =
+        data.canReviewScoreDeleteApply === true || Number(data.canReviewScoreDeleteApply) === 1
+
+      canSubmitScoreDeleteApply =
+        data.canSubmitScoreDeleteApply === true || Number(data.canSubmitScoreDeleteApply) === 1
     } catch (error) {
       console.error('获取部门权限失败：', error)
 
@@ -662,6 +779,16 @@ async function loadAuthContext(storedUser) {
       archiveScoreManager = false
 
       canDepartmentApply = false
+
+      seniorCounselor = false
+
+      canExportAllScopes = false
+
+      canDeleteScoreDirectly = false
+
+      canReviewScoreDeleteApply = false
+
+      canSubmitScoreDeleteApply = false
     }
 
     // 后端未返回角色时，回退到登录时写入的本地角色。
@@ -681,6 +808,16 @@ async function loadAuthContext(storedUser) {
     authCache.archiveLeader = archiveLeader
 
     authCache.archiveScoreManager = archiveScoreManager
+
+    authCache.seniorCounselor = seniorCounselor
+
+    authCache.canExportAllScopes = canExportAllScopes
+
+    authCache.canDeleteScoreDirectly = canDeleteScoreDirectly
+
+    authCache.canReviewScoreDeleteApply = canReviewScoreDeleteApply
+
+    authCache.canSubmitScoreDeleteApply = canSubmitScoreDeleteApply
 
     authCache.loaded = true
 
@@ -806,6 +943,18 @@ router.beforeEach(async (to) => {
     requiresArchiveScoreManager: to.matched.some(
       (record) => record.meta?.requiresArchiveScoreManager === true,
     ),
+
+    requiresSeniorExport: to.matched.some(
+      (record) => record.meta?.requiresSeniorExport === true,
+    ),
+
+    requiresScoreDeleteAudit: to.matched.some(
+      (record) => record.meta?.requiresScoreDeleteAudit === true,
+    ),
+
+    requiresScoreDeleteApply: to.matched.some(
+      (record) => record.meta?.requiresScoreDeleteApply === true,
+    ),
   }
 
   const decision = decideAccess({
@@ -823,6 +972,16 @@ router.beforeEach(async (to) => {
       archiveLeader: auth.archiveLeader,
 
       archiveScoreManager: auth.archiveScoreManager,
+
+      seniorCounselor: auth.seniorCounselor,
+
+      canExportAllScopes: auth.canExportAllScopes,
+
+      canDeleteScoreDirectly: auth.canDeleteScoreDirectly,
+
+      canReviewScoreDeleteApply: auth.canReviewScoreDeleteApply,
+
+      canSubmitScoreDeleteApply: auth.canSubmitScoreDeleteApply,
     },
   })
 

@@ -399,7 +399,7 @@ const handleSubmit =
       }
 
 
-      if (role === '辅导员') {
+      if (role === '辅导员' || role === '高级辅导员') {
 
         await router.replace(
           '/teacher'

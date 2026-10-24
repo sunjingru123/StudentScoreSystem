@@ -49,6 +49,8 @@ class ScoreManagerPermissionServiceTest {
     private static final long STUDENT_ID = 5L;
     private static final long COUNSELOR_ID = 6L;
     private static final long OTHER_LEADER_ID = 7L;
+    private static final long SENIOR_COUNSELOR_ID = 8L;
+    private static final long ARCHIVE_COUNSELOR_TEACHER_ID = 9L;
 
     private static final long ARCHIVE_DEPT_ID = 10L;
     private static final long OTHER_DEPT_ID = 11L;
@@ -242,5 +244,100 @@ class ScoreManagerPermissionServiceTest {
         assertFalse(service.canManageStudentScores(null));
         assertFalse(service.isAdmin(null));
         assertFalse(service.isArchiveLeader(null));
+    }
+
+    /* =========================================================
+     * 成绩删除申请相关权限（高级辅导员 / 档案部负责辅导员）
+     * ========================================================= */
+
+    @Test
+    void seniorCounselorCanDeleteAndReviewButNotSubmit() {
+
+        givenPosition(
+                SENIOR_COUNSELOR_ID,
+                200L,
+                "高级辅导员",
+                (short) 1
+        );
+
+        assertTrue(service.isSeniorCounselor(SENIOR_COUNSELOR_ID));
+        assertTrue(service.canManageStudentScores(SENIOR_COUNSELOR_ID));
+        assertTrue(service.canDeleteScoreDirectly(SENIOR_COUNSELOR_ID));
+        assertTrue(service.canReviewScoreDeleteApply(SENIOR_COUNSELOR_ID));
+        assertFalse(service.canSubmitScoreDeleteApply(SENIOR_COUNSELOR_ID));
+    }
+
+    @Test
+    void archiveDepartmentCounselorCanDeleteAndReview() {
+
+        Department department = new Department();
+
+        department.setId(ARCHIVE_DEPT_ID);
+        department.setName("档案部");
+        department.setStatus((short) 1);
+        department.setTeacherId(ARCHIVE_COUNSELOR_TEACHER_ID);
+
+        when(departmentMapper.selectList(any()))
+                .thenReturn(List.of(department));
+
+        assertTrue(
+                service.isArchiveDepartmentCounselor(
+                        ARCHIVE_COUNSELOR_TEACHER_ID
+                )
+        );
+
+        assertTrue(
+                service.canDeleteScoreDirectly(
+                        ARCHIVE_COUNSELOR_TEACHER_ID
+                )
+        );
+
+        assertTrue(
+                service.canReviewScoreDeleteApply(
+                        ARCHIVE_COUNSELOR_TEACHER_ID
+                )
+        );
+    }
+
+    @Test
+    void archiveLeaderCanSubmitButCannotDeleteDirectly() {
+
+        givenDepartment(
+                ARCHIVE_LEADER_ID,
+                ARCHIVE_DEPT_ID,
+                "部长",
+                "档案部",
+                (short) 1
+        );
+
+        assertTrue(service.canSubmitScoreDeleteApply(ARCHIVE_LEADER_ID));
+        assertFalse(service.canDeleteScoreDirectly(ARCHIVE_LEADER_ID));
+    }
+
+    @Test
+    void archiveMemberCannotSubmitDeleteApply() {
+
+        givenDepartment(
+                ARCHIVE_MEMBER_ID,
+                ARCHIVE_DEPT_ID,
+                "干事",
+                "档案部",
+                (short) 1
+        );
+
+        assertFalse(service.canSubmitScoreDeleteApply(ARCHIVE_MEMBER_ID));
+    }
+
+    @Test
+    void disabledSeniorCounselorPositionIsRejected() {
+
+        givenPosition(
+                SENIOR_COUNSELOR_ID,
+                200L,
+                "高级辅导员",
+                (short) 0
+        );
+
+        assertFalse(service.isSeniorCounselor(SENIOR_COUNSELOR_ID));
     }
 }

@@ -208,7 +208,7 @@ const handleLogin =
       }
 
 
-      if (user.role === '辅导员') {
+      if (user.role === '辅导员' || user.role === '高级辅导员') {
 
         await router.push(
           '/teacher'

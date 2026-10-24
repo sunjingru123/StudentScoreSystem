@@ -32,4 +32,10 @@ public class TeacherVO {
      * 1正常 0停用
      */
     private Short status;
+
+    /**
+     * 岗位名称
+     * 辅导员 / 高级辅导员
+     */
+    private String positionName;
 }
