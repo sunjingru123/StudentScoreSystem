@@ -7,7 +7,7 @@
         <h2>加减分汇总导出</h2>
 
         <p>
-          高级辅导员可按全年级、各部门、各班导出加减分汇总
+          高级辅导员可按全年级、各班导出加减分汇总
         </p>
       </div>
 
@@ -56,10 +56,6 @@
               全年级
             </el-radio-button>
 
-            <el-radio-button value="DEPARTMENT">
-              各部门
-            </el-radio-button>
-
             <el-radio-button value="CLASS">
               各班
             </el-radio-button>
@@ -87,31 +83,6 @@
               :key="item"
               :label="item"
               :value="item"
-            />
-
-          </el-select>
-
-        </el-form-item>
-
-
-        <!-- 部门 -->
-
-        <el-form-item
-          v-if="form.scope === 'DEPARTMENT'"
-          label="部门"
-        >
-
-          <el-select
-            v-model="form.departmentId"
-            placeholder="请选择部门"
-            style="width: 100%"
-          >
-
-            <el-option
-              v-for="item in options.departments"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
             />
 
           </el-select>
@@ -175,11 +146,6 @@
         </div>
 
         <div>
-          <strong>各部门：</strong>
-          导出该部门在编成员学生的加减分汇总
-        </div>
-
-        <div>
           <strong>周次：</strong>
           第 X 周按所选学期的开始日期推算，学期一更新，导出结果随之更新
         </div>
@@ -210,9 +176,7 @@ const options = reactive({
 
   grades: [],
 
-  classes: [],
-
-  departments: []
+  classes: []
 
 })
 
@@ -224,8 +188,6 @@ const form = reactive({
   scope: 'GRADE',
 
   grade: '',
-
-  departmentId: null,
 
   className: ''
 
@@ -279,7 +241,7 @@ const loadSemesters = async () => {
 
 
 // =========================================================
-// 导出选项（年级 / 班级 / 部门）
+// 导出选项（年级 / 班级）
 // =========================================================
 
 const loadOptions = async () => {
@@ -297,8 +259,6 @@ const loadOptions = async () => {
       options.grades = Array.isArray(data.grades) ? data.grades : []
 
       options.classes = Array.isArray(data.classes) ? data.classes : []
-
-      options.departments = Array.isArray(data.departments) ? data.departments : []
 
     } else {
 
@@ -370,14 +330,6 @@ const handleExport = async () => {
 
   }
 
-  if (form.scope === 'DEPARTMENT' && !form.departmentId) {
-
-    ElMessage.warning('请选择部门')
-
-    return
-
-  }
-
   if (form.scope === 'CLASS' && !form.className) {
 
     ElMessage.warning('请选择班级')
@@ -399,8 +351,6 @@ const handleExport = async () => {
         scope: form.scope,
 
         grade: form.scope === 'GRADE' ? form.grade : undefined,
-
-        departmentId: form.scope === 'DEPARTMENT' ? form.departmentId : undefined,
 
         className: form.scope === 'CLASS' ? form.className : undefined
 
@@ -459,17 +409,7 @@ function exportLabel() {
 
   }
 
-  if (form.scope === 'CLASS') {
-
-    return form.className
-
-  }
-
-  const department = options.departments.find(
-    (item) => item.id === form.departmentId
-  )
-
-  return department?.name || '部门'
+  return form.className
 
 }
 

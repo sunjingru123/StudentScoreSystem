@@ -2,15 +2,11 @@ package com.student.studentscoresystem.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.ScoreConstants;
-import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
-import com.student.studentscoresystem.entity.SysUserDepartment;
-import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysSemesterMapper;
-import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.IScoreExportService;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
@@ -38,10 +34,6 @@ public class ScoreExportServiceImpl
 
     private final SysSemesterMapper sysSemesterMapper;
 
-    private final SysUserDepartmentMapper userDepartmentMapper;
-
-    private final DepartmentMapper departmentMapper;
-
     private final ScoreProjectNameResolver
             scoreProjectNameResolver;
 
@@ -50,8 +42,6 @@ public class ScoreExportServiceImpl
             SysUserMapper sysUserMapper,
             ScoreRecordMapper scoreRecordMapper,
             SysSemesterMapper sysSemesterMapper,
-            SysUserDepartmentMapper userDepartmentMapper,
-            DepartmentMapper departmentMapper,
             ScoreProjectNameResolver
                     scoreProjectNameResolver) {
 
@@ -63,12 +53,6 @@ public class ScoreExportServiceImpl
 
         this.sysSemesterMapper =
                 sysSemesterMapper;
-
-        this.userDepartmentMapper =
-                userDepartmentMapper;
-
-        this.departmentMapper =
-                departmentMapper;
 
         this.scoreProjectNameResolver =
                 scoreProjectNameResolver;
@@ -121,7 +105,7 @@ public class ScoreExportServiceImpl
 
     /**
      * =========================================================
-     * 按范围导出（全年级 / 各部门 / 各班）
+     * 按范围导出（全年级 / 各班）
      *
      * 与 {@link #export(Long, String, HttpServletResponse)}
      * 完全共用同一套 Excel 生成逻辑，
@@ -129,7 +113,6 @@ public class ScoreExportServiceImpl
      *
      * scope：
      *   GRADE      按年级关键字（如 24级）匹配 class_name
-     *   DEPARTMENT 导出该部门全部在编成员
      *   CLASS      按班级关键字匹配 class_name
      * =========================================================
      */
@@ -138,7 +121,6 @@ public class ScoreExportServiceImpl
             Long semesterId,
             String scope,
             String grade,
-            Long departmentId,
             String className,
             HttpServletResponse response) {
 
@@ -172,37 +154,6 @@ public class ScoreExportServiceImpl
             students =
                     queryStudentsByClassNameLike(
                             fileLabel
-                    );
-
-        } else if ("DEPARTMENT".equals(normalizedScope)) {
-
-            if (departmentId == null) {
-
-                throw new IllegalArgumentException(
-                        "请选择部门"
-                );
-            }
-
-
-            Department department =
-                    departmentMapper.selectById(
-                            departmentId
-                    );
-
-
-            if (department == null) {
-
-                throw new IllegalArgumentException(
-                        "部门不存在"
-                );
-            }
-
-
-            fileLabel = department.getName();
-
-            students =
-                    queryDepartmentMembers(
-                            departmentId
                     );
 
         } else if ("CLASS".equals(normalizedScope)) {
@@ -312,69 +263,6 @@ public class ScoreExportServiceImpl
         return students == null
                 ? new ArrayList<>()
                 : students;
-    }
-
-
-    /**
-     * 查询某个部门当前在编（status = 1）的学生成员。
-     */
-    private List<SysUser> queryDepartmentMembers(
-            Long departmentId) {
-
-        List<SysUserDepartment> relations =
-                userDepartmentMapper.selectList(
-                        new LambdaQueryWrapper<SysUserDepartment>()
-                                .eq(
-                                        SysUserDepartment::getDepartmentId,
-                                        departmentId
-                                )
-                                .eq(
-                                        SysUserDepartment::getStatus,
-                                        (short) 1
-                                )
-                );
-
-
-        if (relations == null || relations.isEmpty()) {
-
-            return new ArrayList<>();
-        }
-
-
-        List<Long> userIds =
-                relations.stream()
-                        .filter(Objects::nonNull)
-                        .map(SysUserDepartment::getUserId)
-                        .filter(Objects::nonNull)
-                        .distinct()
-                        .toList();
-
-
-        if (userIds.isEmpty()) {
-
-            return new ArrayList<>();
-        }
-
-
-        List<SysUser> users =
-                sysUserMapper.selectList(
-                        new LambdaQueryWrapper<SysUser>()
-                                .in(
-                                        SysUser::getId,
-                                        userIds
-                                )
-                                .orderByAsc(
-                                        SysUser::getStudentNo
-                                )
-                                .orderByAsc(
-                                        SysUser::getId
-                                )
-                );
-
-
-        return users == null
-                ? new ArrayList<>()
-                : users;
     }
 
 

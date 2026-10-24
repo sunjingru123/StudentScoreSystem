@@ -412,7 +412,7 @@ public class ScoreExportController {
        判断是否为高级辅导员
 
        高级辅导员是辅导员端的一个岗位：
-       可以导出全年级 / 各部门 / 各班的加减分汇总。
+       可以导出全年级 / 各班的加减分汇总。
 
        判定复用现有 sys_user_position + sys_position，
        不新增角色表。
@@ -519,7 +519,7 @@ public class ScoreExportController {
 
 
         /*
-         * 3. 高级辅导员（全年级 / 各部门 / 各班导出）
+         * 3. 高级辅导员（全年级 / 各班导出）
          */
 
         return isSeniorCounselor(
@@ -615,8 +615,8 @@ public class ScoreExportController {
 
 
         /*
-         * 高级辅导员 / 管理员可以导出全部三个范围：
-         * 全年级、各部门、各班。
+         * 高级辅导员 / 管理员可以导出全部范围：
+         * 全年级、各班。
          */
         data.put(
                 "canExportAllScopes",
@@ -809,7 +809,7 @@ public class ScoreExportController {
 
 
     /* =========================================================
-       高级辅导员：导出选项（年级 / 部门 / 班级）
+       高级辅导员：导出选项（年级 / 班级）
        ========================================================= */
 
     @GetMapping("/senior/options")
@@ -909,50 +909,6 @@ public class ScoreExportController {
         }
 
 
-        /*
-         * 部门：启用中的业务部门
-         */
-        List<Department> departments =
-                departmentMapper.selectList(
-                        new LambdaQueryWrapper<Department>()
-                                .eq(
-                                        Department::getStatus,
-                                        (short) 1
-                                )
-                                .orderByAsc(
-                                        Department::getId
-                                )
-                );
-
-
-        List<Map<String, Object>> departmentItems =
-                new ArrayList<>();
-
-
-        if (departments != null) {
-
-            for (Department department : departments) {
-
-                if (department == null) {
-
-                    continue;
-                }
-
-
-                Map<String, Object> item =
-                        new LinkedHashMap<>();
-
-
-                item.put("id", department.getId());
-
-                item.put("name", department.getName());
-
-
-                departmentItems.add(item);
-            }
-        }
-
-
         Map<String, Object> data =
                 new LinkedHashMap<>();
 
@@ -969,12 +925,6 @@ public class ScoreExportController {
         );
 
 
-        data.put(
-                "departments",
-                departmentItems
-        );
-
-
         return Result.success(
                 data
         );
@@ -986,9 +936,8 @@ public class ScoreExportController {
 
        GET /scoreExport/senior
            ?semesterId=1
-           &scope=GRADE|DEPARTMENT|CLASS
+           &scope=GRADE|CLASS
            &grade=24级
-           &departmentId=3
            &className=24级1班
        ========================================================= */
 
@@ -997,7 +946,6 @@ public class ScoreExportController {
             @RequestParam Long semesterId,
             @RequestParam String scope,
             @RequestParam(required = false) String grade,
-            @RequestParam(required = false) Long departmentId,
             @RequestParam(required = false) String className,
             HttpServletRequest request,
             HttpServletResponse response) {
@@ -1032,7 +980,6 @@ public class ScoreExportController {
                 semesterId,
                 scope,
                 grade,
-                departmentId,
                 className,
                 response
         );

@@ -1,14 +1,10 @@
 package com.student.studentscoresystem;
 
-import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.ScoreRecord;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
-import com.student.studentscoresystem.entity.SysUserDepartment;
-import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.ScoreRecordMapper;
 import com.student.studentscoresystem.mapper.SysSemesterMapper;
-import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.ScoreProjectNameResolver;
 import com.student.studentscoresystem.service.impl.ScoreExportServiceImpl;
@@ -71,12 +67,6 @@ class ScoreExportServiceImplTest {
     private SysSemesterMapper sysSemesterMapper;
 
     @Mock
-    private SysUserDepartmentMapper userDepartmentMapper;
-
-    @Mock
-    private DepartmentMapper departmentMapper;
-
-    @Mock
     private ScoreProjectNameResolver scoreProjectNameResolver;
 
     @Mock
@@ -93,8 +83,6 @@ class ScoreExportServiceImplTest {
                 sysUserMapper,
                 scoreRecordMapper,
                 sysSemesterMapper,
-                userDepartmentMapper,
-                departmentMapper,
                 scoreProjectNameResolver
         );
 
@@ -363,7 +351,6 @@ class ScoreExportServiceImplTest {
                 "GRADE",
                 "24级",
                 null,
-                null,
                 response
         );
 
@@ -380,58 +367,6 @@ class ScoreExportServiceImplTest {
                 "加减分具体情况",
                 sheet.getRow(0)
                         .getCell(4)
-                        .getStringCellValue()
-        );
-    }
-
-    /**
-     * 高级辅导员按「各部门」导出时，
-     * 导出该部门在编成员。
-     */
-    @Test
-    void exportByScopeDepartmentExportsMembers() throws Exception {
-
-        stubExportData(
-                LocalDate.of(2025, 9, 1),
-                LocalDate.of(2026, 1, 11)
-        );
-
-        Department department = new Department();
-
-        department.setId(9L);
-        department.setName("体育部");
-        department.setStatus((short) 1);
-
-        lenient()
-                .when(departmentMapper.selectById(9L))
-                .thenReturn(department);
-
-        SysUserDepartment relation =
-                new SysUserDepartment();
-
-        relation.setUserId(STUDENT_ID);
-        relation.setDepartmentId(9L);
-        relation.setStatus((short) 1);
-
-        lenient()
-                .when(userDepartmentMapper.selectList(any()))
-                .thenReturn(List.of(relation));
-
-        service.exportByScope(
-                SEMESTER_ID,
-                "DEPARTMENT",
-                null,
-                9L,
-                null,
-                response
-        );
-
-        Sheet sheet = readSheet();
-
-        assertEquals(
-                "张三",
-                sheet.getRow(1)
-                        .getCell(0)
                         .getStringCellValue()
         );
     }

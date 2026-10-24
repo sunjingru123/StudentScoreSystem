@@ -317,7 +317,7 @@ export function decideAccess({
   }
 
 
-  /* ---------- 辅导员端：全年级 / 各部门 / 各班导出 ---------- */
+  /* ---------- 辅导员端：全年级 / 各班导出 ---------- */
 
   if (flags.requiresSeniorExport) {
 
