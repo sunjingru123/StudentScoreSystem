@@ -734,12 +734,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_score_rule_dept_name_score
 -- sys_position 没有 UNIQUE(name)，这里用 NOT EXISTS 保证幂等，
 -- 重复部署不会重复插入，也不会覆盖已有岗位。
 -- 只新增岗位，不改动任何已有岗位或用户岗位关系。
+--
+-- 注意：历史岗位数据可能以显式 id 写入，BIGSERIAL 序列会滞留在 1，
+-- 直接 INSERT 会撞 sys_position_pkey。因此插入前先把序列对齐到 MAX(id) + 1。
 -- ==========================================
-INSERT INTO public.sys_position (name, description, status)
-SELECT '高级辅导员', '高级辅导员（可跨年级 / 部门 / 班级导出，并审核成绩删除申请）', 1
-WHERE NOT EXISTS (
-    SELECT 1 FROM public.sys_position WHERE name = '高级辅导员'
-);
+DO $$
+DECLARE
+    seq_name text;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public.sys_position WHERE name = '高级辅导员') THEN
+        seq_name := pg_get_serial_sequence('public.sys_position', 'id');
+        IF seq_name IS NOT NULL THEN
+            PERFORM setval(
+                seq_name,
+                (SELECT COALESCE(MAX(id), 0) + 1 FROM public.sys_position),
+                false
+            );
+        END IF;
+
+        INSERT INTO public.sys_position (name, description, status)
+        VALUES ('高级辅导员', '高级辅导员（可跨年级 / 部门 / 班级导出，并审核成绩删除申请）', 1);
+    END IF;
+END $$;
 
 -- ==========================================
 -- 5.9 成绩删除申请表 score_record_delete_apply
