@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAddDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAuditDTO;
+import com.student.studentscoresystem.dto.DepartmentScoreArchiveScoreDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreFinalAuditDTO;
 import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.DepartmentScoreApply;
@@ -20,6 +21,7 @@ import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.vo.ArchiveScoreOptionsVO;
 import com.student.studentscoresystem.vo.BatchAuditResultVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -2224,6 +2226,127 @@ public class DepartmentScoreApplyController {
 
         return Result.success(
                 result
+        );
+    }
+
+
+    /*
+     * =========================================================
+     * 档案部审核时查询可调整的分值范围
+     *
+     * restricted = true  只能从 allowedScores 中选择正式规则分值
+     * restricted = false 该项目没有正式规则，可自由填写正数
+     * =========================================================
+     */
+    @GetMapping("/archive-audit/{id}/score-options")
+    public Result<ArchiveScoreOptionsVO> archiveScoreOptions(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+
+
+        Long currentUserId;
+
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+
+        if (!scoreManagerPermissionService
+                .isArchiveLeader(currentUserId)) {
+
+            return Result.fail(
+                    "你不是档案部的部长或副部长，没有审核权限"
+            );
+        }
+
+
+        return Result.success(
+                departmentScoreArchiveAuditService
+                        .scoreOptions(
+                                id
+                        )
+        );
+    }
+
+
+    /*
+     * =========================================================
+     * 档案部审核时调整申报分值
+     *
+     * 只修改申报分值，不改变加减分类型与审核状态；
+     * 分值必须落在该项目的正式规则分值集合内，
+     * 否则辅导员终审无法生成成绩。
+     * =========================================================
+     */
+    @PutMapping("/archive-audit/{id}/score")
+    public Result<Void> archiveUpdateScore(
+            @PathVariable Long id,
+            @RequestBody DepartmentScoreArchiveScoreDTO dto,
+            HttpServletRequest request) {
+
+
+        Long currentUserId;
+
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+
+        if (!scoreManagerPermissionService
+                .isArchiveLeader(currentUserId)) {
+
+            return Result.fail(
+                    "你不是档案部的部长或副部长，没有审核权限"
+            );
+        }
+
+
+        if (dto == null
+                || dto.getScore() == null) {
+
+            return Result.fail(
+                    "请填写调整后的分值"
+            );
+        }
+
+
+        String message =
+                departmentScoreArchiveAuditService
+                        .updateScore(
+                                id,
+                                currentUserId,
+                                dto.getScore()
+                        );
+
+
+        if (message != null) {
+
+            return Result.fail(
+                    message
+            );
+        }
+
+
+        return Result.success(
+                null
         );
     }
 

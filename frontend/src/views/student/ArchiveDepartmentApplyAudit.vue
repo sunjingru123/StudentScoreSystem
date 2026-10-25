@@ -383,12 +383,27 @@
         <!-- 操作 -->
         <el-table-column
           label="操作"
-          width="190"
+          width="280"
           fixed="right"
           align="center"
         >
 
           <template #default="{ row }">
+
+            <el-button
+              type="primary"
+              link
+              :disabled="
+                processingId !== null ||
+                batchLoading
+              "
+              @click="openScoreDialog(row)"
+            >
+
+              修改分值
+
+            </el-button>
+
 
             <el-button
               type="success"
@@ -449,6 +464,172 @@
 
     </el-card>
 
+
+    <!-- =====================================================
+         调整申报分值
+    ====================================================== -->
+    <el-dialog
+      v-model="scoreDialogVisible"
+      title="调整申报分值"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+
+      <div
+        v-if="scoreRow"
+        class="score-dialog"
+      >
+
+        <div class="score-dialog-info">
+
+          <p>
+            <span>学生：</span>
+            {{ scoreRow.studentName || '—' }}
+          </p>
+
+          <p>
+            <span>项目：</span>
+            {{ scoreRow.title || '—' }}
+          </p>
+
+          <p>
+            <span>类型：</span>
+
+            <el-tag
+              :type="
+                Number(scoreRow.scoreType) === 1
+                  ? 'success'
+                  : 'danger'
+              "
+              size="small"
+            >
+
+              {{
+                Number(scoreRow.scoreType) === 1
+                  ? '加分'
+                  : '减分'
+              }}
+
+            </el-tag>
+
+          </p>
+
+        </div>
+
+
+        <!-- 存在正式规则：只能选规则分值 -->
+        <template
+          v-if="
+            scoreOptions.restricted &&
+            scoreOptions.allowedScores.length > 0
+          "
+        >
+
+          <el-form label-width="90px">
+
+            <el-form-item label="调整分值">
+
+              <el-select
+                v-model="scoreInput"
+                placeholder="请选择分值"
+                style="width: 100%"
+              >
+
+                <el-option
+                  v-for="item in scoreOptions.allowedScores"
+                  :key="String(item)"
+                  :value="Number(item)"
+                  :label="String(item)"
+                />
+
+              </el-select>
+
+            </el-form-item>
+
+          </el-form>
+
+          <p class="score-dialog-tip">
+            只能选择该项目的正式评分规则分值，否则辅导员终审无法生成成绩。
+          </p>
+
+        </template>
+
+
+        <!-- 无正式规则：自由填写 -->
+        <template v-else>
+
+          <el-form label-width="90px">
+
+            <el-form-item label="调整分值">
+
+              <el-input-number
+                v-model="scoreInput"
+                :min="0.01"
+                :max="100"
+                :step="0.5"
+                :precision="2"
+                :disabled="
+                  scoreOptions.restricted &&
+                  scoreOptions.allowedScores.length === 0
+                "
+                style="width: 100%"
+              />
+
+            </el-form-item>
+
+          </el-form>
+
+          <el-alert
+            v-if="
+              scoreOptions.restricted &&
+              scoreOptions.allowedScores.length === 0
+            "
+            type="warning"
+            :closable="false"
+            show-icon
+            title="该项目在当前部门的正式评分规则与申报类型不匹配，暂无法调整分值"
+          />
+
+          <p
+            v-else
+            class="score-dialog-tip"
+          >
+            该项目没有正式评分规则，分值以申报单为准，可直接调整。
+          </p>
+
+        </template>
+
+      </div>
+
+
+      <template #footer>
+
+        <el-button
+          :disabled="scoreSubmitting"
+          @click="scoreDialogVisible = false"
+        >
+          取消
+        </el-button>
+
+        <el-button
+          type="primary"
+          :loading="scoreSubmitting"
+          :disabled="
+            scoreDialogLoading ||
+            (!scoreOptions.restricted &&
+              !(Number(scoreInput) > 0)) ||
+            (scoreOptions.restricted &&
+              scoreOptions.allowedScores.length === 0)
+          "
+          @click="submitScore"
+        >
+          确定
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -501,6 +682,35 @@ const processingId = ref(null)
 const rejectLoading = ref(false)
 
 const processedCount = ref(0)
+
+
+/*
+ * =========================================================
+ * 修改分值
+ * =========================================================
+ */
+
+const scoreDialogVisible = ref(false)
+
+const scoreDialogLoading = ref(false)
+
+const scoreSubmitting = ref(false)
+
+const scoreRow = ref(null)
+
+const scoreInput = ref(null)
+
+const scoreOptions = ref({
+
+  scoreType: null,
+
+  currentScore: null,
+
+  restricted: false,
+
+  allowedScores: []
+
+})
 
 
 /* =========================================================
@@ -1156,6 +1366,261 @@ async function batchPass() {
 
 
 /* =========================================================
+   打开「调整分值」弹窗
+========================================================= */
+
+async function openScoreDialog(row) {
+
+  if (
+    !row ||
+    row.id == null
+  ) {
+
+    ElMessage.error(
+      '申报记录不存在'
+    )
+
+    return
+
+  }
+
+
+  scoreRow.value =
+    row
+
+  scoreInput.value =
+    Number(row.score)
+
+  /*
+   * 先用表格行数据兜底，
+   * 避免接口未返回时弹窗空白
+   */
+
+  scoreOptions.value = {
+
+    scoreType:
+      row.scoreType ?? null,
+
+    currentScore:
+      row.score ?? null,
+
+    restricted:
+      false,
+
+    allowedScores: []
+
+  }
+
+
+  scoreDialogVisible.value =
+    true
+
+  scoreDialogLoading.value =
+    true
+
+
+  try {
+
+    const res =
+      await request.get(
+        `/departmentScoreApply/archive-audit/${row.id}/score-options`
+      )
+
+
+    if (
+      res &&
+      Number(res.code) === 200 &&
+      res.data
+    ) {
+
+      scoreOptions.value = {
+
+        scoreType:
+          res.data.scoreType ?? null,
+
+        currentScore:
+          res.data.currentScore ?? null,
+
+        restricted:
+          Boolean(res.data.restricted),
+
+        allowedScores:
+          Array.isArray(res.data.allowedScores)
+            ? res.data.allowedScores
+            : []
+
+      }
+
+      /*
+       * 只能用正式规则分值时，默认选中当前分值（如果合法）
+       */
+
+      if (
+        scoreOptions.value.restricted &&
+        scoreOptions.value.allowedScores.length > 0
+      ) {
+
+        const matched =
+          scoreOptions.value.allowedScores.find(
+            item =>
+              Number(item) === Number(row.score)
+          )
+
+        scoreInput.value =
+          Number(
+            matched ??
+            scoreOptions.value.allowedScores[0]
+          )
+
+      }
+
+    }
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '获取可调整分值失败：',
+      error
+    )
+
+    ElMessage.error(
+      error?.message ||
+      '获取可调整分值失败'
+    )
+
+  }
+
+  finally {
+
+    scoreDialogLoading.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
+   提交分值调整
+========================================================= */
+
+async function submitScore() {
+
+  if (scoreSubmitting.value) {
+
+    return
+
+  }
+
+
+  const row =
+    scoreRow.value
+
+
+  if (
+    !row ||
+    row.id == null
+  ) {
+
+    ElMessage.error(
+      '申报记录不存在'
+    )
+
+    return
+
+  }
+
+
+  const score =
+    Number(scoreInput.value)
+
+
+  if (
+    !Number.isFinite(score) ||
+    score <= 0
+  ) {
+
+    ElMessage.warning(
+      '请填写大于 0 的分值'
+    )
+
+    return
+  }
+
+
+  scoreSubmitting.value =
+    true
+
+
+  try {
+
+    const res =
+      await request.put(
+
+        `/departmentScoreApply/archive-audit/${row.id}/score`,
+
+        {
+          score: score
+        }
+
+      )
+
+
+    if (
+      !res ||
+      Number(res.code) !== 200
+    ) {
+
+      throw new Error(
+        res?.message ||
+        res?.msg ||
+        '分值调整失败'
+      )
+
+    }
+
+
+    ElMessage.success(
+      '分值已调整'
+    )
+
+
+    scoreDialogVisible.value =
+      false
+
+
+    await loadList()
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '分值调整失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      error?.message ||
+      '分值调整失败'
+    )
+
+  }
+
+  finally {
+
+    scoreSubmitting.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
    页面初始化
 ========================================================= */
 
@@ -1174,6 +1639,82 @@ onBeforeUnmount(
 
 
 <style scoped>
+
+/* =========================================================
+   调整分值弹窗
+========================================================= */
+
+.score-dialog-info {
+
+  margin-bottom:
+    18px;
+
+  padding:
+    14px 16px;
+
+  background:
+    #f5f7fa;
+
+  border-radius:
+    8px;
+
+}
+
+
+.score-dialog-info p {
+
+  margin:
+    0 0 8px;
+
+  font-size:
+    14px;
+
+  color:
+    #303133;
+
+  display: flex;
+
+  align-items:
+    center;
+
+}
+
+
+.score-dialog-info p:last-child {
+
+  margin-bottom:
+    0;
+
+}
+
+
+.score-dialog-info p span {
+
+  color:
+    #909399;
+
+  margin-right:
+    6px;
+
+}
+
+
+.score-dialog-tip {
+
+  margin:
+    10px 0 0;
+
+  font-size:
+    13px;
+
+  color:
+    #909399;
+
+  line-height:
+    1.7;
+
+}
+
 
 /* =========================================================
    页面
