@@ -22,13 +22,27 @@
 
         <el-tab-pane label="待审核" name="pending">
 
+          <el-button
+            class="batch-approve"
+            type="success"
+            :loading="batchLoading"
+            :disabled="loading || selectedRows.length === 0"
+            @click="handleBatchApprove"
+          >
+            一键审批通过（已选 {{ selectedRows.length }} 条）
+          </el-button>
+
           <el-table
-            v-loading="loading"
+            v-loading="loading || batchLoading"
             :data="pendingList"
+            row-key="id"
+            @selection-change="selectedRows = $event"
             border
             stripe
             empty-text="暂无待审核的删除申请"
           >
+
+            <el-table-column type="selection" width="48" />
 
             <el-table-column prop="studentName" label="学生" width="110" />
 
@@ -136,6 +150,55 @@ const loading = ref(false)
 const pendingList = ref([])
 
 const processedList = ref([])
+const selectedRows = ref([])
+const batchLoading = ref(false)
+
+async function handleBatchApprove() {
+  if (batchLoading.value || selectedRows.value.length === 0) return
+  const rows = [...selectedRows.value]
+  batchLoading.value = true
+  try {
+    await ElMessageBox.confirm(
+      `确认通过选中的 ${rows.length} 条删除申请？通过后将立即作废并隐藏对应的加减分成绩。`,
+      '一键审批通过',
+      { type: 'warning', confirmButtonText: '确认通过并删除', cancelButtonText: '取消' }
+    )
+
+    let successCount = 0
+    const failures = []
+    for (const row of rows) {
+      try {
+        const result = unwrap(await approveDeleteApply(row.id, '一键审批通过'))
+        if (result?.code === 200 || result?.code === 0) {
+          successCount++
+        } else {
+          failures.push(`申请 ${row.id}：${result?.message || '审核失败'}`)
+        }
+      } catch (error) {
+        failures.push(`申请 ${row.id}：${error?.response?.data?.message || error?.message || '请求失败，请刷新确认处理状态'}`)
+      }
+    }
+
+    selectedRows.value = []
+    await loadPending()
+    if (failures.length) {
+      await ElMessageBox.alert(
+        `成功 ${successCount} 条，失败 ${failures.length} 条。\n${failures.join('\n')}`,
+        '批量审批结果',
+        { type: 'warning' }
+      )
+    } else {
+      ElMessage.success(`已通过 ${successCount} 条申请并删除对应成绩`)
+    }
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('批量审批失败：', error)
+      ElMessage.error('批量审批失败，请刷新确认处理状态')
+    }
+  } finally {
+    batchLoading.value = false
+  }
+}
 
 
 function unwrap(res) {
@@ -150,6 +213,7 @@ function unwrap(res) {
 async function loadPending() {
 
   loading.value = true
+  selectedRows.value = []
 
   try {
 
@@ -387,6 +451,10 @@ onMounted(() => {
 
 }
 
+
+.batch-approve {
+  margin-bottom: 16px;
+}
 
 .audit-card {
 
