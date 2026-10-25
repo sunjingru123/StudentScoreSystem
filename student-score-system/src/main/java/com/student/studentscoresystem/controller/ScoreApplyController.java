@@ -1954,11 +1954,21 @@ public class ScoreApplyController {
         /*
          * =====================================================
          * 终审通过
+         *
+         * 副部长 / 部长可以在终审时直接修改认定分值：
+         * request.finalScore 非空则以它为准，
+         * 为空则沿用初审写入的分值。
          * =====================================================
          */
 
+        BigDecimal effectiveScore =
+                request.getFinalScore() != null
+                        ? request.getFinalScore()
+                        : apply.getApplyScore();
+
+
         if (
-                apply.getApplyScore() == null
+                effectiveScore == null
         ) {
 
             return Result.error(
@@ -1966,8 +1976,9 @@ public class ScoreApplyController {
             );
         }
 
+
         if (
-                apply.getApplyScore()
+                effectiveScore
                         .compareTo(
                                 BigDecimal.ZERO
                         ) <= 0
@@ -1994,7 +2005,8 @@ public class ScoreApplyController {
                     certificateScoreFinalizeService
                             .finalizeApproval(
                                     apply,
-                                    reviewerId
+                                    reviewerId,
+                                    request.getFinalScore()
                             );
 
             if (message != null) {

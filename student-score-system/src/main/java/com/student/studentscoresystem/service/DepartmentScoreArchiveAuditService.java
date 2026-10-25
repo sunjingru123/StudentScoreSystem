@@ -39,11 +39,10 @@ import java.util.List;
  * 3. 审核人必须是「档案部」的部长 / 副部长，
  *    且不能审核自己提交的申报，与部门初审保持一致。
  *
- * 4. 档案部审核时可以调整申报分值，但调整范围受正式规则约束：
- *    {@link DepartmentScoreFinalizeService} 终审时要求
- *    「部门 + 名称 + 分值 + 类型」能匹配到一条正式 score_rule，
- *    否则拒绝生成成绩。因此分值调整必须限制在该项目的正式规则分值集合内，
- *    避免把申报改成分值后卡死在终审环节。
+ * 4. 档案部审核时可以自由调整申报分值（任意大于 0 的正数），
+ *    分值的最终采纳由辅导员终审决定；
+ *    {@link DepartmentScoreFinalizeService} 不再因为申报分值与正式规则不同而阻断，
+ *    但若能匹配到正式规则仍会把 score_record.rule_id 关联上去。
  * =========================================================
  */
 @Service
@@ -193,9 +192,10 @@ public class DepartmentScoreArchiveAuditService {
      * 档案部审核时调整申报分值
      *
      * 只修改 department_score_apply.score，
-     * 不改变加减分类型（score_type）、审核状态与成绩生成结果；
-     * 分值是否合法由 {@link #scoreOptions} 暴露给前端，
-     * 后端在这里再做一次强校验。
+     * 不改变加减分类型（score_type）、审核状态与成绩生成结果。
+     *
+     * 分值由档案部审核人自行填写，不强制落在正式规则分值集合内；
+     * 辅导员终审会直接采用这里填写的分值生成正式成绩。
      *
      * @param applyId    申报记录 ID
      * @param reviewerId 当前登录用户
@@ -270,35 +270,6 @@ public class DepartmentScoreArchiveAuditService {
         }
 
 
-        /*
-         * 有正式规则时必须落在正式规则分值集合内，
-         * 否则辅导员终审无法生成成绩（见 DepartmentScoreFinalizeService）。
-         */
-        List<ScoreRule> candidates =
-                listFormalRules(apply);
-
-
-        if (!candidates.isEmpty()) {
-
-            List<BigDecimal> allowedScores =
-                    allowedScores(candidates, apply);
-
-
-            if (allowedScores.isEmpty()) {
-
-                return "该项目在当前部门的正式评分规则与申报类型不匹配，" +
-                        "无法调整分值，请联系管理员";
-            }
-
-
-            if (!containsScore(allowedScores, newScore)) {
-
-                return "调整后的分值必须与该项目正式评分规则一致，可选分值：" +
-                        formatScores(allowedScores);
-            }
-        }
-
-
         apply.setScore(
                 newScore
         );
@@ -322,10 +293,10 @@ public class DepartmentScoreArchiveAuditService {
 
     /**
      * =========================================================
-     * 查询某条申报允许调整的分值范围
+     * 查询调整分值弹窗所需的参考信息
      *
-     * restricted = true  该项目存在正式规则，只能从 allowedScores 中选择
-     * restricted = false 该项目没有正式规则，可自由填写正数
+     * suggestedScores 是该项目的正式规则分值，仅作参考，
+     * 档案部可以自行填写任意大于 0 的分值。
      * =========================================================
      */
     public ArchiveScoreOptionsVO scoreOptions(
@@ -359,30 +330,11 @@ public class DepartmentScoreArchiveAuditService {
                 apply.getScore()
         );
 
-
-        List<ScoreRule> candidates =
-                listFormalRules(apply);
-
-
-        if (candidates.isEmpty()) {
-
-            /*
-             * 部门自建活动，没有正式规则，分值以申报单为准
-             */
-            vo.setRestricted(
-                    false
-            );
-
-            return vo;
-        }
-
-
-        vo.setRestricted(
-                true
-        );
-
-        vo.setAllowedScores(
-                allowedScores(candidates, apply)
+        vo.setSuggestedScores(
+                suggestedScores(
+                        listFormalRules(apply),
+                        apply
+                )
         );
 
 
@@ -582,13 +534,13 @@ public class DepartmentScoreArchiveAuditService {
 
     /**
      * =========================================================
-     * 从候选规则中提取允许的分值集合
+     * 从候选规则中提取参考分值集合
      *
      * 过滤掉分值缺失 / 非正数的脏配置，
      * 并要求加减分类型与申报一致（历史数据类型为空时向后兼容）。
      * =========================================================
      */
-    private List<BigDecimal> allowedScores(
+    private List<BigDecimal> suggestedScores(
             List<ScoreRule> candidates,
             DepartmentScoreApply apply) {
 
@@ -688,33 +640,5 @@ public class DepartmentScoreArchiveAuditService {
 
 
         return false;
-    }
-
-
-    /**
-     * 分值集合格式化为业务提示文案
-     */
-    private String formatScores(
-            List<BigDecimal> scores) {
-
-        StringBuilder builder =
-                new StringBuilder();
-
-
-        for (BigDecimal score : scores) {
-
-            if (builder.length() > 0) {
-
-                builder.append(" / ");
-            }
-
-
-            builder.append(
-                    score.stripTrailingZeros().toPlainString()
-            );
-        }
-
-
-        return builder.toString();
     }
 }

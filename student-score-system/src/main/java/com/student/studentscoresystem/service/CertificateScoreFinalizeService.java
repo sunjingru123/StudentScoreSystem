@@ -68,10 +68,76 @@ public class CertificateScoreFinalizeService {
             Long reviewerId
     ) {
 
+        return doFinalizeApproval(
+                apply,
+                reviewerId,
+                null
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 终审通过（可同时调整认定分值）
+     *
+     * 档案部副部长 / 部长在终审时可以直接修改认定分值后再通过，
+     * 传 null 表示沿用初审写入的分值。
+     *
+     * @param applyScore 终审时修改的认定分值，null 表示不修改
+     * @return null 表示成功，否则为业务失败提示
+     * =========================================================
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String finalizeApproval(
+            ScoreApply apply,
+            Long reviewerId,
+            BigDecimal applyScore
+    ) {
+
+        return doFinalizeApproval(
+                apply,
+                reviewerId,
+                applyScore
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 终审通过的真实实现
+     *
+     * 分值调整只修改内存中的对象，
+     * 真正落库与成绩生成在同一个事务里完成，
+     * 任何一步失败都会整体回滚。
+     * =========================================================
+     */
+    private String doFinalizeApproval(
+            ScoreApply apply,
+            Long reviewerId,
+            BigDecimal applyScore
+    ) {
+
         if (apply == null
                 || apply.getId() == null) {
 
             return "申请不存在";
+        }
+
+        /*
+         * 终审时修改分值的合法性校验
+         */
+        if (applyScore != null) {
+
+            if (applyScore.compareTo(
+                    BigDecimal.ZERO
+            ) <= 0) {
+
+                return "认定分值必须大于0";
+            }
+
+            apply.setApplyScore(
+                    applyScore
+            );
         }
 
         /*

@@ -148,7 +148,10 @@ public class DepartmentScoreFinalizeService {
          * 再挑选与申报分值/类型完全一致的那一条，
          * 不能只取第一条，否则会因同名规则导致分值匹配漂移。
          *
-         * 有正式规则（固定加减分项目）时要求申报分值与规则一致；
+         * 档案部审核时允许自行调整申报分值，
+         * 调整后的分值可能不再等于任何正式规则，
+         * 此时不能阻断成绩生成（否则申报会卡在终审无法落地），
+         * 只是不再关联 rule_id，项目名称回退到申报单上的项目名。
          * 没有正式规则说明是部门自己的非固定活动，
          * 分值以申报单上填写的为准。
          * =====================================================
@@ -192,27 +195,12 @@ public class DepartmentScoreFinalizeService {
                 }
             }
 
-            if (scoreRule == null) {
-
-                return "部门申报分值与正式加减分规则不一致：" +
-                        "申报分值=" +
-                        apply.getScore() +
-                        "（" +
-                        scoreTypeLabel(
-                                apply.getScoreType()
-                        ) +
-                        "）" +
-                        "，该部门同名正式规则：" +
-                        describeCandidates(
-                                candidates
-                        );
-            }
-
-            if (scoreRule.getScore() == null
+            if (scoreRule != null
+                    && (scoreRule.getScore() == null
                     || scoreRule.getScore()
                     .compareTo(
                             BigDecimal.ZERO
-                    ) <= 0) {
+                    ) <= 0)) {
 
                 return "正式加减分规则分值配置错误：" +
                         scoreRule.getName();
@@ -236,7 +224,8 @@ public class DepartmentScoreFinalizeService {
         );
 
         /*
-         * 非固定活动没有正式规则，score_record.rule_id 允许为空。
+         * 非固定活动，或分值已被档案部调整到规则之外：
+         * score_record.rule_id 为空，项目名称回退到申报单。
          */
         record.setRuleId(
                 scoreRule == null
@@ -356,69 +345,6 @@ public class DepartmentScoreFinalizeService {
         return apply.getScoreType().equals(
                 rule.getScoreType()
         );
-    }
-
-    /**
-     * =========================================================
-     * 候选规则描述，仅用于业务错误提示
-     * =========================================================
-     */
-    private String describeCandidates(
-            List<ScoreRule> candidates
-    ) {
-
-        StringBuilder builder =
-                new StringBuilder();
-
-        for (ScoreRule candidate : candidates) {
-
-            if (builder.length() > 0) {
-
-                builder.append(" / ");
-            }
-
-            builder.append(
-                    scoreTypeLabel(
-                            candidate.getScoreType()
-                    )
-            );
-
-            builder.append(" ");
-
-            builder.append(
-                    candidate.getScore() == null
-                            ? "未配置"
-                            : candidate.getScore()
-                            .stripTrailingZeros()
-                            .toPlainString()
-            );
-        }
-
-        return builder.toString();
-    }
-
-    /**
-     * =========================================================
-     * 加分 / 减分文案
-     * =========================================================
-     */
-    private String scoreTypeLabel(
-            Short scoreType
-    ) {
-
-        if (Short.valueOf((short) -1)
-                .equals(scoreType)) {
-
-            return "减分";
-        }
-
-        if (Short.valueOf((short) 1)
-                .equals(scoreType)) {
-
-            return "加分";
-        }
-
-        return "未标注类型";
     }
 
     /**

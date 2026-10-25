@@ -24,10 +24,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -35,7 +33,10 @@ import static org.mockito.Mockito.verify;
  *
  * 重点验证：同一部门存在同名但分值 / 类型不同的规则时，
  * 必须匹配到分值、类型与申报完全一致的那条，
- * 不能因为同名规则而误报「分值不一致」或匹配到错误规则。
+ * 不能因为同名规则而匹配到错误规则。
+ *
+ * 另外验证：档案部审核时调整过的分值可能不再等于任何正式规则，
+ * 此时不能阻断成绩生成，只是不再关联 rule_id。
  */
 @ExtendWith(MockitoExtension.class)
 class DepartmentScoreFinalizeServiceTest {
@@ -135,7 +136,7 @@ class DepartmentScoreFinalizeServiceTest {
     }
 
     @Test
-    void rejectsScoreNotMatchingAnyFormalRule() {
+    void allowsAdjustedScoreWithoutMatchingFormalRule() {
 
         whenRules(
                 rule(1L, "0.50", (short) 1),
@@ -149,14 +150,19 @@ class DepartmentScoreFinalizeServiceTest {
                         "通过"
                 );
 
-        assertNotNull(message);
-        assertTrue(
-                message.contains("不一致"),
-                "分值无法匹配时应提示不一致，实际：" + message
+        assertNull(
+                message,
+                "档案部调整过的分值不应阻断终审，实际：" + message
         );
 
-        verify(scoreRecordMapper, never())
-                .insert(any(ScoreRecord.class));
+        ScoreRecord record = captureRecord();
+
+        assertNull(
+                record.getRuleId(),
+                "分值不匹配任何正式规则时不应误挂 rule_id"
+        );
+
+        assertScore("2.00", record.getScore());
     }
 
     @Test

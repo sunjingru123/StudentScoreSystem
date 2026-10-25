@@ -390,13 +390,22 @@
 
             <el-table-column
               label="操作"
-              :width="isMobile ? 64 : 180"
+              :width="isMobile ? 64 : 260"
               class-name="audit-actions"
               fixed="right"
               align="center"
             >
 
               <template #default="{ row }">
+
+                <el-button
+                  type="primary"
+                  link
+                  @click="openFinalScoreDialog(row)"
+                >
+                  修改分值
+                </el-button>
+
 
                 <el-button
                   type="success"
@@ -527,6 +536,116 @@
           type="success"
           :loading="auditLoading"
           @click="confirmPreliminaryApprove"
+        >
+          确定通过
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
+
+    <!-- ==================== 终审修改分值 ==================== -->
+
+    <el-dialog
+      v-model="finalScoreDialogVisible"
+      title="修改分值并终审通过"
+      width="420px"
+      destroy-on-close
+    >
+
+      <div
+        v-if="finalScoreRow"
+        class="score-dialog"
+      >
+
+        <div class="student-info">
+
+          <div>
+            <span class="label">
+              学生：
+            </span>
+
+            <span>
+              {{ finalScoreRow.studentName || '-' }}
+            </span>
+          </div>
+
+
+          <div>
+            <span class="label">
+              学号：
+            </span>
+
+            <span>
+              {{ finalScoreRow.studentNo || '-' }}
+            </span>
+          </div>
+
+
+          <div>
+            <span class="label">
+              证书：
+            </span>
+
+            <span>
+              {{ finalScoreRow.title || '-' }}
+            </span>
+          </div>
+
+
+          <div>
+            <span class="label">
+              初审分值：
+            </span>
+
+            <span>
+              {{ formatScore(finalScoreRow.applyScore) }}
+            </span>
+          </div>
+
+        </div>
+
+
+        <el-form @submit.prevent>
+
+          <el-form-item label="终审分值">
+
+            <el-input-number
+              v-model="finalScoreValue"
+              :min="0.01"
+              :max="100"
+              :precision="2"
+              :step="0.5"
+              controls-position="right"
+              style="width: 100%"
+            />
+
+          </el-form-item>
+
+        </el-form>
+
+
+        <div class="score-tip">
+          可以直接修改认定分值，确定后将按新分值终审通过并生成正式成绩。
+        </div>
+
+      </div>
+
+
+      <template #footer>
+
+        <el-button
+          @click="finalScoreDialogVisible = false"
+        >
+          取消
+        </el-button>
+
+
+        <el-button
+          type="success"
+          :loading="auditLoading"
+          @click="confirmFinalScore"
         >
           确定通过
         </el-button>
@@ -1032,6 +1151,20 @@ const currentRow =
 
 
 const scoreValue =
+  ref(null)
+
+
+// =========================================================
+// 终审修改分值对话框
+// =========================================================
+
+const finalScoreDialogVisible =
+  ref(false)
+
+const finalScoreRow =
+  ref(null)
+
+const finalScoreValue =
   ref(null)
 
 
@@ -1593,6 +1726,183 @@ async function confirmBatchPreliminaryApprove() {
   } finally {
 
     batchLoading.value =
+      false
+
+  }
+
+}
+
+
+
+// =========================================================
+// 终审修改分值
+// =========================================================
+
+function openFinalScoreDialog(row) {
+
+  if (
+    !row ||
+    row.id == null
+  ) {
+
+    ElMessage.error(
+      '申请记录不存在'
+    )
+
+    return
+
+  }
+
+
+  finalScoreRow.value =
+    row
+
+
+  finalScoreValue.value =
+    row.applyScore == null
+      ? null
+      : Number(row.applyScore)
+
+
+  finalScoreDialogVisible.value =
+    true
+
+}
+
+
+// =========================================================
+// 确认「修改分值并终审通过」
+// =========================================================
+
+async function confirmFinalScore() {
+
+  if (!finalScoreRow.value) {
+
+    return
+
+  }
+
+
+  if (
+    finalScoreValue.value === null ||
+    finalScoreValue.value === undefined ||
+    Number(finalScoreValue.value) <= 0
+  ) {
+
+    ElMessage.warning(
+      '请填写大于 0 的终审分值'
+    )
+
+    return
+
+  }
+
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      `确定按 ${
+        Number(finalScoreValue.value)
+      } 分终审通过「${
+        finalScoreRow.value.studentName || ''
+      }」的个人证书申请吗？`,
+
+      '终审确认',
+
+      {
+
+        confirmButtonText:
+          '确定通过',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'success'
+
+      }
+
+    )
+
+  } catch {
+
+    return
+
+  }
+
+
+  auditLoading.value =
+    true
+
+
+  try {
+
+    const res =
+      await request.post(
+        '/scoreApply/final-audit',
+        {
+
+          id:
+          finalScoreRow.value.id,
+
+          status:
+            1,
+
+          finalScore:
+            Number(finalScoreValue.value)
+
+        }
+      )
+
+
+    const result =
+      getResultData(res)
+
+
+    if (
+      result?.code !== 200 &&
+      result?.code !== 0
+    ) {
+
+      ElMessage.error(
+        result?.message ||
+        '终审失败'
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      '终审通过，已按新分值生成正式成绩记录'
+    )
+
+
+    finalScoreDialogVisible.value =
+      false
+
+
+    await load()
+
+  } catch (error) {
+
+    console.error(
+      '个人证书终审（修改分值）失败',
+      error
+    )
+
+
+    ElMessage.error(
+      error?.response?.data?.message ||
+      error?.response?.data?.msg ||
+      '个人证书终审失败'
+    )
+
+  } finally {
+
+    auditLoading.value =
       false
 
   }

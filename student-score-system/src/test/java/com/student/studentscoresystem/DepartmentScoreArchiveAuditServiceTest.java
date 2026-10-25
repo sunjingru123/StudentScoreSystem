@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -273,7 +274,7 @@ class DepartmentScoreArchiveAuditServiceTest {
     }
 
     @Test
-    void updateScoreRejectsValueNotInFormalRules() {
+    void updateScoreAllowsValueOutsideFormalRules() {
 
         when(scoreManagerPermissionService.isArchiveLeader(7L))
                 .thenReturn(true);
@@ -281,12 +282,8 @@ class DepartmentScoreArchiveAuditServiceTest {
         when(applyService.getById(10L))
                 .thenReturn(pendingApply(10L, 99L));
 
-        stubFormalRules(
-                List.of(
-                        rule(1L, (short) 1, "0.5"),
-                        rule(2L, (short) 1, "1")
-                )
-        );
+        when(applyService.updateById(any(DepartmentScoreApply.class)))
+                .thenReturn(true);
 
         String message =
                 service.updateScore(
@@ -295,14 +292,23 @@ class DepartmentScoreArchiveAuditServiceTest {
                         new BigDecimal("0.7")
                 );
 
-        assertNotNull(message);
-        assertTrue(
-                message.contains("可选分值"),
-                "分值不在正式规则内应被拦截，实际：" + message
+        assertNull(
+                message,
+                "档案部应能自由填写分值，实际：" + message
         );
 
-        verify(applyService, never())
-                .updateById(any(DepartmentScoreApply.class));
+        assertEquals(
+                0,
+                captureUpdate().getScore()
+                        .compareTo(new BigDecimal("0.7"))
+        );
+
+        /*
+         * 调整分值不再受正式规则约束，不应再查询 score_rule
+         */
+        verifyNoInteractions(
+                scoreRuleMapper
+        );
     }
 
     @Test
@@ -313,13 +319,6 @@ class DepartmentScoreArchiveAuditServiceTest {
 
         when(applyService.getById(10L))
                 .thenReturn(pendingApply(10L, 99L));
-
-        stubFormalRules(
-                List.of(
-                        rule(1L, (short) 1, "0.5"),
-                        rule(2L, (short) 1, "1")
-                )
-        );
 
         when(applyService.updateById(any(DepartmentScoreApply.class)))
                 .thenReturn(true);
@@ -466,7 +465,7 @@ class DepartmentScoreArchiveAuditServiceTest {
     }
 
     @Test
-    void scoreOptionsReturnsAllowedScores() {
+    void scoreOptionsReturnsSuggestedScores() {
 
         when(applyService.getById(10L))
                 .thenReturn(pendingApply(10L, 99L));
@@ -482,18 +481,17 @@ class DepartmentScoreArchiveAuditServiceTest {
         ArchiveScoreOptionsVO options =
                 service.scoreOptions(10L);
 
-        assertTrue(options.isRestricted());
-        assertEquals(2, options.getAllowedScores().size());
+        assertEquals(2, options.getSuggestedScores().size());
 
         assertEquals(
                 0,
-                options.getAllowedScores().get(0)
+                options.getSuggestedScores().get(0)
                         .compareTo(new BigDecimal("0.5"))
         );
 
         assertEquals(
                 0,
-                options.getAllowedScores().get(1)
+                options.getSuggestedScores().get(1)
                         .compareTo(new BigDecimal("1"))
         );
 

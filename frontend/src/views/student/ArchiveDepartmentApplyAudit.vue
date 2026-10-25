@@ -517,87 +517,39 @@
         </div>
 
 
-        <!-- 存在正式规则：只能选规则分值 -->
-        <template
-          v-if="
-            scoreOptions.restricted &&
-            scoreOptions.allowedScores.length > 0
-          "
+        <!-- 正式规则分值仅作参考，可自由填写 -->
+        <el-form label-width="90px">
+
+          <el-form-item label="调整分值">
+
+            <el-input-number
+              v-model="scoreInput"
+              :min="0.01"
+              :max="100"
+              :step="0.5"
+              :precision="2"
+              style="width: 100%"
+            />
+
+          </el-form-item>
+
+        </el-form>
+
+        <p
+          v-if="scoreOptions.suggestedScores.length > 0"
+          class="score-dialog-tip"
         >
+          该项目正式规则分值为
+          {{ formatSuggestedScores }}
+          ，可参考也可自行填写其他分值。
+        </p>
 
-          <el-form label-width="90px">
-
-            <el-form-item label="调整分值">
-
-              <el-select
-                v-model="scoreInput"
-                placeholder="请选择分值"
-                style="width: 100%"
-              >
-
-                <el-option
-                  v-for="item in scoreOptions.allowedScores"
-                  :key="String(item)"
-                  :value="Number(item)"
-                  :label="String(item)"
-                />
-
-              </el-select>
-
-            </el-form-item>
-
-          </el-form>
-
-          <p class="score-dialog-tip">
-            只能选择该项目的正式评分规则分值，否则辅导员终审无法生成成绩。
-          </p>
-
-        </template>
-
-
-        <!-- 无正式规则：自由填写 -->
-        <template v-else>
-
-          <el-form label-width="90px">
-
-            <el-form-item label="调整分值">
-
-              <el-input-number
-                v-model="scoreInput"
-                :min="0.01"
-                :max="100"
-                :step="0.5"
-                :precision="2"
-                :disabled="
-                  scoreOptions.restricted &&
-                  scoreOptions.allowedScores.length === 0
-                "
-                style="width: 100%"
-              />
-
-            </el-form-item>
-
-          </el-form>
-
-          <el-alert
-            v-if="
-              scoreOptions.restricted &&
-              scoreOptions.allowedScores.length === 0
-            "
-            type="warning"
-            :closable="false"
-            show-icon
-            title="该项目在当前部门的正式评分规则与申报类型不匹配，暂无法调整分值"
-          />
-
-          <p
-            v-else
-            class="score-dialog-tip"
-          >
-            该项目没有正式评分规则，分值以申报单为准，可直接调整。
-          </p>
-
-        </template>
+        <p
+          v-else
+          class="score-dialog-tip"
+        >
+          该项目没有正式评分规则，可自行填写分值。
+        </p>
 
       </div>
 
@@ -616,10 +568,7 @@
           :loading="scoreSubmitting"
           :disabled="
             scoreDialogLoading ||
-            (!scoreOptions.restricted &&
-              !(Number(scoreInput) > 0)) ||
-            (scoreOptions.restricted &&
-              scoreOptions.allowedScores.length === 0)
+            !(Number(scoreInput) > 0)
           "
           @click="submitScore"
         >
@@ -706,11 +655,21 @@ const scoreOptions = ref({
 
   currentScore: null,
 
-  restricted: false,
-
-  allowedScores: []
+  suggestedScores: []
 
 })
+
+
+/*
+ * 正式规则分值提示文案
+ */
+
+const formatSuggestedScores =
+  computed(() =>
+    scoreOptions.value.suggestedScores
+      .map(item => String(item))
+      .join(' / ')
+  )
 
 
 /* =========================================================
@@ -1404,10 +1363,7 @@ async function openScoreDialog(row) {
     currentScore:
       row.score ?? null,
 
-    restricted:
-      false,
-
-    allowedScores: []
+    suggestedScores: []
 
   }
 
@@ -1441,36 +1397,10 @@ async function openScoreDialog(row) {
         currentScore:
           res.data.currentScore ?? null,
 
-        restricted:
-          Boolean(res.data.restricted),
-
-        allowedScores:
-          Array.isArray(res.data.allowedScores)
-            ? res.data.allowedScores
+        suggestedScores:
+          Array.isArray(res.data.suggestedScores)
+            ? res.data.suggestedScores
             : []
-
-      }
-
-      /*
-       * 只能用正式规则分值时，默认选中当前分值（如果合法）
-       */
-
-      if (
-        scoreOptions.value.restricted &&
-        scoreOptions.value.allowedScores.length > 0
-      ) {
-
-        const matched =
-          scoreOptions.value.allowedScores.find(
-            item =>
-              Number(item) === Number(row.score)
-          )
-
-        scoreInput.value =
-          Number(
-            matched ??
-            scoreOptions.value.allowedScores[0]
-          )
 
       }
 
