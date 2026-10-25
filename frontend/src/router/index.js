@@ -235,6 +235,29 @@ const router = createRouter({
         },
 
         // ===================================================
+        // 部门申报档案部审核
+        //
+        // 仅档案部副部长 / 部长
+        //
+        // 部门初审通过后，先由档案部审核，
+        // 通过后才进入辅导员终审。
+        // ===================================================
+
+        {
+          path: 'archive-department-audit',
+
+          name: 'ArchiveDepartmentApplyAudit',
+
+          component: () => import('@/views/student/ArchiveDepartmentApplyAudit.vue'),
+
+          meta: {
+            title: '部门申报审核',
+
+            requiresArchiveApplyAudit: true,
+          },
+        },
+
+        // ===================================================
         // 学生成绩管理
         //
         // 仅档案部部长 / 副部长
@@ -609,6 +632,8 @@ const authCache = {
 
   canSubmitScoreDeleteApply: false,
 
+  canArchiveApplyAudit: false,
+
   loaded: false,
 
   pending: null,
@@ -643,6 +668,8 @@ function clearAuth() {
   authCache.canReviewScoreDeleteApply = false
 
   authCache.canSubmitScoreDeleteApply = false
+
+  authCache.canArchiveApplyAudit = false
 
   authCache.loaded = false
 }
@@ -679,6 +706,8 @@ async function loadAuthContext(storedUser) {
       canReviewScoreDeleteApply: false,
 
       canSubmitScoreDeleteApply: false,
+
+      canArchiveApplyAudit: false,
     }
   }
 
@@ -710,6 +739,8 @@ async function loadAuthContext(storedUser) {
     let canReviewScoreDeleteApply = false
 
     let canSubmitScoreDeleteApply = false
+
+    let canArchiveApplyAudit = false
 
     try {
       const infoRes = await request.get('/user/info')
@@ -769,6 +800,13 @@ async function loadAuthContext(storedUser) {
 
       canSubmitScoreDeleteApply =
         data.canSubmitScoreDeleteApply === true || Number(data.canSubmitScoreDeleteApply) === 1
+
+      /*
+       * 档案部部门申报审核：
+       * 仅档案部的部长 / 副部长，以后端返回为准。
+       */
+      canArchiveApplyAudit =
+        data.canArchiveAudit === true || Number(data.canArchiveAudit) === 1
     } catch (error) {
       console.error('获取部门权限失败：', error)
 
@@ -789,6 +827,8 @@ async function loadAuthContext(storedUser) {
       canReviewScoreDeleteApply = false
 
       canSubmitScoreDeleteApply = false
+
+      canArchiveApplyAudit = false
     }
 
     // 后端未返回角色时，回退到登录时写入的本地角色。
@@ -818,6 +858,8 @@ async function loadAuthContext(storedUser) {
     authCache.canReviewScoreDeleteApply = canReviewScoreDeleteApply
 
     authCache.canSubmitScoreDeleteApply = canSubmitScoreDeleteApply
+
+    authCache.canArchiveApplyAudit = canArchiveApplyAudit
 
     authCache.loaded = true
 
@@ -955,6 +997,10 @@ router.beforeEach(async (to) => {
     requiresScoreDeleteApply: to.matched.some(
       (record) => record.meta?.requiresScoreDeleteApply === true,
     ),
+
+    requiresArchiveApplyAudit: to.matched.some(
+      (record) => record.meta?.requiresArchiveApplyAudit === true,
+    ),
   }
 
   const decision = decideAccess({
@@ -982,6 +1028,8 @@ router.beforeEach(async (to) => {
       canReviewScoreDeleteApply: auth.canReviewScoreDeleteApply,
 
       canSubmitScoreDeleteApply: auth.canSubmitScoreDeleteApply,
+
+      canArchiveApplyAudit: auth.canArchiveApplyAudit,
     },
   })
 

@@ -134,6 +134,27 @@
         </el-menu-item>
 
 
+        <!--
+ ★ 档案部部门加减分申报审核
+ ★ 仅部长 / 副部长
+-->
+
+        <el-menu-item
+          v-if="archiveApplyAudit"
+          index="/home/archive-department-audit"
+        >
+
+          <el-icon>
+            <Checked />
+          </el-icon>
+
+          <span>
+            部门申报审核
+          </span>
+
+        </el-menu-item>
+
+
 
 
 
@@ -233,6 +254,14 @@
         >
           <el-icon><FolderChecked /></el-icon>
           <span>个人证书审核</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="archiveApplyAudit"
+          index="/home/archive-department-audit"
+        >
+          <el-icon><Checked /></el-icon>
+          <span>部门申报审核</span>
         </el-menu-item>
 
         <el-menu-item
@@ -438,6 +467,11 @@ const archiveScoreManager =
   ref(false)
 
 
+// 档案部部长 / 副部长：审核部门加减分申报
+const archiveApplyAudit =
+  ref(false)
+
+
 // =========================================================
 // 获取当前用户
 // =========================================================
@@ -519,6 +553,8 @@ async function loadPermission() {
 
       archiveScoreManager.value = false
 
+      archiveApplyAudit.value = false
+
       return
 
     }
@@ -584,6 +620,16 @@ async function loadPermission() {
       )
 
 
+    /*
+     * 档案部部门申报审核：
+     *
+     * 以后端返回的 canArchiveAudit 为准
+     */
+
+    archiveApplyAudit.value =
+      data.canArchiveAudit === true ||
+      Number(data.canArchiveAudit) === 1
+
 
 
 
@@ -600,6 +646,8 @@ async function loadPermission() {
     archiveLeader.value = false
 
     archiveScoreManager.value = false
+
+    archiveApplyAudit.value = false
 
   }
 

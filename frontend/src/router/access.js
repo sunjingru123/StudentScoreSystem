@@ -119,7 +119,7 @@ export function areaOfPath(path) {
  *                 { canDepartmentApply, departmentLeader, archiveLeader,
  *                   archiveScoreManager, seniorCounselor, canExportAllScopes,
  *                   canDeleteScoreDirectly, canReviewScoreDeleteApply,
- *                   canSubmitScoreDeleteApply }
+ *                   canSubmitScoreDeleteApply, canArchiveApplyAudit }
  *   firstLogin  - 是否首次登录需强制改密
  *
  * 返回：
@@ -372,6 +372,27 @@ export function decideAccess({
         path: area,
 
         warning: '只有档案部部长 / 副部长可以提交成绩删除申请',
+
+      }
+
+    }
+
+  }
+
+
+  /* ---------- 学生端：档案部审核部门加减分申报（档案部部长 / 副部长） ---------- */
+
+  if (flags.requiresArchiveApplyAudit) {
+
+    if (role !== '管理员' && !permissions.canArchiveApplyAudit) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '只有档案部的部长 / 副部长可以审核部门加减分申报',
 
       }
 
