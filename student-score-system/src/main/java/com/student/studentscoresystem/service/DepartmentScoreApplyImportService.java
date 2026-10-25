@@ -957,6 +957,8 @@ public class DepartmentScoreApplyImportService {
 
         apply.setFinalStatus((short) 0);
 
+        apply.setArchiveStatus((short) 0);
+
         apply.setActivityDate(activityDate);
 
         apply.setCreateTime(now);

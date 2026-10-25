@@ -836,3 +836,64 @@ CREATE INDEX IF NOT EXISTS idx_score_delete_apply_record
 CREATE UNIQUE INDEX IF NOT EXISTS uk_score_delete_apply_pending
     ON public.score_record_delete_apply(score_record_id)
     WHERE status = 0;
+
+-- ==========================================
+-- 5.10 部门申报「档案部审核」环节
+--
+-- 部门加减分申报的审核链路由三段扩展为四段：
+--   干事 / 副部长 / 部长 提交
+--     -> 部门副部长 / 部长 初审
+--     -> 档案部副部长 / 部长 审核
+--     -> 辅导员 终审 -> 生成正式成绩
+--
+-- archive_status 含义：
+--   0 = 待档案部审核
+--   1 = 档案部审核通过（可进入辅导员待终审列表）
+--   2 = 档案部审核驳回
+--
+-- 注意：
+--   1. 补列与「一次性回填」必须包在同一个 DO 块中，
+--      只在列不存在（首次执行）时回填，重复部署不会再次回填、
+--      也不会覆盖运行中的审核状态；
+--   2. 回填口径：补列前已经通过部门初审（status = 1）的存量申报，
+--      视为已通过档案部审核，避免历史数据被卡在新环节之前；
+--      其余存量数据（status <> 1）保持默认值 0；
+--   3. 全程只新增列 / 约束 / 索引，不修改、不删除任何业务数据。
+-- ==========================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'department_score_apply'
+           AND column_name = 'archive_status'
+    ) THEN
+        ALTER TABLE public.department_score_apply
+            ADD COLUMN archive_status SMALLINT NOT NULL DEFAULT 0;
+
+        UPDATE public.department_score_apply
+           SET archive_status = 1
+         WHERE status = 1;
+    END IF;
+END $$;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS archive_reviewer_id BIGINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS archive_review_remark VARCHAR(1000);
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS archive_review_time TIMESTAMP WITHOUT TIME ZONE;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dsa_archive_status') THEN
+        ALTER TABLE public.department_score_apply
+            ADD CONSTRAINT ck_dsa_archive_status CHECK (archive_status IN (0, 1, 2));
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_dsa_archive_status
+    ON public.department_score_apply(archive_status);

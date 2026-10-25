@@ -78,8 +78,13 @@ public class DepartmentScoreApplyDuplicateChecker {
                                 /*
                                  * 只和未被驳回的申报判重：
                                  * 0 = 待部门审核
-                                 * 1 + finalStatus 0 = 待辅导员终审
+                                 * 1 + finalStatus 0 + archiveStatus != 2 = 待档案部 / 待辅导员终审
                                  * 1 + finalStatus 1 = 已通过
+                                 *
+                                 * 档案部已驳回（archiveStatus = 2）的申报
+                                 * 属于可修正后重新提交，不再参与判重；
+                                 * archive_status 在历史数据上可能为 NULL，
+                                 * 因此用「<> 2 或 IS NULL」保证 NULL 行仍参与判重。
                                  */
                                 .and(w -> w
                                         .eq(
@@ -94,7 +99,16 @@ public class DepartmentScoreApplyDuplicateChecker {
                                                 .eq(
                                                         DepartmentScoreApply::getFinalStatus,
                                                         (short) 0
-                                                ))
+                                                )
+                                                .and(sub -> sub
+                                                        .ne(
+                                                                DepartmentScoreApply::getArchiveStatus,
+                                                                (short) 2
+                                                        )
+                                                        .or()
+                                                        .isNull(
+                                                                DepartmentScoreApply::getArchiveStatus
+                                                        )))
                                         .or(inner -> inner
                                                 .eq(
                                                         DepartmentScoreApply::getStatus,

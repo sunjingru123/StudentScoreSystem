@@ -138,4 +138,27 @@ public class DepartmentScoreApply {
      * 最终审核时间
      */
     private LocalDateTime finalReviewTime;
+
+    /**
+     * 档案部审核状态
+     * 0 = 待档案部审核
+     * 1 = 档案部审核通过
+     * 2 = 档案部审核驳回
+     */
+    private Short archiveStatus;
+
+    /**
+     * 档案部审核人（档案部部长 / 副部长）
+     */
+    private Long archiveReviewerId;
+
+    /**
+     * 档案部审核意见
+     */
+    private String archiveReviewRemark;
+
+    /**
+     * 档案部审核时间
+     */
+    private LocalDateTime archiveReviewTime;
 }

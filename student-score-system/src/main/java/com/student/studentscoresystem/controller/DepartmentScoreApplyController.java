@@ -14,11 +14,13 @@ import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.service.DepartmentScoreApplyImportService;
+import com.student.studentscoresystem.service.DepartmentScoreArchiveAuditService;
 import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
 import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.vo.BatchAuditResultVO;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -59,6 +61,8 @@ public class DepartmentScoreApplyController {
 
     private final ScoreManagerPermissionService scoreManagerPermissionService;
 
+    private final DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService;
+
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
@@ -68,7 +72,8 @@ public class DepartmentScoreApplyController {
             SysUserMapper sysUserMapper,
             DepartmentScoreFinalizeService departmentScoreFinalizeService,
             DepartmentScoreApplyImportService departmentScoreApplyImportService,
-            ScoreManagerPermissionService scoreManagerPermissionService) {
+            ScoreManagerPermissionService scoreManagerPermissionService,
+            DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService) {
 
         this.applyService = applyService;
 
@@ -91,6 +96,9 @@ public class DepartmentScoreApplyController {
 
         this.scoreManagerPermissionService =
                 scoreManagerPermissionService;
+
+        this.departmentScoreArchiveAuditService =
+                departmentScoreArchiveAuditService;
     }
 
 
@@ -543,6 +551,16 @@ public class DepartmentScoreApplyController {
          * 0 = 待审核
          */
         apply.setFinalStatus(
+                (short) 0
+        );
+
+
+        /*
+         * 档案部审核：
+         *
+         * 0 = 待档案部审核
+         */
+        apply.setArchiveStatus(
                 (short) 0
         );
 
@@ -1165,6 +1183,17 @@ public class DepartmentScoreApplyController {
                 "canSubmitScoreDeleteApply",
                 scoreManagerPermissionService
                         .canSubmitScoreDeleteApply(currentUserId)
+        );
+
+
+        /*
+         * 档案部部门申报审核权限：
+         * 仅档案部的部长 / 副部长可以在辅导员终审之前审核部门申报。
+         */
+        data.put(
+                "canArchiveAudit",
+                scoreManagerPermissionService
+                        .isArchiveLeader(currentUserId)
         );
 
 
@@ -2009,6 +2038,198 @@ public class DepartmentScoreApplyController {
 
     /*
      * =========================================================
+     * 档案部待审核列表
+     *
+     * 部门初审通过（status = 1）、尚未档案部审核（archiveStatus = 0）
+     * 的申报，由档案部部长 / 副部长在这里审核。
+     * =========================================================
+     */
+    @GetMapping("/archive-audit/list")
+    public Result<List<DepartmentScoreApply>>
+    archiveAuditList(
+            HttpServletRequest request) {
+
+
+        Long currentUserId;
+
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+
+        if (!scoreManagerPermissionService
+                .isArchiveLeader(currentUserId)) {
+
+            return Result.fail(
+                    "你不是档案部的部长或副部长，没有审核权限"
+            );
+        }
+
+
+        List<DepartmentScoreApply> list =
+
+                applyService.list(
+
+                        new LambdaQueryWrapper<DepartmentScoreApply>()
+
+                                .eq(
+                                        DepartmentScoreApply::getStatus,
+                                        (short) 1
+                                )
+
+                                .eq(
+                                        DepartmentScoreApply::getArchiveStatus,
+                                        (short) 0
+                                )
+
+                                /*
+                                 * 自己的申报不能自己审批
+                                 */
+                                .ne(
+                                        DepartmentScoreApply::getApplicantId,
+                                        currentUserId
+                                )
+
+                                .orderByDesc(
+                                        DepartmentScoreApply::getCreateTime
+                                )
+                );
+
+
+        fillNames(
+                list
+        );
+
+
+        return Result.success(
+                list
+        );
+    }
+
+
+    /*
+     * =========================================================
+     * 档案部单条审核（通过 / 驳回）
+     *
+     * 该环节只更新档案部审核字段，不生成成绩；
+     * 成绩仍由辅导员终审通过后生成。
+     * =========================================================
+     */
+    @PutMapping("/archive-audit/{id}")
+    public Result<Void> archiveAudit(
+            @PathVariable Long id,
+            @RequestBody DepartmentScoreApplyAuditDTO dto,
+            HttpServletRequest request) {
+
+
+        Long currentUserId;
+
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+
+        if (dto == null
+                || dto.getStatus() == null) {
+
+            return Result.fail(
+                    "审核状态不能为空"
+            );
+        }
+
+
+        String message =
+                departmentScoreArchiveAuditService
+                        .archiveAudit(
+                                id,
+                                currentUserId,
+                                dto.getStatus(),
+                                dto.getReviewRemark()
+                        );
+
+
+        if (message != null) {
+
+            return Result.fail(
+                    message
+            );
+        }
+
+
+        return Result.success(
+                null
+        );
+    }
+
+
+    /*
+     * =========================================================
+     * 档案部一键审批全部
+     * =========================================================
+     */
+    @PutMapping("/archive-audit/batch-pass")
+    public Result<BatchAuditResultVO> archiveBatchPass(
+            HttpServletRequest request) {
+
+
+        Long currentUserId;
+
+
+        try {
+
+            currentUserId =
+                    getCurrentUserId(request);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+        }
+
+
+        if (!scoreManagerPermissionService
+                .isArchiveLeader(currentUserId)) {
+
+            return Result.fail(
+                    "你不是档案部的部长或副部长，没有审核权限"
+            );
+        }
+
+
+        BatchAuditResultVO result =
+                departmentScoreArchiveAuditService
+                        .batchPass(
+                                currentUserId
+                        );
+
+
+        return Result.success(
+                result
+        );
+    }
+
+
+    /*
+     * =========================================================
      * 辅导员待终审
      * =========================================================
      */
@@ -2098,6 +2319,14 @@ public class DepartmentScoreApplyController {
                                 .eq(
                                         DepartmentScoreApply::getFinalStatus,
                                         (short) 0
+                                )
+
+                                /*
+                                 * 只有通过档案部审核的申报才进入辅导员终审
+                                 */
+                                .eq(
+                                        DepartmentScoreApply::getArchiveStatus,
+                                        (short) 1
                                 )
 
                                 .orderByDesc(
@@ -2351,6 +2580,20 @@ public class DepartmentScoreApplyController {
 
             return Result.fail(
                     "该申报尚未通过部门审核"
+            );
+        }
+
+
+        /*
+         * 必须先通过档案部审核，才能进入辅导员终审
+         */
+        if (!Short.valueOf((short) 1)
+                .equals(
+                        apply.getArchiveStatus()
+                )) {
+
+            return Result.fail(
+                    "该申报尚未通过档案部审核"
             );
         }
 
