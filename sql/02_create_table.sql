@@ -665,6 +665,14 @@ ALTER TABLE public.score_record
 ALTER TABLE public.sys_user
     ADD COLUMN IF NOT EXISTS first_login SMALLINT DEFAULT 0;
 
+-- 5.4.1 贫困生标识（1 = 贫困生，0 = 非贫困生）
+--
+-- 由辅导员端「导入贫困生名单」维护，
+-- 用于比赛（个人证书）按贫困生 / 非贫困生筛选。
+-- 只新增列并给存量数据回填默认值，不修改、不删除任何业务数据。
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS poverty_status SMALLINT NOT NULL DEFAULT 0;
+
 -- 5.5 部门申报 department_score_apply（部门初审 -> 辅导员终审）
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS applicant_id BIGINT;

@@ -12,6 +12,7 @@ import com.student.studentscoresystem.entity.*;
 import com.student.studentscoresystem.mapper.*;
 import com.student.studentscoresystem.service.CertificateBatchAuditService;
 import com.student.studentscoresystem.service.CertificateScoreFinalizeService;
+import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.BatchAuditResultVO;
 import com.student.studentscoresystem.vo.ScoreApplyVO;
@@ -23,7 +24,9 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/scoreApply")
@@ -45,6 +48,8 @@ public class ScoreApplyController {
 
     private final CertificateBatchAuditService certificateBatchAuditService;
 
+    private final ScoreManagerPermissionService scoreManagerPermissionService;
+
     public ScoreApplyController(
             ScoreApplyMapper scoreApplyMapper,
             SysUserMapper sysUserMapper,
@@ -53,7 +58,8 @@ public class ScoreApplyController {
             SysUserDepartmentMapper userDepartmentMapper,
             DepartmentMapper departmentMapper,
             CertificateScoreFinalizeService certificateScoreFinalizeService,
-            CertificateBatchAuditService certificateBatchAuditService
+            CertificateBatchAuditService certificateBatchAuditService,
+            ScoreManagerPermissionService scoreManagerPermissionService
     ) {
 
         this.scoreApplyMapper =
@@ -79,6 +85,9 @@ public class ScoreApplyController {
 
         this.certificateBatchAuditService =
                 certificateBatchAuditService;
+
+        this.scoreManagerPermissionService =
+                scoreManagerPermissionService;
     }
 
     /**
@@ -1106,6 +1115,578 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
+     * 辅导员端：比赛（个人证书）筛选列表
+     *
+     * 筛选维度：
+     *   1. 获奖级别 awardLevel（国家级 / 省级 / 校级 / 院级）
+     *   2. 获奖类别 awardCategory（A / B / C / OTHER）
+     *   3. 贫困生 povertyStatus（1 = 贫困生，0 = 非贫困生）
+     *   4. 关键字 keyword（学号 / 姓名 / 班级）
+     *
+     * 权限：辅导员 / 高级辅导员 / 教师 / 档案部部长·副部长 / 管理员，
+     *      以后端判定为准，不依赖前端路由。
+     * ========================================================
+     */
+    @GetMapping("/contest/list")
+    public Result<Page<ScoreApplyVO>> contestList(
+            @RequestParam(
+                    defaultValue = "1"
+            )
+            long pageNum,
+
+            @RequestParam(
+                    defaultValue = "10"
+            )
+            long pageSize,
+
+            @RequestParam(
+                    required = false
+            )
+            String keyword,
+
+            @RequestParam(
+                    required = false
+            )
+            String awardLevel,
+
+            @RequestParam(
+                    required = false
+            )
+            String awardCategory,
+
+            @RequestParam(
+                    required = false
+            )
+            String povertyStatus,
+
+            HttpServletRequest request
+    ) {
+
+        Long currentUserId =
+                getCurrentUserId(
+                        request
+                );
+
+
+        if (
+                !scoreManagerPermissionService
+                        .canViewContestList(currentUserId)
+        ) {
+
+            return Result.fail(
+                    "你不是辅导员或档案部成员，没有查看比赛汇总的权限"
+            );
+        }
+
+
+        if (
+                pageNum < 1
+        ) {
+
+            pageNum = 1;
+        }
+
+
+        if (
+                pageSize < 1
+                        ||
+                        pageSize > 200
+        ) {
+
+            pageSize = 10;
+        }
+
+
+        /*
+         * =====================================================
+         * 先按学生条件筛出候选学生 ID
+         * =====================================================
+         */
+
+        List<Long> studentIds =
+                resolveContestStudentIds(
+                        keyword,
+                        parsePovertyStatus(povertyStatus)
+                );
+
+
+        if (
+                studentIds != null
+                        &&
+                        studentIds.isEmpty()
+        ) {
+
+            Page<ScoreApplyVO> emptyPage =
+                    new Page<>(
+                            pageNum,
+                            pageSize,
+                            0
+                    );
+
+            emptyPage.setRecords(
+                    new ArrayList<>()
+            );
+
+            return Result.success(
+                    emptyPage
+            );
+        }
+
+
+        LambdaQueryWrapper<ScoreApply>
+                wrapper =
+                new LambdaQueryWrapper<>();
+
+        wrapper.eq(
+                ScoreApply::getApplyType,
+                "CERTIFICATE"
+        );
+
+
+        if (
+                studentIds != null
+        ) {
+
+            wrapper.in(
+                    ScoreApply::getStudentId,
+                    studentIds
+            );
+        }
+
+
+        wrapper.orderByDesc(
+                ScoreApply::getCreateTime
+        );
+
+
+        /*
+         * =====================================================
+         * 获奖级别 / 类别存在 description JSON 中，
+         * 需要加载后在内存中过滤：
+         *
+         * 此时先取出全部候选再分页，保证总数与列表一致。
+         * =====================================================
+         */
+
+        boolean needManualFilter =
+                hasText(awardLevel)
+                        ||
+                        hasText(awardCategory);
+
+
+        if (
+                !needManualFilter
+        ) {
+
+            Page<ScoreApply> page =
+                    new Page<>(
+                            pageNum,
+                            pageSize
+                    );
+
+            Page<ScoreApply> applyPage =
+                    scoreApplyMapper.selectPage(
+                            page,
+                            wrapper
+                    );
+
+            Map<Long, SysUser> userMap =
+                    loadUsers(
+                            applyPage.getRecords()
+                    );
+
+            List<ScoreApplyVO> voList =
+                    new ArrayList<>();
+
+            for (
+                    ScoreApply apply :
+                    applyPage.getRecords()
+            ) {
+
+                voList.add(
+                        convertToVO(
+                                apply,
+                                userMap
+                        )
+                );
+            }
+
+
+            Page<ScoreApplyVO> voPage =
+                    new Page<>(
+                            applyPage.getCurrent(),
+                            applyPage.getSize(),
+                            applyPage.getTotal()
+                    );
+
+            voPage.setRecords(
+                    voList
+            );
+
+            return Result.success(
+                    voPage
+            );
+        }
+
+
+        List<ScoreApply> applies =
+                scoreApplyMapper.selectList(
+                        wrapper
+                );
+
+        Map<Long, SysUser> userMap =
+                loadUsers(
+                        applies
+                );
+
+        List<ScoreApplyVO> filtered =
+                new ArrayList<>();
+
+
+        for (
+                ScoreApply apply :
+                applies
+        ) {
+
+            ScoreApplyVO vo =
+                    convertToVO(
+                            apply,
+                            userMap
+                    );
+
+            if (
+                    hasText(awardLevel)
+                            &&
+                            !awardLevel.trim().equals(
+                                    vo.getAwardLevel()
+                            )
+            ) {
+
+                continue;
+            }
+
+
+            if (
+                    hasText(awardCategory)
+                            &&
+                            !awardCategory.trim().equals(
+                                    vo.getAwardCategory()
+                            )
+            ) {
+
+                continue;
+            }
+
+
+            filtered.add(
+                    vo
+            );
+        }
+
+
+        long from =
+                (pageNum - 1) * pageSize;
+
+        List<ScoreApplyVO> records =
+                new ArrayList<>();
+
+
+        if (
+                from < filtered.size()
+        ) {
+
+            long to =
+                    Math.min(
+                            filtered.size(),
+                            from + pageSize
+                    );
+
+            records =
+                    new ArrayList<>(
+                            filtered.subList(
+                                    (int) from,
+                                    (int) to
+                            )
+                    );
+        }
+
+
+        Page<ScoreApplyVO> voPage =
+                new Page<>(
+                        pageNum,
+                        pageSize,
+                        filtered.size()
+                );
+
+        voPage.setRecords(
+                records
+        );
+
+        return Result.success(
+                voPage
+        );
+    }
+
+
+    /**
+     * 解析贫困生筛选参数
+     *
+     * 空值 / 非法值返回 null，表示不按贫困生过滤。
+     */
+    private Integer parsePovertyStatus(
+            String value
+    ) {
+
+        if (
+                !hasText(value)
+        ) {
+
+            return null;
+        }
+
+
+        try {
+
+            int parsed =
+                    Integer.parseInt(
+                            value.trim()
+                    );
+
+
+            if (
+                    parsed == 0
+                            ||
+                            parsed == 1
+            ) {
+
+                return parsed;
+            }
+
+        } catch (NumberFormatException e) {
+
+            return null;
+        }
+
+
+        return null;
+    }
+
+
+    /**
+     * ========================================================
+     * 按学号 / 姓名 / 班级 / 贫困生标识筛出候选学生
+     *
+     * 返回 null 表示学生条件为空，不做学生维度限制。
+     * ========================================================
+     */
+    private List<Long> resolveContestStudentIds(
+            String keyword,
+            Integer povertyStatus
+    ) {
+
+        boolean hasKeyword =
+                hasText(keyword);
+
+        if (
+                !hasKeyword
+                        &&
+                        povertyStatus == null
+        ) {
+
+            return null;
+        }
+
+
+        LambdaQueryWrapper<SysUser>
+                userWrapper =
+                new LambdaQueryWrapper<>();
+
+
+        if (
+                hasKeyword
+        ) {
+
+            String kw =
+                    keyword.trim();
+
+            userWrapper.and(
+                    w -> w.like(
+                                    SysUser::getStudentNo,
+                                    kw
+                            )
+                            .or()
+                            .like(
+                                    SysUser::getRealName,
+                                    kw
+                            )
+                            .or()
+                            .like(
+                                    SysUser::getClassName,
+                                    kw
+                            )
+            );
+        }
+
+
+        if (
+                povertyStatus != null
+        ) {
+
+            userWrapper.eq(
+                    SysUser::getPovertyStatus,
+                    povertyStatus.shortValue()
+            );
+        }
+
+
+        List<SysUser> users =
+                sysUserMapper.selectList(
+                        userWrapper
+                );
+
+        List<Long> ids =
+                new ArrayList<>();
+
+
+        if (
+                users == null
+        ) {
+
+            return ids;
+        }
+
+
+        for (
+                SysUser user :
+                users
+        ) {
+
+            if (
+                    user != null
+                            &&
+                            user.getId() != null
+            ) {
+
+                ids.add(
+                        user.getId()
+                );
+            }
+        }
+
+
+        return ids;
+    }
+
+
+    /**
+     * ========================================================
+     * 批量预取学生信息，避免列表转换时的 N+1 查询
+     * ========================================================
+     */
+    private Map<Long, SysUser> loadUsers(
+            List<ScoreApply> applies
+    ) {
+
+        Map<Long, SysUser> userMap =
+                new HashMap<>();
+
+
+        if (
+                applies == null
+                        ||
+                        applies.isEmpty()
+        ) {
+
+            return userMap;
+        }
+
+
+        List<Long> ids =
+                new ArrayList<>();
+
+
+        for (
+                ScoreApply apply :
+                applies
+        ) {
+
+            if (
+                    apply != null
+                            &&
+                            apply.getStudentId() != null
+                            &&
+                            !ids.contains(
+                                    apply.getStudentId()
+                            )
+            ) {
+
+                ids.add(
+                        apply.getStudentId()
+                );
+            }
+        }
+
+
+        if (
+                ids.isEmpty()
+        ) {
+
+            return userMap;
+        }
+
+
+        List<SysUser> users =
+                sysUserMapper.selectBatchIds(
+                        ids
+                );
+
+
+        if (
+                users == null
+        ) {
+
+            return userMap;
+        }
+
+
+        for (
+                SysUser user :
+                users
+        ) {
+
+            if (
+                    user != null
+                            &&
+                            user.getId() != null
+            ) {
+
+                userMap.put(
+                        user.getId(),
+                        user
+                );
+            }
+        }
+
+
+        return userMap;
+    }
+
+
+    /**
+     * 字符串是否有内容
+     */
+    private boolean hasText(
+            String value
+    ) {
+
+        return value != null
+                &&
+                !value.trim().isEmpty();
+    }
+
+
+    /**
+     * ========================================================
      * 初审待审核
      *
      * 干事 / 副部长 / 部长均可以审核
@@ -2114,6 +2695,22 @@ public class ScoreApplyController {
             ScoreApply apply
     ) {
 
+        return convertToVO(
+                apply,
+                null
+        );
+    }
+
+    /**
+     * ========================================================
+     * Entity → VO（可传入已批量预取的学员 Map，避免 N+1）
+     * ========================================================
+     */
+    private ScoreApplyVO convertToVO(
+            ScoreApply apply,
+            Map<Long, SysUser> userMap
+    ) {
+
         ScoreApplyVO vo =
                 new ScoreApplyVO();
 
@@ -2226,9 +2823,13 @@ public class ScoreApplyController {
         ) {
 
             SysUser user =
-                    sysUserMapper.selectById(
-                            apply.getStudentId()
-                    );
+                    userMap != null
+                            ? userMap.get(
+                                    apply.getStudentId()
+                            )
+                            : sysUserMapper.selectById(
+                                    apply.getStudentId()
+                            );
 
             if (
                     user != null
@@ -2253,6 +2854,15 @@ public class ScoreApplyController {
                  */
                 vo.setStudentName(
                         user.getRealName()
+                );
+
+                /*
+                 * 贫困生标识
+                 */
+                vo.setPovertyStatus(
+                        user.getPovertyStatus() != null
+                                ? user.getPovertyStatus().intValue()
+                                : 0
                 );
             }
         }

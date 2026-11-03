@@ -111,6 +111,24 @@
 
 
         <!-- =========================
+             比赛筛选
+        ========================== -->
+        <el-menu-item
+          index="/teacher/contest"
+        >
+
+          <el-icon>
+            <Medal />
+          </el-icon>
+
+          <span>
+            比赛筛选
+          </span>
+
+        </el-menu-item>
+
+
+        <!-- =========================
              消息通知
         ========================== -->
         <el-menu-item
@@ -223,6 +241,11 @@
         <el-menu-item index="/teacher/message">
           <el-icon><Bell /></el-icon>
           <span>消息通知</span>
+        </el-menu-item>
+
+        <el-menu-item index="/teacher/contest">
+          <el-icon><Medal /></el-icon>
+          <span>比赛筛选</span>
         </el-menu-item>
 
         <el-menu-item
@@ -370,7 +393,8 @@ import {
   Delete,
   SwitchButton,
   Lock,
-  Menu
+  Menu,
+  Medal
 } from '@element-plus/icons-vue'
 
 

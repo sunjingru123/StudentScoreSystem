@@ -62,6 +62,12 @@ public class ScoreManagerPermissionService {
     private static final String SENIOR_COUNSELOR_POSITION_NAME =
             "高级辅导员";
 
+    /**
+     * 辅导员端普通岗位名称
+     */
+    private static final List<String> COUNSELOR_POSITION_NAMES =
+            List.of("辅导员", "教师");
+
 
     private final SysUserPositionMapper userPositionMapper;
 
@@ -469,6 +475,104 @@ public class ScoreManagerPermissionService {
     public boolean canSubmitScoreDeleteApply(Long userId) {
 
         return isArchiveLeader(userId);
+    }
+
+
+    /**
+     * =====================================================
+     * 是否为辅导员端账号（辅导员 / 教师）
+     * =====================================================
+     *
+     * 判定依据复用 sys_user_position + sys_position，
+     * 不新增任何角色表或字段。
+     */
+    public boolean isCounselor(Long userId) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        List<SysUserPosition> relations =
+                userPositionMapper.selectList(
+                        new LambdaQueryWrapper<SysUserPosition>()
+                                .eq(
+                                        SysUserPosition::getUserId,
+                                        userId
+                                )
+                );
+
+
+        if (relations == null || relations.isEmpty()) {
+
+            return false;
+        }
+
+
+        for (SysUserPosition relation : relations) {
+
+            if (relation == null || relation.getPositionId() == null) {
+
+                continue;
+            }
+
+
+            SysPosition position =
+                    positionMapper.selectById(
+                            relation.getPositionId()
+                    );
+
+
+            if (position == null || position.getName() == null) {
+
+                continue;
+            }
+
+
+            if (position.getStatus() != null && position.getStatus() != 1) {
+
+                continue;
+            }
+
+
+            if (COUNSELOR_POSITION_NAMES.contains(
+                    position.getName().trim()
+            )) {
+
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+
+
+    /**
+     * =====================================================
+     * 是否可以查看学生比赛（证书）汇总
+     * =====================================================
+     *
+     * 辅导员端页面使用：
+     * 管理员 / 辅导员 / 高级辅导员 / 教师 /
+     * 档案部部长 / 副部长 均可查看。
+     *
+     * 学生（含干事 / 部长 / 副部长）不具备该权限，
+     * 因为他们只能查看自己的申报。
+     */
+    public boolean canViewContestList(Long userId) {
+
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        return isAdmin(userId)
+                || isCounselor(userId)
+                || isSeniorCounselor(userId)
+                || isArchiveLeader(userId);
     }
 
 }

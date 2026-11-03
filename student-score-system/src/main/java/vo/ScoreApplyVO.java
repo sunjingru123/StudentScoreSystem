@@ -24,6 +24,14 @@ public class ScoreApplyVO {
     private String studentName;
 
     /**
+     * 学生是否贫困生
+     *
+     * 1 = 贫困生
+     * 0 = 非贫困生
+     */
+    private Integer povertyStatus;
+
+    /**
      * 学号
      */
     private String studentNo;

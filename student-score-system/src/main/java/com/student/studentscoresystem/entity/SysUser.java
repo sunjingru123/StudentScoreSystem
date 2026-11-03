@@ -108,6 +108,17 @@ public class SysUser implements Serializable {
     private Short status;
 
     /**
+     * 贫困生标识
+     *
+     * 1 = 贫困生
+     * 0 = 非贫困生（默认）
+     *
+     * 由辅导员端「导入贫困生名单」维护，
+     * 用于比赛（个人证书）筛选与统计。
+     */
+    private Short povertyStatus;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

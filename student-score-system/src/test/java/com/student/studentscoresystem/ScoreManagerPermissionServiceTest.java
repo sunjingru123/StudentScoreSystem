@@ -340,4 +340,86 @@ class ScoreManagerPermissionServiceTest {
 
         assertFalse(service.isSeniorCounselor(SENIOR_COUNSELOR_ID));
     }
+
+    /* =========================================================
+     * 辅导员端比赛（证书）汇总权限
+     *
+     * 允许：管理员 / 辅导员 / 教师 / 高级辅导员 / 档案部正副部长
+     * 拒绝：普通学生（含干事 / 部长 / 副部长）
+     * ========================================================= */
+
+    @Test
+    void counselorCanViewContestList() {
+
+        givenPosition(COUNSELOR_ID, 102L, "辅导员", (short) 1);
+
+        assertTrue(service.isCounselor(COUNSELOR_ID));
+        assertFalse(service.isArchiveLeader(COUNSELOR_ID));
+        assertTrue(service.canViewContestList(COUNSELOR_ID));
+    }
+
+    @Test
+    void teacherPositionCanViewContestList() {
+
+        givenPosition(300L, 103L, "教师", (short) 1);
+
+        assertTrue(service.isCounselor(300L));
+        assertFalse(service.isArchiveLeader(300L));
+        assertTrue(service.canViewContestList(300L));
+    }
+
+    @Test
+    void seniorCounselorCanViewContestList() {
+
+        givenPosition(
+                SENIOR_COUNSELOR_ID,
+                200L,
+                "高级辅导员",
+                (short) 1
+        );
+
+        assertTrue(service.canViewContestList(SENIOR_COUNSELOR_ID));
+        assertFalse(service.isArchiveLeader(SENIOR_COUNSELOR_ID));
+    }
+
+    @Test
+    void adminCanViewContestList() {
+
+        givenPosition(ADMIN_ID, 100L, "管理员", (short) 1);
+
+        assertTrue(service.canViewContestList(ADMIN_ID));
+        assertFalse(service.isArchiveLeader(ADMIN_ID));
+    }
+
+    @Test
+    void archiveLeaderCanViewContestList() {
+
+        givenDepartment(
+                ARCHIVE_LEADER_ID,
+                ARCHIVE_DEPT_ID,
+                "部长",
+                "档案部",
+                (short) 1
+        );
+
+        assertTrue(service.canViewContestList(ARCHIVE_LEADER_ID));
+        assertFalse(service.isCounselor(ARCHIVE_LEADER_ID));
+    }
+
+    @Test
+    void plainStudentCannotViewContestList() {
+
+        givenPosition(STUDENT_ID, 101L, "学生", (short) 1);
+
+        assertFalse(service.isCounselor(STUDENT_ID));
+        assertFalse(service.isArchiveLeader(STUDENT_ID));
+        assertFalse(service.canViewContestList(STUDENT_ID));
+    }
+
+    @Test
+    void anonymousCannotViewContestList() {
+
+        assertFalse(service.isCounselor(null));
+        assertFalse(service.canViewContestList(null));
+    }
 }
