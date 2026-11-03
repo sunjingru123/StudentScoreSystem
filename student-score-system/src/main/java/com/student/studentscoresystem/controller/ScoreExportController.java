@@ -16,6 +16,7 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.IScoreExportService;
+import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +67,8 @@ public class ScoreExportController {
 
     private final SysUserMapper sysUserMapper;
 
+    private final ScoreManagerPermissionService scoreManagerPermissionService;
+
 
     public ScoreExportController(
             IScoreExportService scoreExportService,
@@ -74,7 +77,8 @@ public class ScoreExportController {
             DepartmentMapper departmentMapper,
             SysUserPositionMapper sysUserPositionMapper,
             SysPositionMapper sysPositionMapper,
-            SysUserMapper sysUserMapper) {
+            SysUserMapper sysUserMapper,
+            ScoreManagerPermissionService scoreManagerPermissionService) {
 
         this.scoreExportService =
                 scoreExportService;
@@ -96,6 +100,9 @@ public class ScoreExportController {
 
         this.sysUserMapper =
                 sysUserMapper;
+
+        this.scoreManagerPermissionService =
+                scoreManagerPermissionService;
     }
 
 
@@ -627,10 +634,14 @@ public class ScoreExportController {
         /*
          * 成绩删除申请审核权（供前端菜单展示，
          * 真实校验始终在 /scoreDeleteApply/** 后端接口）。
+         *
+         * 只有分管档案部的辅导员（与管理员）可以审核，
+         * 与 ScoreManagerPermissionService 保持同一口径。
          */
         data.put(
                 "canReviewScoreDelete",
-                admin || seniorCounselor
+                scoreManagerPermissionService
+                        .canReviewScoreDeleteApply(userId)
         );
 
 

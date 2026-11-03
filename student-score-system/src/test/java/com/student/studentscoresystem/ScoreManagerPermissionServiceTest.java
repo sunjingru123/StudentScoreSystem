@@ -251,7 +251,7 @@ class ScoreManagerPermissionServiceTest {
      * ========================================================= */
 
     @Test
-    void seniorCounselorCanDeleteAndReviewButNotSubmit() {
+    void seniorCounselorCanDeleteDirectlyButCannotReviewDeleteApply() {
 
         givenPosition(
                 SENIOR_COUNSELOR_ID,
@@ -263,8 +263,38 @@ class ScoreManagerPermissionServiceTest {
         assertTrue(service.isSeniorCounselor(SENIOR_COUNSELOR_ID));
         assertTrue(service.canManageStudentScores(SENIOR_COUNSELOR_ID));
         assertTrue(service.canDeleteScoreDirectly(SENIOR_COUNSELOR_ID));
-        assertTrue(service.canReviewScoreDeleteApply(SENIOR_COUNSELOR_ID));
+
+        /*
+         * 高级辅导员不分管档案部，
+         * 不能审核档案部成员提交的删除申请。
+         */
+        assertFalse(
+                service.canReviewScoreDeleteApply(SENIOR_COUNSELOR_ID)
+        );
+
         assertFalse(service.canSubmitScoreDeleteApply(SENIOR_COUNSELOR_ID));
+    }
+
+    @Test
+    void adminCanReviewDeleteApply() {
+
+        givenPosition(ADMIN_ID, 100L, "管理员", (short) 1);
+
+        assertTrue(service.canReviewScoreDeleteApply(ADMIN_ID));
+    }
+
+    @Test
+    void plainCounselorCannotReviewDeleteApply() {
+
+        givenPosition(COUNSELOR_ID, 102L, "辅导员", (short) 1);
+
+        assertFalse(
+                service.canReviewScoreDeleteApply(COUNSELOR_ID)
+        );
+
+        assertFalse(
+                service.canDeleteScoreDirectly(COUNSELOR_ID)
+        );
     }
 
     @Test
@@ -292,6 +322,9 @@ class ScoreManagerPermissionServiceTest {
                 )
         );
 
+        /*
+         * 分管档案部的老师是唯一的审核人。
+         */
         assertTrue(
                 service.canReviewScoreDeleteApply(
                         ARCHIVE_COUNSELOR_TEACHER_ID

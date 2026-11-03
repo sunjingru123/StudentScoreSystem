@@ -453,15 +453,32 @@ public class ScoreManagerPermissionService {
 
     /**
      * =====================================================
-     * 是否可以审核成绩删除申请
+     * 是否可以审核（通过 / 驳回）成绩删除申请
      * =====================================================
      *
-     * 与 canDeleteScoreDirectly 保持一致：
-     * 审核人即可以直接删除的辅导员 / 管理员。
+     * 只有「负责档案部的分管老师」可以审核：
+     *
+     *   1. 系统管理员（超级权限，始终保留）；
+     *   2. 档案部负责辅导员
+     *      （department.teacher_id = 当前用户，且部门为「档案部」并已启用）。
+     *
+     * 高级辅导员不再具备审核权：
+     *   高级辅导员并不分管档案部，
+     *   删除学生加减分的申请必须由分管档案部的老师审批。
+     *
+     * 注意：本方法只控制「审核」入口，
+     * 与 canDeleteScoreDirectly（直接删除）相互独立。
      */
     public boolean canReviewScoreDeleteApply(Long userId) {
 
-        return canDeleteScoreDirectly(userId);
+        if (userId == null) {
+
+            return false;
+        }
+
+
+        return isAdmin(userId)
+                || isArchiveDepartmentCounselor(userId);
     }
 
 
