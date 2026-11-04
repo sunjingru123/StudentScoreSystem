@@ -68,6 +68,35 @@
         </div>
 
 
+        <!-- ===============================================
+             导入模式
+        ================================================ -->
+
+        <el-radio-group
+          v-model="importMode"
+          class="mode-group"
+          :disabled="importing"
+        >
+
+          <el-radio value="append">
+            仅新增 / 修正（不影响名单外学生）
+          </el-radio>
+
+          <el-radio value="replace">
+            按名单覆盖（清除名单外的贫困生标记）
+          </el-radio>
+
+        </el-radio-group>
+
+
+        <div
+          v-if="importMode === 'replace'"
+          class="mode-tip"
+        >
+          覆盖模式下，本次名单即最终结果：名单外的学生会被取消贫困生标记。
+        </div>
+
+
         <el-upload
           ref="uploadRef"
           class="upload-area"
@@ -134,6 +163,9 @@
               共处理 {{ importResult.totalCount || 0 }} 条，
               成功 {{ importResult.successCount || 0 }} 条，
               失败 {{ importResult.failCount || 0 }} 条
+              <template v-if="importResult.mode === 'replace'">
+                ，取消标记 {{ importResult.clearedCount || 0 }} 人
+              </template>
 
             </template>
 
@@ -189,7 +221,8 @@ import {
 
 
 import {
-  ElMessage
+  ElMessage,
+  ElMessageBox
 } from 'element-plus'
 
 
@@ -230,6 +263,11 @@ const templateDownloading =
 
 const importResult =
   ref(null)
+
+
+// 导入模式：append（仅新增/修正） | replace（按名单覆盖）
+const importMode =
+  ref('append')
 
 
 const importErrors =
@@ -390,6 +428,33 @@ async function submitImport() {
   }
 
 
+  /*
+   * 覆盖模式会清除名单外学生的贫困生标记，
+   * 属于批量数据变更，提交前必须二次确认。
+   */
+  if (importMode.value === 'replace') {
+
+    try {
+
+      await ElMessageBox.confirm(
+        '覆盖模式会把本次名单作为最终结果，名单外的学生将被取消贫困生标记。确定继续吗？',
+        '确认覆盖导入',
+        {
+          type: 'warning',
+          confirmButtonText: '确定覆盖',
+          cancelButtonText: '取消',
+        }
+      )
+
+    } catch (e) {
+
+      return
+
+    }
+
+  }
+
+
   importing.value = true
 
   try {
@@ -397,6 +462,8 @@ async function submitImport() {
     const formData = new FormData()
 
     formData.append('file', selectedFile.value)
+
+    formData.append('mode', importMode.value)
 
     const res =
       await importPovertyStudents(formData)
@@ -438,6 +505,17 @@ async function submitImport() {
     selectedFile.value = null
 
     uploadRef.value?.clearFiles()
+
+
+    /*
+     * 覆盖导入完成后自动切回默认模式，
+     * 避免重复点击再次清空名单外的标记。
+     */
+    if (importResult.value.mode === 'replace') {
+
+      importMode.value = 'append'
+
+    }
 
   } catch (error) {
 
@@ -508,6 +586,28 @@ onMounted(loadPermission)
 .toolbar {
 
   margin-bottom: 16px;
+
+}
+
+.mode-group {
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px 20px;
+
+  margin-bottom: 8px;
+
+}
+
+.mode-tip {
+
+  margin-bottom: 12px;
+
+  font-size: 12px;
+
+  color: #e6a23c;
 
 }
 

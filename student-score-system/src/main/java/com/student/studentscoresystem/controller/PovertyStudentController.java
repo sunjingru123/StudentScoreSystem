@@ -174,10 +174,18 @@ public class PovertyStudentController {
 
     /**
      * 导入贫困生名单
+     *
+     * mode = append（默认）：只新增 / 修正标记，不清除名单外学生；
+     * mode = replace        ：以本次名单为准，清除名单外的贫困生标记。
      */
     @PostMapping("/import")
     public Result<Map<String, Object>> importPovertyStudents(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(
+                    value = "mode",
+                    required = false,
+                    defaultValue = "append"
+            ) String mode,
             HttpServletRequest request
     ) {
 
@@ -202,7 +210,12 @@ public class PovertyStudentController {
                     povertyStudentImportService
                             .importPovertyStudents(
                                     currentUserId,
-                                    file
+                                    file,
+                                    "replace".equalsIgnoreCase(
+                                            mode == null
+                                                    ? ""
+                                                    : mode.trim()
+                                    )
                             )
             );
 

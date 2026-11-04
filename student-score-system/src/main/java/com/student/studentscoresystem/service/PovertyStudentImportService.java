@@ -2,6 +2,7 @@ package com.student.studentscoresystem.service;
 
 import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.student.studentscoresystem.dto.PovertyStudentExcelRow;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.SysUserMapper;
@@ -128,13 +129,53 @@ public class PovertyStudentImportService {
      * 导入贫困生名单
      *
      * 返回结构与其他 Excel 导入保持一致：
-     *   totalCount / successCount / failCount / errors
+     *   totalCount / successCount / failCount / clearedCount / mode / errors
      * =========================================================
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> importPovertyStudents(
             Long currentUserId,
             MultipartFile file
+    ) {
+
+        /*
+         * 默认模式：只新增 / 修正标记，
+         * 不取消任何人的贫困生标记，
+         * 避免传错文件时静默清空全校标记。
+         */
+        return importPovertyStudents(
+                currentUserId,
+                file,
+                false
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 导入贫困生名单（支持覆盖模式）
+     * =========================================================
+     *
+     * append （replaceMode = false）：
+     *    只把名单中的学生标记为贫困生，
+     *    不影响名单之外的学生。
+     *
+     * replace（replaceMode = true）：
+     *    以本次名单为权威结果：
+     *    文件中出现过的学号保留 / 标记为贫困生，
+     *    其余已标记的学生取消贫困生标记。
+     *
+     * 安全保护：
+     *    1. 名单中没有任何有效学号时中止；
+     *    2. 全部行都导入失败时中止；
+     *    避免一份错误文件把全部贫困生标记清空。
+     * =========================================================
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> importPovertyStudents(
+            Long currentUserId,
+            MultipartFile file,
+            boolean replaceMode
     ) {
 
         requireImportPermission(currentUserId);
@@ -318,12 +359,61 @@ public class PovertyStudentImportService {
         }
 
 
+        /*
+         * 覆盖模式：
+         *
+         * 以「文件中出现过的学号」为权威名单，
+         * 取消名单之外学生已有的贫困生标记。
+         *
+         * 只按学号判定：
+         * 即使某行姓名写错（该行本身导入失败），
+         * 也不会因此取消该学生的贫困生标记，
+         * 避免手误造成误清。
+         */
+        int clearedCount = 0;
+
+        if (replaceMode) {
+
+            if (handledStudentNos.isEmpty()) {
+
+                throw new IllegalArgumentException(
+                        "本次导入没有有效学号，已中止覆盖，"
+                                + "避免清空全部贫困生标记"
+                );
+            }
+
+
+            if (successCount == 0) {
+
+                throw new IllegalArgumentException(
+                        "本次导入没有任何成功记录，已中止覆盖，"
+                                + "避免清空全部贫困生标记"
+                );
+            }
+
+
+            clearedCount = sysUserMapper.update(
+                    null,
+                    /*
+                     * 这里使用字符串列名（而非 Lambda）：
+                     * 改的是 sys_user 表的确切字段，
+                     * 且不依赖 MyBatis-Plus 的 lambda 缓存，
+                     * 单测（无 Spring 上下文）也能覆盖到这段逻辑。
+                     */
+                    new UpdateWrapper<SysUser>()
+                            .set("poverty_status", (short) 0)
+                            .eq("poverty_status", (short) 1)
+                            .notIn("student_no", handledStudentNos)
+            );
+        }
+
+
         return buildResult(
                 totalCount,
                 successCount,
-                errors,
-                "共处理 " + totalCount + " 条，"
-                        + "成功标记 " + successCount + " 人"
+                clearedCount,
+                replaceMode,
+                errors
         );
     }
 
@@ -396,8 +486,9 @@ public class PovertyStudentImportService {
     private Map<String, Object> buildResult(
             int totalCount,
             int successCount,
-            List<Map<String, Object>> errors,
-            String message
+            int clearedCount,
+            boolean replaceMode,
+            List<Map<String, Object>> errors
     ) {
 
         Map<String, Object> result =
@@ -409,7 +500,25 @@ public class PovertyStudentImportService {
 
         result.put("failCount", totalCount - successCount);
 
+        result.put("clearedCount", clearedCount);
+
+        result.put(
+                "mode",
+                replaceMode ? "replace" : "append"
+        );
+
         result.put("errors", errors);
+
+
+        String message =
+                "共处理 " + totalCount + " 条，"
+                        + "成功标记 " + successCount + " 人";
+
+        if (replaceMode) {
+
+            message = message
+                    + "，取消标记 " + clearedCount + " 人";
+        }
 
         result.put("message", message);
 

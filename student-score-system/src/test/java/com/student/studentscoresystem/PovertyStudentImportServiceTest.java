@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -250,6 +251,77 @@ class PovertyStudentImportServiceTest {
         assertEquals(1, result.get("failCount"));
 
         verify(sysUserMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
+    void appendModeNeverClearsOtherStudents() {
+
+        SysUser user = new SysUser();
+        user.setId(100L);
+        user.setStudentNo("2024010");
+        user.setRealName("张三");
+        user.setPovertyStatus((short) 0);
+
+        when(sysUserMapper.selectList(any()))
+                .thenReturn(List.of(user));
+
+        Map<String, Object> result =
+                service.importPovertyStudents(
+                        OPERATOR_ID,
+                        buildFile(List.of(row("2024010", "张三")))
+                );
+
+        assertEquals("append", result.get("mode"));
+        assertEquals(0, result.get("clearedCount"));
+
+        verify(sysUserMapper, never()).update(isNull(), any());
+    }
+
+    @Test
+    void replaceModeClearsStudentsNotInFile() {
+
+        SysUser user = new SysUser();
+        user.setId(100L);
+        user.setStudentNo("2024011");
+        user.setRealName("李四");
+        user.setPovertyStatus((short) 0);
+
+        when(sysUserMapper.selectList(any()))
+                .thenReturn(List.of(user));
+
+        when(sysUserMapper.update(isNull(), any()))
+                .thenReturn(3);
+
+        Map<String, Object> result =
+                service.importPovertyStudents(
+                        OPERATOR_ID,
+                        buildFile(List.of(row("2024011", "李四"))),
+                        true
+                );
+
+        assertEquals("replace", result.get("mode"));
+        assertEquals(1, result.get("successCount"));
+        assertEquals(3, result.get("clearedCount"));
+
+        verify(sysUserMapper).update(isNull(), any());
+    }
+
+    @Test
+    void replaceModeAbortsWhenNothingSucceeds() {
+
+        when(sysUserMapper.selectList(any()))
+                .thenReturn(Collections.emptyList());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.importPovertyStudents(
+                        OPERATOR_ID,
+                        buildFile(List.of(row("9999999", "查无此人"))),
+                        true
+                )
+        );
+
+        verify(sysUserMapper, never()).update(isNull(), any());
     }
 
     @Test
