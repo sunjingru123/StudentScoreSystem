@@ -119,7 +119,8 @@ export function areaOfPath(path) {
  *                 { canDepartmentApply, departmentLeader, archiveLeader,
  *                   archiveScoreManager, seniorCounselor, canExportAllScopes,
  *                   canDeleteScoreDirectly, canReviewScoreDeleteApply,
- *                   canSubmitScoreDeleteApply, canArchiveApplyAudit }
+ *                   canSubmitScoreDeleteApply, canArchiveApplyAudit,
+ *                   canImportPoverty }
  *   firstLogin  - 是否首次登录需强制改密
  *
  * 返回：
@@ -372,6 +373,27 @@ export function decideAccess({
         path: area,
 
         warning: '只有档案部部长 / 副部长可以提交成绩删除申请',
+
+      }
+
+    }
+
+  }
+
+
+  /* ---------- 学生端：贫困生名单导入（勤工助学部部长 / 副部长） ---------- */
+
+  if (flags.requiresPovertyImport) {
+
+    if (role !== '管理员' && !permissions.canImportPoverty) {
+
+      return {
+
+        action: 'redirect',
+
+        path: area,
+
+        warning: '只有勤工助学部的部长 / 副部长可以导入贫困生名单',
 
       }
 

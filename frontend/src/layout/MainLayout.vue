@@ -179,6 +179,27 @@
         </el-menu-item>
 
 
+        <!--
+ ★ 勤工助学部贫困生名单导入
+ ★ 仅部长 / 副部长
+-->
+
+        <el-menu-item
+          v-if="povertyImporter"
+          index="/home/poverty-import"
+        >
+
+          <el-icon>
+            <Upload />
+          </el-icon>
+
+          <span>
+            贫困生名单导入
+          </span>
+
+        </el-menu-item>
+
+
         <!-- =================================================
              消息
         ================================================== -->
@@ -270,6 +291,14 @@
         >
           <el-icon><DataAnalysis /></el-icon>
           <span>学生成绩管理</span>
+        </el-menu-item>
+
+        <el-menu-item
+          v-if="povertyImporter"
+          index="/home/poverty-import"
+        >
+          <el-icon><Upload /></el-icon>
+          <span>贫困生名单导入</span>
         </el-menu-item>
 
         <el-menu-item index="/home/message">
@@ -428,6 +457,7 @@ import {
   FolderChecked,
   DataAnalysis,
   Download,
+  Upload,
   Bell,
   SwitchButton,
   Lock,
@@ -469,6 +499,11 @@ const archiveScoreManager =
 
 // 档案部部长 / 副部长：审核部门加减分申报
 const archiveApplyAudit =
+  ref(false)
+
+
+// 勤工助学部部长 / 副部长：导入贫困生名单
+const povertyImporter =
   ref(false)
 
 
@@ -555,6 +590,8 @@ async function loadPermission() {
 
       archiveApplyAudit.value = false
 
+      povertyImporter.value = false
+
       return
 
     }
@@ -631,6 +668,18 @@ async function loadPermission() {
       Number(data.canArchiveAudit) === 1
 
 
+    /*
+     * 贫困生名单导入：
+     *
+     * 仅勤工助学部的部长 / 副部长，
+     * 以后端返回的 canImportPoverty 为准
+     */
+
+    povertyImporter.value =
+      data.canImportPoverty === true ||
+      Number(data.canImportPoverty) === 1
+
+
 
 
   }
@@ -648,6 +697,8 @@ async function loadPermission() {
     archiveScoreManager.value = false
 
     archiveApplyAudit.value = false
+
+    povertyImporter.value = false
 
   }
 

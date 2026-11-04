@@ -19,6 +19,7 @@ import com.student.studentscoresystem.service.DepartmentScoreArchiveAuditService
 import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
+import com.student.studentscoresystem.service.PovertyImportPermissionService;
 import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.vo.ArchiveScoreOptionsVO;
@@ -65,6 +66,8 @@ public class DepartmentScoreApplyController {
 
     private final DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService;
 
+    private final PovertyImportPermissionService povertyImportPermissionService;
+
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
@@ -75,7 +78,8 @@ public class DepartmentScoreApplyController {
             DepartmentScoreFinalizeService departmentScoreFinalizeService,
             DepartmentScoreApplyImportService departmentScoreApplyImportService,
             ScoreManagerPermissionService scoreManagerPermissionService,
-            DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService) {
+            DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService,
+            PovertyImportPermissionService povertyImportPermissionService) {
 
         this.applyService = applyService;
 
@@ -101,6 +105,9 @@ public class DepartmentScoreApplyController {
 
         this.departmentScoreArchiveAuditService =
                 departmentScoreArchiveAuditService;
+
+        this.povertyImportPermissionService =
+                povertyImportPermissionService;
     }
 
 
@@ -1196,6 +1203,17 @@ public class DepartmentScoreApplyController {
                 "canArchiveAudit",
                 scoreManagerPermissionService
                         .isArchiveLeader(currentUserId)
+        );
+
+
+        /*
+         * 贫困生名单导入权限：
+         * 仅勤工助学部的部长 / 副部长（以及管理员）可以导入。
+         */
+        data.put(
+                "canImportPoverty",
+                povertyImportPermissionService
+                        .canImportPovertyList(currentUserId)
         );
 
 

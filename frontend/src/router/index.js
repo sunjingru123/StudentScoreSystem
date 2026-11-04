@@ -299,6 +299,26 @@ const router = createRouter({
         },
 
         // ===================================================
+        // 贫困生名单导入
+        //
+        // 仅勤工助学部的部长 / 副部长
+        // ===================================================
+
+        {
+          path: 'poverty-import',
+
+          name: 'StudentPovertyImport',
+
+          component: () => import('@/views/student/PovertyImport.vue'),
+
+          meta: {
+            title: '贫困生名单导入',
+
+            requiresPovertyImport: true,
+          },
+        },
+
+        // ===================================================
         // 加减分汇总导出
         //
         // 档案部负责人 / 副负责人
@@ -650,6 +670,8 @@ const authCache = {
 
   canArchiveApplyAudit: false,
 
+  canImportPoverty: false,
+
   loaded: false,
 
   pending: null,
@@ -686,6 +708,8 @@ function clearAuth() {
   authCache.canSubmitScoreDeleteApply = false
 
   authCache.canArchiveApplyAudit = false
+
+  authCache.canImportPoverty = false
 
   authCache.loaded = false
 }
@@ -724,6 +748,8 @@ async function loadAuthContext(storedUser) {
       canSubmitScoreDeleteApply: false,
 
       canArchiveApplyAudit: false,
+
+      canImportPoverty: false,
     }
   }
 
@@ -757,6 +783,8 @@ async function loadAuthContext(storedUser) {
     let canSubmitScoreDeleteApply = false
 
     let canArchiveApplyAudit = false
+
+    let canImportPoverty = false
 
     try {
       const infoRes = await request.get('/user/info')
@@ -823,6 +851,13 @@ async function loadAuthContext(storedUser) {
        */
       canArchiveApplyAudit =
         data.canArchiveAudit === true || Number(data.canArchiveAudit) === 1
+
+      /*
+       * 贫困生名单导入：
+       * 仅勤工助学部的部长 / 副部长，以后端返回为准。
+       */
+      canImportPoverty =
+        data.canImportPoverty === true || Number(data.canImportPoverty) === 1
     } catch (error) {
       console.error('获取部门权限失败：', error)
 
@@ -845,6 +880,8 @@ async function loadAuthContext(storedUser) {
       canSubmitScoreDeleteApply = false
 
       canArchiveApplyAudit = false
+
+      canImportPoverty = false
     }
 
     // 后端未返回角色时，回退到登录时写入的本地角色。
@@ -876,6 +913,8 @@ async function loadAuthContext(storedUser) {
     authCache.canSubmitScoreDeleteApply = canSubmitScoreDeleteApply
 
     authCache.canArchiveApplyAudit = canArchiveApplyAudit
+
+    authCache.canImportPoverty = canImportPoverty
 
     authCache.loaded = true
 
@@ -1017,6 +1056,10 @@ router.beforeEach(async (to) => {
     requiresArchiveApplyAudit: to.matched.some(
       (record) => record.meta?.requiresArchiveApplyAudit === true,
     ),
+
+    requiresPovertyImport: to.matched.some(
+      (record) => record.meta?.requiresPovertyImport === true,
+    ),
   }
 
   const decision = decideAccess({
@@ -1046,6 +1089,8 @@ router.beforeEach(async (to) => {
       canSubmitScoreDeleteApply: auth.canSubmitScoreDeleteApply,
 
       canArchiveApplyAudit: auth.canArchiveApplyAudit,
+
+      canImportPoverty: auth.canImportPoverty,
     },
   })
 
