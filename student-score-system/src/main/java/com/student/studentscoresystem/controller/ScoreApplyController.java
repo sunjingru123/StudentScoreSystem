@@ -1243,6 +1243,18 @@ public class ScoreApplyController {
         );
 
 
+        /*
+         * 只统计「终审通过」的申报：
+         *
+         * status = 1 表示整个证书审核流程已完成（终审通过），
+         * 待审核（0）与已驳回（2）都不计入比赛汇总。
+         */
+        wrapper.eq(
+                ScoreApply::getStatus,
+                (short) 1
+        );
+
+
         if (
                 studentIds != null
         ) {
