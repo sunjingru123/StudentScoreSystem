@@ -8,20 +8,10 @@
       <div class="title-box">
         <div>
           <h2>比赛筛选</h2>
-          <p>按获奖级别、获奖类别、贫困生分类筛选学生参加的比赛</p>
+          <p>按获奖级别、获奖类别、贫困生分类筛选学生参加的比赛（仅统计已通过的）</p>
         </div>
 
         <div class="title-actions">
-          <el-button
-            v-if="canImportPoverty"
-            type="primary"
-            plain
-            :icon="Upload"
-            @click="openImportDialog"
-          >
-            导入贫困生名单
-          </el-button>
-
           <el-button
             :icon="Refresh"
             :loading="loading"
@@ -273,114 +263,6 @@
 
     </el-card>
 
-    <!-- =========================
-         贫困生名单导入
-    ========================== -->
-    <el-dialog
-      v-model="importVisible"
-      title="导入贫困生名单"
-      width="620px"
-      destroy-on-close
-    >
-      <div class="import-tip">
-        <p>
-          模板固定两列：
-          <b>学号</b>、
-          <b>姓名</b>。
-          系统按学号匹配学生，只把名单中的学生标记为贫困生，
-          未出现在名单中的学生保持原状态。
-        </p>
-
-        <el-button
-          type="primary"
-          link
-          :loading="templateDownloading"
-          @click="downloadTemplate"
-        >
-          下载导入模板
-        </el-button>
-      </div>
-
-      <el-upload
-        ref="importUploadRef"
-        :auto-upload="false"
-        :limit="1"
-        accept=".xlsx,.xls"
-        :on-change="handleImportFileChange"
-        :on-remove="removeImportFile"
-        drag
-        style="width: 100%"
-      >
-        <el-icon class="el-icon--upload">
-          <UploadFilled />
-        </el-icon>
-
-        <div class="el-upload__text">
-          将 Excel 拖到此处，或
-          <em>点击选择文件</em>
-        </div>
-      </el-upload>
-
-      <!-- 导入结果 -->
-      <div
-        v-if="importResult"
-        class="import-result"
-      >
-        <p>
-          共处理
-          <b>{{ importResult.totalCount || 0 }}</b>
-          条，成功
-          <b class="success-text">{{ importResult.successCount || 0 }}</b>
-          条，失败
-          <b class="fail-text">{{ importResult.failCount || 0 }}</b>
-          条
-        </p>
-
-        <el-table
-          v-if="importResult.errors && importResult.errors.length > 0"
-          :data="importResult.errors"
-          border
-          size="small"
-          max-height="220"
-          style="width: 100%"
-        >
-          <el-table-column
-            prop="row"
-            label="Excel 行号"
-            width="110"
-            align="center"
-          />
-
-          <el-table-column
-            prop="studentNo"
-            label="学号"
-            width="150"
-            align="center"
-          />
-
-          <el-table-column
-            prop="reason"
-            label="失败原因"
-          />
-        </el-table>
-      </div>
-
-      <template #footer>
-        <el-button @click="importVisible = false">
-          关闭
-        </el-button>
-
-        <el-button
-          type="primary"
-          :disabled="!importFile"
-          :loading="importing"
-          @click="submitImport"
-        >
-          开始导入
-        </el-button>
-      </template>
-    </el-dialog>
-
   </div>
 </template>
 
@@ -398,17 +280,9 @@ import {
   Refresh,
   RefreshLeft,
   Search,
-  Upload,
-  UploadFilled,
 } from '@element-plus/icons-vue'
 
 import { getContestList } from '@/api/contest'
-
-import {
-  downloadPovertyTemplate,
-  getPovertyPermission,
-  importPovertyStudents,
-} from '@/api/poverty'
 
 /* ====================================================== */
 /* 筛选项                                                */
@@ -448,24 +322,6 @@ const total = ref(0)
 const pageNum = ref(1)
 
 const pageSize = ref(10)
-
-/* ====================================================== */
-/* 贫困生导入                                            */
-/* ====================================================== */
-
-const canImportPoverty = ref(false)
-
-const importVisible = ref(false)
-
-const importFile = ref(null)
-
-const importing = ref(false)
-
-const templateDownloading = ref(false)
-
-const importResult = ref(null)
-
-const importUploadRef = ref(null)
 
 /* ====================================================== */
 /* 列表加载                                              */
@@ -604,148 +460,10 @@ function statusTagType(status) {
 }
 
 /* ====================================================== */
-/* 权限                                                  */
-/* ====================================================== */
-
-async function loadPermission() {
-  try {
-    const res = await getPovertyPermission()
-
-    const data = res?.data || {}
-
-    canImportPoverty.value =
-      data.canImport === true || Number(data.canImport) === 1
-  } catch (error) {
-    canImportPoverty.value = false
-  }
-}
-
-/* ====================================================== */
-/* 导入贫困生名单                                        */
-/* ====================================================== */
-
-function openImportDialog() {
-  importFile.value = null
-
-  importResult.value = null
-
-  importUploadRef.value?.clearFiles()
-
-  importVisible.value = true
-}
-
-function handleImportFileChange(file) {
-  importFile.value = file.raw
-}
-
-function removeImportFile() {
-  importFile.value = null
-}
-
-async function downloadTemplate() {
-  templateDownloading.value = true
-
-  try {
-    const response = await downloadPovertyTemplate()
-
-    /*
-     * 下载失败时后端返回的是 JSON，
-     * 这里要提示真实原因，而不是当成 xlsx 保存。
-     */
-    if (
-      response instanceof Blob &&
-      (response.type || '').includes('json')
-    ) {
-      let message = '下载导入模板失败'
-
-      try {
-        const data = JSON.parse(await response.text())
-
-        message = data?.message || message
-      } catch (e) {
-        // 保持默认提示
-      }
-
-      ElMessage.error(message)
-
-      return
-    }
-
-    const blob = new Blob(
-      [response?.data || response],
-      {
-        type:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      },
-    )
-
-    const url = window.URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-
-    link.href = url
-
-    link.download = '贫困生名单导入模板.xlsx'
-
-    document.body.appendChild(link)
-
-    link.click()
-
-    document.body.removeChild(link)
-
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    ElMessage.error(error?.message || '下载导入模板失败')
-  } finally {
-    templateDownloading.value = false
-  }
-}
-
-async function submitImport() {
-  if (!importFile.value) {
-    ElMessage.warning('请先选择贫困生名单 Excel')
-
-    return
-  }
-
-  importing.value = true
-
-  importResult.value = null
-
-  try {
-    const formData = new FormData()
-
-    formData.append('file', importFile.value)
-
-    const res = await importPovertyStudents(formData)
-
-    if (res?.code !== 200) {
-      ElMessage.error(res?.message || '导入失败')
-
-      return
-    }
-
-    const result = res?.data || {}
-
-    importResult.value = result
-
-    ElMessage.success(result.message || '导入完成')
-
-    loadList()
-  } catch (error) {
-    ElMessage.error(error?.message || '导入失败')
-  } finally {
-    importing.value = false
-  }
-}
-
-/* ====================================================== */
 /* 初始化                                                */
 /* ====================================================== */
 
 onMounted(() => {
-  loadPermission()
-
   loadList()
 })
 
@@ -815,36 +533,6 @@ onMounted(() => {
   justify-content: flex-end;
 
   margin-top: 16px;
-}
-
-.import-tip {
-  margin-bottom: 14px;
-
-  font-size: 13px;
-
-  color: #606266;
-
-  line-height: 1.7;
-}
-
-.import-tip p {
-  margin: 0 0 6px;
-}
-
-.import-result {
-  margin-top: 16px;
-
-  font-size: 13px;
-
-  color: #606266;
-}
-
-.import-result .success-text {
-  color: #67c23a;
-}
-
-.import-result .fail-text {
-  color: #f56c6c;
 }
 
 </style>

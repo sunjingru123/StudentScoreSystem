@@ -37,10 +37,3 @@ jwt:
   # 生产环境必须设置 JWT_SECRET；应用不会再使用固定默认密钥。
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
-
-app:
-  poverty:
-    # 允许导入贫困生名单的辅导员姓名关键字，多个用英文逗号分隔。
-    # 只有辅导员端账号（辅导员 / 高级辅导员 / 教师）命中该关键字才能导入；
-    # 管理员始终可以导入。
-    import-names: ${POVERTY_IMPORT_NAMES:邹}
