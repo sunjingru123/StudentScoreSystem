@@ -33,7 +33,8 @@ import java.util.Set;
  * 业务约定：
  *
  * 1. 模板固定两列：学号 | 姓名；
- * 2. 以「学号」唯一匹配 sys_user；
+ * 2. 学号与姓名必须同时与 sys_user 一致，
+ *    只有两者都对上才认为是同一个学生；
  * 3. 只把名单中的学生标记为贫困生（poverty_status = 1），
  *    不在名单中的学生保持原有状态，不清空历史标记；
  * 4. 单行失败只记录原因（行号 / 学号 / 原因），
@@ -234,6 +235,18 @@ public class PovertyStudentImportService {
             }
 
 
+            /*
+             * 姓名必须填写：
+             * 缺少姓名就无法校验学号与姓名是否对应。
+             */
+            if (realName.isEmpty()) {
+
+                addError(errors, rowNo, studentNo, "姓名不能为空");
+
+                continue;
+            }
+
+
             if (!handledStudentNos.add(studentNo)) {
 
                 addError(errors, rowNo, studentNo, "该学号在文件中重复出现");
@@ -257,6 +270,24 @@ public class PovertyStudentImportService {
             if (user.getStatus() != null && user.getStatus() != 1) {
 
                 addError(errors, rowNo, studentNo, "该账号已被停用");
+
+                continue;
+            }
+
+
+            /*
+             * 学号与姓名必须同时匹配：
+             * 只有学号对上、姓名对不上时视为填错了学生，
+             * 一律不标记为贫困生。
+             */
+            if (!trim(user.getRealName()).equals(realName)) {
+
+                addError(
+                        errors,
+                        rowNo,
+                        studentNo,
+                        "学号与姓名不匹配"
+                );
 
                 continue;
             }

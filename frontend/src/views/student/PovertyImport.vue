@@ -86,7 +86,7 @@
           <template #tip>
 
             <div class="upload-tip">
-              支持 .xlsx / .xls 文件，模板固定两列：学号 | 姓名
+              支持 .xlsx / .xls 文件，模板固定两列：学号 | 姓名，学号与姓名必须与系统一致
             </div>
 
           </template>

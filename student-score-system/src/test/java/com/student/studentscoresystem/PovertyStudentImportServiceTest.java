@@ -157,6 +157,7 @@ class PovertyStudentImportServiceTest {
         SysUser user = new SysUser();
         user.setId(100L);
         user.setStudentNo("2024002");
+        user.setRealName("李四");
         user.setPovertyStatus((short) 0);
 
         when(sysUserMapper.selectList(any()))
@@ -184,6 +185,7 @@ class PovertyStudentImportServiceTest {
         SysUser user = new SysUser();
         user.setId(100L);
         user.setStudentNo("2024003");
+        user.setRealName("王五");
         user.setPovertyStatus((short) 1);
 
         when(sysUserMapper.selectList(any()))
@@ -196,6 +198,56 @@ class PovertyStudentImportServiceTest {
                 );
 
         assertEquals(1, result.get("successCount"));
+
+        verify(sysUserMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
+    void mismatchedRealNameIsRejected() {
+
+        SysUser user = new SysUser();
+        user.setId(100L);
+        user.setStudentNo("2024004");
+        user.setRealName("张三");
+        user.setPovertyStatus((short) 0);
+
+        when(sysUserMapper.selectList(any()))
+                .thenReturn(List.of(user));
+
+        Map<String, Object> result =
+                service.importPovertyStudents(
+                        OPERATOR_ID,
+                        buildFile(List.of(row("2024004", "李四")))
+                );
+
+        assertEquals(1, result.get("totalCount"));
+        assertEquals(0, result.get("successCount"));
+        assertEquals(1, result.get("failCount"));
+
+        verify(sysUserMapper, never()).updateById(any(SysUser.class));
+    }
+
+    @Test
+    void missingRealNameIsRejected() {
+
+        SysUser user = new SysUser();
+        user.setId(100L);
+        user.setStudentNo("2024005");
+        user.setRealName("张三");
+        user.setPovertyStatus((short) 0);
+
+        when(sysUserMapper.selectList(any()))
+                .thenReturn(List.of(user));
+
+        Map<String, Object> result =
+                service.importPovertyStudents(
+                        OPERATOR_ID,
+                        buildFile(List.of(row("2024005", null)))
+                );
+
+        assertEquals(1, result.get("totalCount"));
+        assertEquals(0, result.get("successCount"));
+        assertEquals(1, result.get("failCount"));
 
         verify(sysUserMapper, never()).updateById(any(SysUser.class));
     }

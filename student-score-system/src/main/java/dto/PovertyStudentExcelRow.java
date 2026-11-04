@@ -10,8 +10,9 @@ import lombok.Data;
  *
  * 学号 | 姓名
  *
- * 「学号」必填，用于唯一匹配 sys_user；
- * 「姓名」仅用于校验 / 提示，不参与匹配。
+ * 「学号」必填，用于匹配 sys_user；
+ * 「姓名」必填，且必须与学号对应的姓名一致，
+ * 两者任意一项对不上都不会被导入。
  */
 @Data
 public class PovertyStudentExcelRow {
