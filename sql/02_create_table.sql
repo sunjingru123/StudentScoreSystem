@@ -737,7 +737,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_score_rule_dept_name_score
 --
 -- 高级辅导员是辅导员端的一个岗位：
 --   1. 可以导出全年级 / 各部门 / 各班的加减分汇总；
---   2. 可以审核（并直接执行）档案部成员提交的成绩删除申请。
+--   2. 可以直接删除学生成绩（无需审核）。
+--
+-- 注意：审核档案部成员提交的成绩删除申请
+-- 只开放给「分管档案部的辅导员」（与管理员），
+-- 高级辅导员不具备该审核权。
 --
 -- sys_position 没有 UNIQUE(name)，这里用 NOT EXISTS 保证幂等，
 -- 重复部署不会重复插入，也不会覆盖已有岗位。
@@ -761,7 +765,7 @@ BEGIN
         END IF;
 
         INSERT INTO public.sys_position (name, description, status)
-        VALUES ('高级辅导员', '高级辅导员（可跨年级 / 部门 / 班级导出，并审核成绩删除申请）', 1);
+        VALUES ('高级辅导员', '高级辅导员（可跨年级 / 部门 / 班级导出）', 1);
     END IF;
 END $$;
 
@@ -769,7 +773,7 @@ END $$;
 -- 5.9 成绩删除申请表 score_record_delete_apply
 --
 -- 档案部部长 / 副部长删除学生加减分时，先提交删除申请，
--- 由「档案部负责辅导员」或「高级辅导员」审核通过后，
+-- 由「分管档案部的辅导员」审核通过后，
 -- 才真正执行逻辑删除（status = 0、admin_hidden = 1）。
 --
 -- status 含义：
