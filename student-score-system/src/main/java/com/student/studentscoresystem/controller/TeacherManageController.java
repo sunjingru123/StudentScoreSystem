@@ -206,6 +206,63 @@ public class TeacherManageController {
     }
 
     /**
+     * 解析前端提交的管理部门：
+     *
+     * departmentIds 优先，为空时回退到旧的单部门字段 departmentId。
+     * 自动去重并过滤空值。
+     */
+    private List<Long> resolveDepartmentIds(TeacherAddDTO dto) {
+
+        List<Long> result = new ArrayList<>();
+
+        if (dto == null) {
+            return result;
+        }
+
+        List<Long> source = dto.getDepartmentIds();
+
+        if ((source == null || source.isEmpty())
+                && dto.getDepartmentId() != null) {
+
+            source = List.of(dto.getDepartmentId());
+        }
+
+        if (source == null) {
+            return result;
+        }
+
+        for (Long departmentId : source) {
+
+            if (departmentId != null && !result.contains(departmentId)) {
+
+                result.add(departmentId);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 查询启用状态的业务部门，不存在或已停用返回 null。
+     */
+    private Department loadEnabledDepartment(Long departmentId) {
+
+        if (departmentId == null) {
+            return null;
+        }
+
+        Department department = departmentMapper.selectById(departmentId);
+
+        if (department == null
+                || !Short.valueOf((short) 1).equals(department.getStatus())) {
+
+            return null;
+        }
+
+        return department;
+    }
+
+    /**
      * 查询所有辅导员（含高级辅导员）
      */
     @GetMapping("/list")
@@ -271,11 +328,52 @@ public class TeacherManageController {
             vo.setStatus(user.getStatus());
             vo.setPositionName(positionNames.get(relation.getPositionId()));
 
-            Department department = findBusinessDepartment(relation);
+            /*
+             * 辅导员可以同时分管多个部门：
+             * department.teacher_id = 教师ID 的所有部门都是其负责部门。
+             */
+            List<Department> managedDepartments = departmentMapper.selectList(
+                    new LambdaQueryWrapper<Department>()
+                            .eq(Department::getTeacherId, user.getId())
+                            .orderByAsc(Department::getId)
+            );
 
-            if (department != null) {
-                vo.setDepartmentId(department.getId());
-                vo.setDepartmentName(department.getName());
+            List<Long> managedIds = new ArrayList<>();
+            List<String> managedNames = new ArrayList<>();
+
+            if (managedDepartments != null) {
+
+                for (Department department : managedDepartments) {
+
+                    if (department == null) {
+                        continue;
+                    }
+
+                    managedIds.add(department.getId());
+                    managedNames.add(department.getName());
+                }
+            }
+
+            /*
+             * 兼容旧数据：未占用 department.teacher_id 时，
+             * 回退到 sys_user_position 关联的部门。
+             */
+            if (managedNames.isEmpty()) {
+
+                Department fallback = findBusinessDepartment(relation);
+
+                if (fallback != null) {
+                    managedIds.add(fallback.getId());
+                    managedNames.add(fallback.getName());
+                }
+            }
+
+            vo.setDepartmentIds(managedIds);
+            vo.setDepartmentNames(managedNames);
+
+            if (!managedIds.isEmpty()) {
+                vo.setDepartmentId(managedIds.get(0));
+                vo.setDepartmentName(managedNames.get(0));
             }
 
             result.add(vo);
@@ -364,9 +462,9 @@ public class TeacherManageController {
             return Result.fail(positionName + "岗位不存在，请先创建该岗位");
         }
 
-        Department department = null;
+        List<Long> departmentIds = resolveDepartmentIds(dto);
 
-        SysDepartment sysDepartment;
+        List<Department> departments = new ArrayList<>();
 
         if (seniorCounselor) {
 
@@ -375,43 +473,47 @@ public class TeacherManageController {
              * 也不占用「一个部门一个辅导员」的名额；
              * 管理部门为可选项。
              */
-            if (dto.getDepartmentId() != null) {
+            if (!departmentIds.isEmpty()) {
 
-                department = departmentMapper.selectById(dto.getDepartmentId());
+                Department department =
+                        loadEnabledDepartment(departmentIds.get(0));
 
-                if (department == null
-                        || !Short.valueOf((short) 1).equals(department.getStatus())) {
+                if (department == null) {
                     return Result.fail("管理部门不存在");
                 }
 
-                sysDepartment = getOrCreateSysDepartment(department);
-
-            } else {
-
-                sysDepartment = getOrCreateStandaloneSysDepartment(
-                        SENIOR_COUNSELOR_POSITION_NAME);
+                departments.add(department);
             }
 
         } else {
 
-            if (dto.getDepartmentId() == null) {
+            if (departmentIds.isEmpty()) {
                 return Result.fail("请选择管理部门");
             }
 
-            department = departmentMapper.selectById(dto.getDepartmentId());
+            for (Long departmentId : departmentIds) {
 
-            if (department == null
-                    || !Short.valueOf((short) 1).equals(department.getStatus())) {
-                return Result.fail("管理部门不存在");
+                Department department =
+                        loadEnabledDepartment(departmentId);
+
+                if (department == null) {
+                    return Result.fail("管理部门不存在");
+                }
+
+                // 一个部门只能有一个辅导员
+                if (department.getTeacherId() != null) {
+                    return Result.fail(
+                            "部门「" + department.getName() + "」已经绑定辅导员"
+                    );
+                }
+
+                departments.add(department);
             }
-
-            // 一个部门只能有一个辅导员
-            if (department.getTeacherId() != null) {
-                return Result.fail("该部门已经绑定辅导员");
-            }
-
-            sysDepartment = getOrCreateSysDepartment(department);
         }
+
+        SysDepartment sysDepartment = departments.isEmpty()
+                ? getOrCreateStandaloneSysDepartment(SENIOR_COUNSELOR_POSITION_NAME)
+                : getOrCreateSysDepartment(departments.get(0));
 
         SysUser user = new SysUser();
         user.setStudentNo("T" + System.currentTimeMillis());
@@ -437,10 +539,17 @@ public class TeacherManageController {
 
         userPositionMapper.insert(relation);
 
-        if (!seniorCounselor && department != null) {
+        /*
+         * 辅导员可以同时分管多个部门：
+         * 把本次选择的部门全部绑定到该教师。
+         */
+        if (!seniorCounselor) {
 
-            department.setTeacherId(user.getId());
-            departmentMapper.updateById(department);
+            for (Department department : departments) {
+
+                department.setTeacherId(user.getId());
+                departmentMapper.updateById(department);
+            }
         }
 
         return Result.success(null);
@@ -506,50 +615,55 @@ public class TeacherManageController {
             return Result.fail(positionName + "岗位不存在");
         }
 
-        Department newDepartment = null;
+        List<Long> departmentIds = resolveDepartmentIds(dto);
 
-        SysDepartment newSysDepartment;
+        List<Department> newDepartments = new ArrayList<>();
 
         if (seniorCounselor) {
 
-            if (dto.getDepartmentId() != null) {
+            if (!departmentIds.isEmpty()) {
 
-                newDepartment = departmentMapper.selectById(dto.getDepartmentId());
+                Department department =
+                        loadEnabledDepartment(departmentIds.get(0));
 
-                if (newDepartment == null
-                        || !Short.valueOf((short) 1).equals(newDepartment.getStatus())) {
+                if (department == null) {
                     return Result.fail("管理部门不存在");
                 }
 
-                newSysDepartment = getOrCreateSysDepartment(newDepartment);
-
-            } else {
-
-                newSysDepartment = getOrCreateStandaloneSysDepartment(
-                        SENIOR_COUNSELOR_POSITION_NAME);
+                newDepartments.add(department);
             }
 
         } else {
 
-            if (dto.getDepartmentId() == null) {
+            if (departmentIds.isEmpty()) {
                 return Result.fail("请选择管理部门");
             }
 
-            newDepartment = departmentMapper.selectById(dto.getDepartmentId());
+            for (Long departmentId : departmentIds) {
 
-            if (newDepartment == null
-                    || !Short.valueOf((short) 1).equals(newDepartment.getStatus())) {
-                return Result.fail("管理部门不存在");
+                Department department =
+                        loadEnabledDepartment(departmentId);
+
+                if (department == null) {
+                    return Result.fail("管理部门不存在");
+                }
+
+                // 部门不能已经绑定其他辅导员
+                if (department.getTeacherId() != null
+                        && !department.getTeacherId().equals(id)) {
+
+                    return Result.fail(
+                            "部门「" + department.getName() + "」已经绑定其他辅导员"
+                    );
+                }
+
+                newDepartments.add(department);
             }
-
-            // 换部门时，新部门不能已经有其他辅导员
-            if (newDepartment.getTeacherId() != null
-                    && !newDepartment.getTeacherId().equals(id)) {
-                return Result.fail("该部门已经绑定其他辅导员");
-            }
-
-            newSysDepartment = getOrCreateSysDepartment(newDepartment);
         }
+
+        SysDepartment newSysDepartment = newDepartments.isEmpty()
+                ? getOrCreateStandaloneSysDepartment(SENIOR_COUNSELOR_POSITION_NAME)
+                : getOrCreateSysDepartment(newDepartments.get(0));
 
         // 一个账号只挂一个岗位，按用户维度查找原有岗位关系
         SysUserPosition relation = userPositionMapper.selectOne(
@@ -557,8 +671,6 @@ public class TeacherManageController {
                         .eq(SysUserPosition::getUserId, id)
                         .last("LIMIT 1")
         );
-
-        Department oldDepartment = findBusinessDepartment(relation);
 
         user.setRealName(realName);
         user.setUsername(username);
@@ -588,26 +700,57 @@ public class TeacherManageController {
         }
 
         /*
-         * 原部门是「该教师作为负责辅导员」的部门时解绑：
-         *   - 切换为高级辅导员；
-         *   - 或更换了负责部门。
+         * 重新绑定「该教师负责的部门」：
+         *
+         * 1. 先解绑不再负责的部门
+         *    （原负责部门不在本次选择内，或切换为高级辅导员）；
+         * 2. 再绑定本次选择的部门。
+         *
+         * 辅导员可以同时分管多个部门，
+         * 因此不再依赖单个 oldDepartment / newDepartment。
          */
-        boolean shouldUnbindOldDepartment =
-                oldDepartment != null
-                        && id.equals(oldDepartment.getTeacherId())
-                        && (seniorCounselor
-                            || newDepartment == null
-                            || !oldDepartment.getId().equals(newDepartment.getId()));
+        List<Department> selectedDepartments = new ArrayList<>();
 
-        if (shouldUnbindOldDepartment) {
-            oldDepartment.setTeacherId(null);
-            departmentMapper.updateById(oldDepartment);
+        if (!seniorCounselor) {
+            selectedDepartments.addAll(newDepartments);
+        }
+
+        List<Department> boundDepartments = departmentMapper.selectList(
+                new LambdaQueryWrapper<Department>()
+                        .eq(Department::getTeacherId, id)
+        );
+
+        if (boundDepartments != null) {
+
+            for (Department boundDepartment : boundDepartments) {
+
+                if (boundDepartment == null) {
+                    continue;
+                }
+
+                boolean keep = false;
+
+                for (Department selected : selectedDepartments) {
+
+                    if (selected.getId() != null
+                            && selected.getId().equals(boundDepartment.getId())) {
+
+                        keep = true;
+                        break;
+                    }
+                }
+
+                if (!keep) {
+                    boundDepartment.setTeacherId(null);
+                    departmentMapper.updateById(boundDepartment);
+                }
+            }
         }
 
         // 高级辅导员不占用 department.teacher_id
-        if (!seniorCounselor && newDepartment != null) {
-            newDepartment.setTeacherId(id);
-            departmentMapper.updateById(newDepartment);
+        for (Department selected : selectedDepartments) {
+            selected.setTeacherId(id);
+            departmentMapper.updateById(selected);
         }
 
         return Result.success(null);

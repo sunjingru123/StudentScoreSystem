@@ -108,14 +108,20 @@
         </el-table-column>
 
         <el-table-column
-          prop="departmentName"
           label="管理部门"
-          min-width="160"
+          min-width="200"
         >
           <template #default="{ row }">
-            <el-tag v-if="row.departmentName" type="primary">
-              {{ row.departmentName }}
-            </el-tag>
+            <template v-if="departmentNamesOf(row).length">
+              <el-tag
+                v-for="name in departmentNamesOf(row)"
+                :key="name"
+                type="primary"
+                class="department-tag"
+              >
+                {{ name }}
+              </el-tag>
+            </template>
 
             <span v-else class="empty-text">
               未绑定部门
@@ -258,10 +264,13 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="管理部门" prop="departmentId">
+        <el-form-item label="管理部门" prop="departmentIds">
           <el-select
-            v-model="form.departmentId"
-            placeholder="请选择管理部门"
+            v-model="form.departmentIds"
+            placeholder="请选择管理部门（可多选）"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
             clearable
             style="width: 100%"
           >
@@ -272,6 +281,10 @@
               :value="item.id"
             />
           </el-select>
+
+          <div class="form-tip">
+            辅导员可以同时分管多个部门
+          </div>
         </el-form-item>
 
         <el-form-item label="账号" prop="username">
@@ -356,7 +369,7 @@ const form = ref({
   id: null,
   realName: '',
   positionName: '辅导员',
-  departmentId: null,
+  departmentIds: [],
   username: '',
   password: '123456'
 })
@@ -366,7 +379,39 @@ const form = ref({
  * 高级辅导员不需要管理部门，清理掉旧的必填报错。
  */
 function handlePositionChange() {
-  formRef.value?.clearValidate('departmentId')
+  formRef.value?.clearValidate('departmentIds')
+}
+
+/*
+ * 教师表格 / 编辑弹窗统一取「负责部门名称列表」。
+ * 兼容后端旧字段 departmentName。
+ */
+function departmentNamesOf(row) {
+  if (!row) {
+    return []
+  }
+
+  if (Array.isArray(row.departmentNames) && row.departmentNames.length) {
+    return row.departmentNames
+  }
+
+  return row.departmentName ? [row.departmentName] : []
+}
+
+/*
+ * 编辑弹窗回填「负责部门ID列表」。
+ * 兼容后端旧字段 departmentId。
+ */
+function departmentIdsOf(row) {
+  if (!row) {
+    return []
+  }
+
+  if (Array.isArray(row.departmentIds) && row.departmentIds.length) {
+    return [...row.departmentIds]
+  }
+
+  return row.departmentId ? [row.departmentId] : []
 }
 
 // =========================================================
@@ -390,7 +435,7 @@ const rules = {
     }
   ],
 
-  departmentId: [
+  departmentIds: [
     {
       validator: (rule, value, callback) => {
 
@@ -402,7 +447,7 @@ const rules = {
           return
         }
 
-        if (value === null || value === undefined || value === '') {
+        if (!Array.isArray(value) || value.length === 0) {
           callback(new Error('请选择管理部门'))
           return
         }
@@ -449,7 +494,10 @@ const filteredList = computed(() => {
 
     const matchDepartment =
       search.value.departmentId === null ||
-      Number(item.departmentId) === Number(search.value.departmentId)
+      departmentIdsOf(item).some(
+        departmentId =>
+          Number(departmentId) === Number(search.value.departmentId)
+      )
 
     const matchStatus =
       search.value.status === null ||
@@ -528,7 +576,7 @@ function openAddDialog() {
     id: null,
     realName: '',
     positionName: '辅导员',
-    departmentId: null,
+    departmentIds: [],
     username: '',
     password: '123456'
   }
@@ -547,7 +595,7 @@ function openEditDialog(row) {
     id: row.id,
     realName: row.realName || '',
     positionName: row.positionName || '辅导员',
-    departmentId: row.departmentId || null,
+    departmentIds: departmentIdsOf(row),
     username: row.username || '',
     password: ''
   }
@@ -578,7 +626,7 @@ async function submitTeacher() {
         res = await updateTeacher(form.value.id, {
           realName: form.value.realName,
           positionName: form.value.positionName,
-          departmentId: form.value.departmentId,
+          departmentIds: form.value.departmentIds,
           username: form.value.username,
           password: form.value.password
         })
@@ -586,7 +634,7 @@ async function submitTeacher() {
         res = await addTeacher({
           realName: form.value.realName,
           positionName: form.value.positionName,
-          departmentId: form.value.departmentId,
+          departmentIds: form.value.departmentIds,
           username: form.value.username,
           password: form.value.password || '123456'
         })
@@ -747,6 +795,10 @@ onMounted(() => {
 
 .empty-text {
   color: #c0c4cc;
+}
+
+.department-tag {
+  margin: 2px 6px 2px 0;
 }
 
 .empty-box {
