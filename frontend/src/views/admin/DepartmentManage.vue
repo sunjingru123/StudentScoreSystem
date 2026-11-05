@@ -12,32 +12,70 @@
     </div>
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="departments" stripe>
-        <el-table-column prop="name" label="部门名称" min-width="220" />
-        <el-table-column label="状态" width="110">
+      <el-table
+        :key="isMobile ? 'mobile' : 'desktop'"
+        v-loading="loading"
+        :data="departments"
+        stripe
+      >
+        <el-table-column prop="name" label="部门名称" :min-width="isMobile ? 130 : 220" />
+        <el-table-column label="状态" :width="isMobile ? 78 : 110">
           <template #default="scope">
             <el-tag :type="Number(scope.row.status) === 1 ? 'success' : 'info'">
               {{ Number(scope.row.status) === 1 ? '启用' : '停用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" min-width="180" />
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column
+          v-if="!isMobile"
+          prop="createTime"
+          label="创建时间"
+          min-width="180"
+        />
+        <el-table-column label="操作" :width="isMobile ? 92 : 260" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="openMemberDialog(scope.row)">成员</el-button>
-            <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
-            <el-button
-              v-if="Number(scope.row.status) === 1"
-              link
-              type="danger"
-              @click="changeStatus(scope.row, false)"
-            >停用</el-button>
-            <el-button
-              v-else
-              link
-              type="success"
-              @click="changeStatus(scope.row, true)"
-            >启用</el-button>
+            <!--
+              手机端：操作列收成下拉，
+              避免固定列过宽遮住左侧可滑动的部门名称。
+            -->
+            <el-dropdown
+              v-if="isMobile"
+              trigger="click"
+              @command="(command) => handleRowAction(command, scope.row)"
+            >
+              <el-button link type="primary">
+                操作
+                <el-icon class="action-arrow"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="members">成员</el-dropdown-item>
+                  <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                  <el-dropdown-item
+                    :command="Number(scope.row.status) === 1 ? 'disable' : 'enable'"
+                  >
+                    {{ Number(scope.row.status) === 1 ? '停用' : '启用' }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+
+            <template v-else>
+              <el-button link type="primary" @click="openMemberDialog(scope.row)">成员</el-button>
+              <el-button link type="primary" @click="openEditDialog(scope.row)">编辑</el-button>
+              <el-button
+                v-if="Number(scope.row.status) === 1"
+                link
+                type="danger"
+                @click="changeStatus(scope.row, false)"
+              >停用</el-button>
+              <el-button
+                v-else
+                link
+                type="success"
+                @click="changeStatus(scope.row, true)"
+              >启用</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -52,7 +90,7 @@
     <el-dialog
       v-model="memberDialogVisible"
       :title="`部门成员 - ${currentDepartment?.name || ''}`"
-      width="780px"
+      :width="isMobile ? '94%' : '780px'"
       destroy-on-close
     >
       <div class="member-add">
@@ -118,7 +156,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="editId ? '编辑部门' : '新增部门'"
-      width="460px"
+      :width="isMobile ? '90%' : '460px'"
       destroy-on-close
     >
       <el-form
@@ -147,9 +185,9 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { ArrowDown, Plus } from '@element-plus/icons-vue'
 import {
   addDepartment,
   addDepartmentMember,
@@ -169,6 +207,13 @@ const dialogVisible = ref(false)
 const editId = ref(null)
 const formRef = ref(null)
 const form = reactive({ name: '' })
+
+/* 手机端布局开关（<= 768px） */
+const isMobile = ref(false)
+
+function syncViewport() {
+  isMobile.value = window.innerWidth <= 768
+}
 const rules = {
   name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }]
 }
@@ -212,6 +257,28 @@ function openEditDialog(row) {
   editId.value = row.id
   form.name = row.name || ''
   dialogVisible.value = true
+}
+
+/* 手机端操作下拉：成员 / 编辑 / 启停 */
+function handleRowAction(command, row) {
+  if (command === 'members') {
+    openMemberDialog(row)
+    return
+  }
+
+  if (command === 'edit') {
+    openEditDialog(row)
+    return
+  }
+
+  if (command === 'enable') {
+    changeStatus(row, true)
+    return
+  }
+
+  if (command === 'disable') {
+    changeStatus(row, false)
+  }
 }
 
 async function submitForm() {
@@ -377,7 +444,15 @@ async function removeMember(row) {
   }
 }
 
-onMounted(loadDepartments)
+onMounted(() => {
+  syncViewport()
+  window.addEventListener('resize', syncViewport)
+  loadDepartments()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
+})
 </script>
 
 <style scoped>
@@ -401,9 +476,15 @@ onMounted(loadDepartments)
 .member-select { flex: 1; }
 .position-select { width: 130px; }
 
+.action-arrow { margin-left: 2px; }
+
 @media (max-width: 768px) {
   .department-page { padding: 14px; }
-  .page-header { align-items: flex-start; }
+  .page-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
   .member-add { flex-wrap: wrap; }
+  .position-select { width: 100%; }
 }
 </style>
