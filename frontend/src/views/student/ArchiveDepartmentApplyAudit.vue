@@ -175,6 +175,7 @@
       <el-table
         ref="tableRef"
         v-loading="loading"
+        :key="isMobile ? 'mobile' : 'desktop'"
         :data="filteredList"
         row-key="id"
         border
@@ -190,6 +191,7 @@
         />
 
         <el-table-column
+          v-if="!isMobile"
           type="index"
           label="#"
           width="60"
@@ -385,6 +387,7 @@
 
         <!-- 申请时间 -->
         <el-table-column
+          v-if="!isMobile"
           prop="createTime"
           label="申请时间"
           width="180"
@@ -413,66 +416,120 @@
         <!-- 操作 -->
         <el-table-column
           label="操作"
-          width="280"
+          :width="isMobile ? 92 : 280"
           fixed="right"
           align="center"
         >
 
           <template #default="{ row }">
 
-            <el-button
-              type="primary"
-              link
-              :disabled="
-                processingId !== null ||
-                batchLoading
-              "
-              @click="openScoreDialog(row)"
+            <!--
+              手机端：操作收成下拉，
+              避免过宽的固定列遮住左侧的学生 / 申报人信息。
+            -->
+            <el-dropdown
+              v-if="isMobile"
+              trigger="click"
+              @command="(command) => handleRowAction(command, row)"
             >
 
-              修改分值
+              <el-button
+                link
+                type="primary"
+                :disabled="
+                  processingId !== null ||
+                  batchLoading
+                "
+              >
 
-            </el-button>
+                操作
+
+                <el-icon class="action-arrow">
+                  <ArrowDown />
+                </el-icon>
+
+              </el-button>
+
+              <template #dropdown>
+
+                <el-dropdown-menu>
+
+                  <el-dropdown-item command="score">
+                    修改分值
+                  </el-dropdown-item>
+
+                  <el-dropdown-item command="pass">
+                    通过
+                  </el-dropdown-item>
+
+                  <el-dropdown-item command="reject">
+                    驳回
+                  </el-dropdown-item>
+
+                </el-dropdown-menu>
+
+              </template>
+
+            </el-dropdown>
 
 
-            <el-button
-              type="success"
-              link
-              :loading="processingId === row.id && !rejectLoading"
-              :disabled="
-                processingId !== null ||
-                batchLoading
-              "
-              @click="pass(row)"
-            >
+            <template v-else>
 
-              <el-icon>
-                <CircleCheck />
-              </el-icon>
+              <el-button
+                type="primary"
+                link
+                :disabled="
+                  processingId !== null ||
+                  batchLoading
+                "
+                @click="openScoreDialog(row)"
+              >
 
-              通过
+                修改分值
 
-            </el-button>
+              </el-button>
 
 
-            <el-button
-              type="danger"
-              link
-              :loading="processingId === row.id && rejectLoading"
-              :disabled="
-                processingId !== null ||
-                batchLoading
-              "
-              @click="reject(row)"
-            >
+              <el-button
+                type="success"
+                link
+                :loading="processingId === row.id && !rejectLoading"
+                :disabled="
+                  processingId !== null ||
+                  batchLoading
+                "
+                @click="pass(row)"
+              >
 
-              <el-icon>
-                <CircleClose />
-              </el-icon>
+                <el-icon>
+                  <CircleCheck />
+                </el-icon>
 
-              驳回
+                通过
 
-            </el-button>
+              </el-button>
+
+
+              <el-button
+                type="danger"
+                link
+                :loading="processingId === row.id && rejectLoading"
+                :disabled="
+                  processingId !== null ||
+                  batchLoading
+                "
+                @click="reject(row)"
+              >
+
+                <el-icon>
+                  <CircleClose />
+                </el-icon>
+
+                驳回
+
+              </el-button>
+
+            </template>
 
           </template>
 
@@ -628,6 +685,7 @@ import {
 } from 'element-plus'
 
 import {
+  ArrowDown,
   Clock,
   Checked,
   CircleCheck,
@@ -668,6 +726,18 @@ const processingId = ref(null)
 const rejectLoading = ref(false)
 
 const processedCount = ref(0)
+
+
+/* 手机端布局开关（<= 768px） */
+const isMobile = ref(false)
+
+
+function syncViewport() {
+
+  isMobile.value =
+    window.innerWidth <= 768
+
+}
 
 
 /*
@@ -1788,19 +1858,67 @@ async function submitScore() {
 
 
 /* =========================================================
+   手机端下拉操作
+========================================================= */
+
+function handleRowAction(command, row) {
+
+  if (!row) {
+
+    return
+
+  }
+
+
+  if (command === 'score') {
+
+    openScoreDialog(row)
+
+    return
+
+  }
+
+
+  if (command === 'pass') {
+
+    pass(row)
+
+    return
+
+  }
+
+
+  if (command === 'reject') {
+
+    reject(row)
+
+  }
+
+}
+
+
+/* =========================================================
    页面初始化
 ========================================================= */
 
 onMounted(() => {
+
+  syncViewport()
+
+  window.addEventListener('resize', syncViewport)
 
   loadList()
 
 })
 
 
-onBeforeUnmount(
-  releaseAllProtectedFileUrls
-)
+onBeforeUnmount(() => {
+
+  window.removeEventListener('resize', syncViewport)
+
+  releaseAllProtectedFileUrls()
+
+})
 
 </script>
 
@@ -2212,6 +2330,18 @@ onBeforeUnmount(
 
 
 /* =========================================================
+   手机端操作下拉
+========================================================= */
+
+.action-arrow {
+
+  margin-left:
+    2px;
+
+}
+
+
+/* =========================================================
    响应式
 ========================================================= */
 
@@ -2277,6 +2407,12 @@ onBeforeUnmount(
 
     justify-content:
       space-between;
+
+    flex-wrap:
+      wrap;
+
+    gap:
+      8px;
 
   }
 
