@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -271,6 +272,86 @@ class DepartmentScoreArchiveAuditServiceTest {
 
         verify(applyService, never())
                 .updateById(any(DepartmentScoreApply.class));
+    }
+
+    @Test
+    void batchPassWithIdsApprovesOnlySelectedAndDeduplicates() {
+
+        when(scoreManagerPermissionService.isArchiveLeader(7L))
+                .thenReturn(true);
+
+        when(applyService.getById(10L))
+                .thenReturn(pendingApply(10L, 99L));
+
+        when(applyService.getById(11L))
+                .thenReturn(pendingApply(11L, 99L));
+
+        when(applyService.updateById(any(DepartmentScoreApply.class)))
+                .thenReturn(true);
+
+        BatchAuditResultVO result =
+                service.batchPass(
+                        7L,
+                        List.of(10L, 10L, 11L)
+                );
+
+        assertEquals(2, result.getTotal());
+        assertEquals(2, result.getSuccessCount());
+        assertEquals(0, result.getFailCount());
+
+        verify(applyService, times(1)).getById(10L);
+    }
+
+    @Test
+    void batchPassWithIdsIsDeniedWhenNotArchiveLeader() {
+
+        when(scoreManagerPermissionService.isArchiveLeader(7L))
+                .thenReturn(false);
+
+        BatchAuditResultVO result =
+                service.batchPass(
+                        7L,
+                        List.of(10L)
+                );
+
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(1, result.getFailCount());
+
+        verify(applyService, never())
+                .updateById(any(DepartmentScoreApply.class));
+    }
+
+    @Test
+    void batchPassWithEmptyIdsFallsBackToAllPending() {
+
+        when(scoreManagerPermissionService.isArchiveLeader(7L))
+                .thenReturn(true);
+
+        Wrapper<DepartmentScoreApply> anyWrapper =
+                any();
+
+        when(applyService.list(anyWrapper))
+                .thenReturn(
+                        List.of(
+                                pendingApply(10L, 99L)
+                        )
+                );
+
+        when(applyService.getById(10L))
+                .thenReturn(pendingApply(10L, 99L));
+
+        when(applyService.updateById(any(DepartmentScoreApply.class)))
+                .thenReturn(true);
+
+        BatchAuditResultVO result =
+                service.batchPass(
+                        7L,
+                        List.of()
+                );
+
+        assertEquals(1, result.getTotal());
+        assertEquals(1, result.getSuccessCount());
+        assertEquals(0, result.getFailCount());
     }
 
     @Test

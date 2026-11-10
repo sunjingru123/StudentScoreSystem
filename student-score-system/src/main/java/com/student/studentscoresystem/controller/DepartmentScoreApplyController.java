@@ -2,6 +2,7 @@ package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.dto.ArchiveBatchPassDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAddDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreApplyAuditDTO;
 import com.student.studentscoresystem.dto.DepartmentScoreArchiveScoreDTO;
@@ -2202,11 +2203,16 @@ public class DepartmentScoreApplyController {
 
     /*
      * =========================================================
-     * 档案部一键审批全部
+     * 档案部批量审批
      * =========================================================
+     *
+     * 支持两种用法：
+     *   1. 不传请求体 / ids 为空：一键通过全部待审核；
+     *   2. 传入 ids：只通过选中的申报。
      */
     @PutMapping("/archive-audit/batch-pass")
     public Result<BatchAuditResultVO> archiveBatchPass(
+            @RequestBody(required = false) ArchiveBatchPassDTO dto,
             HttpServletRequest request) {
 
 
@@ -2238,7 +2244,10 @@ public class DepartmentScoreApplyController {
         BatchAuditResultVO result =
                 departmentScoreArchiveAuditService
                         .batchPass(
-                                currentUserId
+                                currentUserId,
+                                dto == null
+                                        ? null
+                                        : dto.getIds()
                         );
 
 

@@ -13,7 +13,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -53,6 +55,11 @@ public class DepartmentScoreArchiveAuditService {
      */
     private static final String ARCHIVE_BATCH_PASS_REMARK =
             "一键审批通过";
+
+    /**
+     * 单次批量审批的最大条数，防止一次请求压垮数据库
+     */
+    private static final int MAX_BATCH_SIZE = 500;
 
     /**
      * 单个申报的分值上限，防止误填异常大值
@@ -432,6 +439,108 @@ public class DepartmentScoreArchiveAuditService {
 
                 result.addFailure(
                         message
+                );
+            }
+        }
+
+
+        return result;
+    }
+
+
+    /**
+     * =========================================================
+     * 批量通过「选中的」待档案部审核申报
+     * =========================================================
+     *
+     * ids 为空时退回 {@link #batchPass(Long)}，
+     * 即「一键通过全部」，保持原有行为不变。
+     *
+     * 逐条复用 {@link #archiveAudit}：
+     * 单条失败只记录原因（带申报 ID），不影响其它记录。
+     * =========================================================
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public BatchAuditResultVO batchPass(
+            Long reviewerId,
+            List<Long> ids) {
+
+        /*
+         * 未指定 ID 时等同于「一键通过全部」
+         */
+        if (ids == null || ids.isEmpty()) {
+
+            return batchPass(reviewerId);
+        }
+
+
+        BatchAuditResultVO result =
+                new BatchAuditResultVO();
+
+
+        if (!scoreManagerPermissionService.isArchiveLeader(reviewerId)) {
+
+            result.addFailure(
+                    "你不是档案部的部长或副部长，没有审核权限"
+            );
+
+            return result;
+        }
+
+
+        /*
+         * 去重并保持前端选择顺序
+         */
+        Set<Long> distinctIds =
+                new LinkedHashSet<>(ids);
+
+
+        if (distinctIds.size() > MAX_BATCH_SIZE) {
+
+            result.addFailure(
+                    "单次最多审批 "
+                            + MAX_BATCH_SIZE
+                            + " 条，请减少选择后再试"
+            );
+
+            return result;
+        }
+
+
+        result.setTotal(
+                distinctIds.size()
+        );
+
+
+        for (Long id : distinctIds) {
+
+            if (id == null) {
+
+                result.addFailure(
+                        "存在无效的申报记录（ID为空）"
+                );
+
+                continue;
+            }
+
+
+            String message =
+                    archiveAudit(
+                            id,
+                            reviewerId,
+                            (short) 1,
+                            ARCHIVE_BATCH_PASS_REMARK
+                    );
+
+
+            if (message == null) {
+
+                result.addSuccess();
+
+            } else {
+
+                result.addFailure(
+                        "申报" + id + "：" + message
                 );
             }
         }

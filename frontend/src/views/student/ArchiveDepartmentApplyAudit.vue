@@ -122,10 +122,32 @@
           <div class="toolbar-right">
 
             <el-button
+              type="primary"
+              :disabled="
+                selectedRows.length === 0 ||
+                batchLoading ||
+                selectedLoading ||
+                processingId !== null
+              "
+              :loading="selectedLoading"
+              @click="batchPassSelected"
+            >
+
+              <el-icon>
+                <Checked />
+              </el-icon>
+
+              通过选中（{{ selectedRows.length }}）
+
+            </el-button>
+
+
+            <el-button
               type="success"
               :disabled="
                 list.length === 0 ||
                 batchLoading ||
+                selectedLoading ||
                 processingId !== null
               "
               :loading="batchLoading"
@@ -151,13 +173,21 @@
            表格
       ====================================================== -->
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="filteredList"
         row-key="id"
         border
         stripe
         style="width: 100%"
+        @selection-change="handleSelectionChange"
       >
+
+        <el-table-column
+          type="selection"
+          width="46"
+          align="center"
+        />
 
         <el-table-column
           type="index"
@@ -625,6 +655,13 @@ const keyword = ref('')
 const loading = ref(false)
 
 const batchLoading = ref(false)
+
+/* 多选批量通过 */
+const selectedLoading = ref(false)
+
+const selectedRows = ref([])
+
+const tableRef = ref(null)
 
 const processingId = ref(null)
 
@@ -1164,6 +1201,203 @@ async function reject(row) {
 
 
 /* =========================================================
+   多选
+========================================================= */
+
+function handleSelectionChange(rows) {
+
+  selectedRows.value =
+    Array.isArray(rows)
+      ? rows
+      : []
+
+}
+
+
+function clearSelection() {
+
+  selectedRows.value = []
+
+  tableRef.value?.clearSelection()
+
+}
+
+
+/* =========================================================
+   通过选中的申报
+========================================================= */
+
+async function batchPassSelected() {
+
+  if (
+    batchLoading.value ||
+    selectedLoading.value
+  ) {
+
+    return
+
+  }
+
+
+  if (processingId.value !== null) {
+
+    return
+
+  }
+
+
+  const ids =
+    selectedRows.value
+      .map(row => row?.id)
+      .filter(id => id !== null && id !== undefined)
+
+
+  if (ids.length === 0) {
+
+    ElMessage.warning(
+      '请先勾选需要通过审核的申报'
+    )
+
+    return
+
+  }
+
+
+  try {
+
+    await ElMessageBox.confirm(
+
+      `确定通过选中的 ${ids.length} 条部门申报吗？`,
+
+      '批量通过确认',
+
+      {
+        confirmButtonText:
+          '通过选中',
+
+        cancelButtonText:
+          '取消',
+
+        type:
+          'success'
+      }
+
+    )
+
+  }
+
+  catch {
+
+    return
+
+  }
+
+
+  selectedLoading.value =
+    true
+
+
+  try {
+
+    const res =
+      await request.put(
+        '/departmentScoreApply/archive-audit/batch-pass',
+        { ids }
+      )
+
+
+    if (
+      !res ||
+      Number(res.code) !== 200
+    ) {
+
+      throw new Error(
+        res?.message ||
+        res?.msg ||
+        '批量通过失败'
+      )
+
+    }
+
+
+    const result =
+      res.data || {}
+
+
+    const successCount =
+      Number(result.successCount || 0)
+
+    const failCount =
+      Number(result.failCount || 0)
+
+
+    if (failCount === 0) {
+
+      ElMessage.success(
+        `成功通过 ${successCount} 条部门申报`
+      )
+
+    }
+
+    else {
+
+      ElMessage.warning(
+        `成功通过 ${successCount} 条，失败 ${failCount} 条`
+      )
+
+
+      if (
+        Array.isArray(result.failures) &&
+        result.failures.length > 0
+      ) {
+
+        console.warn(
+          '批量通过失败明细：',
+          result.failures
+        )
+
+      }
+
+    }
+
+
+    processedCount.value +=
+      successCount
+
+
+    clearSelection()
+
+
+    await loadList()
+
+  }
+
+  catch (error) {
+
+    console.error(
+      '批量通过失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      error?.message ||
+      '批量通过失败'
+    )
+
+  }
+
+  finally {
+
+    selectedLoading.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
    一键通过全部待审核
 ========================================================= */
 
@@ -1293,6 +1527,9 @@ async function batchPass() {
 
     processedCount.value +=
       successCount
+
+
+    clearSelection()
 
 
     await loadList()
