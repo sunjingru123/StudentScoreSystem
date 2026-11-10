@@ -27,6 +27,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -1676,6 +1685,120 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 "规则导入完成"
         );
     }
+
+    /**
+     * =========================================================
+     * 学生名单导入模板
+     * =========================================================
+     *
+     * 表头与 {@link StudentExcelRow} 的 @ExcelProperty 完全一致，
+     * 用户直接填写即可导入。
+     */
+    @Override
+    public byte[] buildStudentTemplateWorkbook() {
+
+        return buildTemplateWorkbook(
+                new String[]{"姓名", "班级", "学号"},
+                new int[]{16, 20, 20}
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 部门成员名单导入模板
+     * =========================================================
+     *
+     * 表头与 {@link DepartmentMemberExcelRow} 的 @ExcelProperty 完全一致。
+     */
+    @Override
+    public byte[] buildDepartmentMemberTemplateWorkbook() {
+
+        return buildTemplateWorkbook(
+                new String[]{"部门", "姓名", "学号", "职位"},
+                new int[]{20, 16, 20, 14}
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 生成只有表头的导入模板
+     * =========================================================
+     *
+     * 不写示例数据行：避免用户忘记删除示例行，
+     * 把“张三”之类的示例当成真实数据导进系统。
+     */
+    private byte[] buildTemplateWorkbook(
+            String[] headers,
+            int[] widths
+    ) {
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out =
+                     new ByteArrayOutputStream()) {
+
+            XSSFSheet sheet =
+                    workbook.createSheet("导入数据");
+
+            CellStyle headerStyle =
+                    workbook.createCellStyle();
+
+            Font headerFont =
+                    workbook.createFont();
+
+            headerFont.setBold(true);
+
+            headerStyle.setFont(headerFont);
+
+
+            Row header =
+                    sheet.createRow(0);
+
+
+            for (int i = 0; i < headers.length; i++) {
+
+                Cell cell =
+                        header.createCell(i);
+
+                cell.setCellValue(headers[i]);
+
+                cell.setCellStyle(headerStyle);
+            }
+
+
+            if (widths != null) {
+
+                for (
+                        int i = 0;
+                        i < widths.length
+                                && i < headers.length;
+                        i++) {
+
+                    sheet.setColumnWidth(
+                            i,
+                            widths[i] * 256
+                    );
+                }
+            }
+
+
+            sheet.createFreezePane(0, 1);
+
+
+            workbook.write(out);
+
+            return out.toByteArray();
+
+        } catch (IOException e) {
+
+            throw new IllegalStateException(
+                    "生成导入模板失败：" + e.getMessage(),
+                    e
+            );
+        }
+    }
+
 
     /**
      * =========================================================

@@ -21,6 +21,16 @@ public interface ExcelImportService {
     );
 
     /**
+     * 生成「学生名单导入」Excel 模板
+     */
+    byte[] buildStudentTemplateWorkbook();
+
+    /**
+     * 生成「部门成员名单导入」Excel 模板
+     */
+    byte[] buildDepartmentMemberTemplateWorkbook();
+
+    /**
      * 导入评分项目（规则）
      *
      * 部门 + 规则名称 已存在则更新，不存在则新增

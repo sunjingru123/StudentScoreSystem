@@ -22,9 +22,25 @@
           </p>
         </div>
 
-        <el-tag type="primary">
-          学生基础数据
-        </el-tag>
+        <div class="header-actions">
+
+          <el-button
+            type="primary"
+            plain
+            :loading="studentTemplateDownloading"
+            @click="downloadStudentTemplate"
+          >
+            <el-icon>
+              <Download />
+            </el-icon>
+            下载模板
+          </el-button>
+
+          <el-tag type="primary">
+            学生基础数据
+          </el-tag>
+
+        </div>
       </div>
 
       <div class="import-content">
@@ -116,9 +132,25 @@
           </p>
         </div>
 
-        <el-tag type="success">
-          部门干部数据
-        </el-tag>
+        <div class="header-actions">
+
+          <el-button
+            type="success"
+            plain
+            :loading="departmentTemplateDownloading"
+            @click="downloadDepartmentTemplate"
+          >
+            <el-icon>
+              <Download />
+            </el-icon>
+            下载模板
+          </el-button>
+
+          <el-tag type="success">
+            部门干部数据
+          </el-tag>
+
+        </div>
 
       </div>
 
@@ -387,7 +419,7 @@
 
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Document } from '@element-plus/icons-vue'
+import { Document, Download } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 const studentUploadRef = ref(null)
@@ -399,7 +431,149 @@ const departmentFile = ref(null)
 const studentImporting = ref(false)
 const departmentImporting = ref(false)
 
+const studentTemplateDownloading = ref(false)
+const departmentTemplateDownloading = ref(false)
+
 const lastImportResult = ref(null)
+
+
+/**
+ * =========================
+ * 模板下载
+ * =========================
+ */
+
+async function saveTemplateBlob(
+  response,
+  fileName,
+  fallbackMessage
+) {
+
+  /*
+   * 下载失败时后端返回的是 JSON，
+   * 这里要提示真实原因，而不是当成 xlsx 保存。
+   */
+  if (
+    response instanceof Blob &&
+    (response.type || '').includes('json')
+  ) {
+
+    let message = fallbackMessage
+
+    try {
+
+      const data = JSON.parse(
+        await response.text()
+      )
+
+      message = data?.message || message
+
+    } catch (error) {
+
+      // 保持默认提示
+
+    }
+
+    ElMessage.error(message)
+
+    return
+  }
+
+
+  const blob = new Blob(
+    [response?.data || response],
+    {
+      type:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+  )
+
+  const url = window.URL.createObjectURL(blob)
+
+  const link = document.createElement('a')
+
+  link.href = url
+
+  link.download = fileName
+
+  document.body.appendChild(link)
+
+  link.click()
+
+  document.body.removeChild(link)
+
+  window.URL.revokeObjectURL(url)
+}
+
+
+async function downloadStudentTemplate() {
+
+  studentTemplateDownloading.value = true
+
+  try {
+
+    const response = await request.get(
+      '/excel/import/students/template',
+      {
+        responseType: 'blob'
+      }
+    )
+
+    await saveTemplateBlob(
+      response,
+      '学生名单导入模板.xlsx',
+      '下载学生名单模板失败'
+    )
+
+  } catch (error) {
+
+    console.error('下载学生名单模板失败：', error)
+
+    ElMessage.error(
+      '下载学生名单模板失败'
+    )
+
+  } finally {
+
+    studentTemplateDownloading.value = false
+
+  }
+}
+
+
+async function downloadDepartmentTemplate() {
+
+  departmentTemplateDownloading.value = true
+
+  try {
+
+    const response = await request.get(
+      '/excel/import/department-members/template',
+      {
+        responseType: 'blob'
+      }
+    )
+
+    await saveTemplateBlob(
+      response,
+      '部门成员名单导入模板.xlsx',
+      '下载部门成员模板失败'
+    )
+
+  } catch (error) {
+
+    console.error('下载部门成员模板失败：', error)
+
+    ElMessage.error(
+      '下载部门成员模板失败'
+    )
+
+  } finally {
+
+    departmentTemplateDownloading.value = false
+
+  }
+}
 
 /**
  * =========================
@@ -773,6 +947,26 @@ async function importDepartmentMembers() {
   margin: 0;
   color: #909399;
   font-size: 14px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
 }
 
 .import-content {
