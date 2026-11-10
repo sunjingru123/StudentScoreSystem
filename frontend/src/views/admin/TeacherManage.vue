@@ -234,7 +234,7 @@
       <el-form
         ref="formRef"
         :model="form"
-        :rules="rules"
+        :rules="formRules"
         label-width="90px"
         @submit.prevent
       >
@@ -297,7 +297,11 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="密码" prop="password">
+        <el-form-item
+          v-if="!isEdit"
+          label="密码"
+          prop="password"
+        >
           <el-input
             v-model="form.password"
             type="password"
@@ -465,21 +469,38 @@ const rules = {
       message: '请输入账号',
       trigger: 'blur'
     }
-  ],
-
-  password: [
-    {
-      required: true,
-      message: '请输入密码',
-      trigger: 'blur'
-    },
-    {
-      min: 6,
-      message: '密码至少6位',
-      trigger: 'blur'
-    }
   ]
 }
+
+/*
+ * 密码只在新增教师时填写与校验；
+ * 编辑教师不修改密码，如需重置请使用列表中的「重置密码」。
+ */
+const formRules = computed(() => {
+
+  if (isEdit.value) {
+
+    return rules
+  }
+
+  return {
+
+    ...rules,
+
+    password: [
+      {
+        required: true,
+        message: '请输入密码',
+        trigger: 'blur'
+      },
+      {
+        min: 6,
+        message: '密码至少6位',
+        trigger: 'blur'
+      }
+    ]
+  }
+})
 
 // =========================================================
 // 前端筛选
@@ -627,8 +648,7 @@ async function submitTeacher() {
           realName: form.value.realName,
           positionName: form.value.positionName,
           departmentIds: form.value.departmentIds,
-          username: form.value.username,
-          password: form.value.password
+          username: form.value.username
         })
       } else {
         res = await addTeacher({
