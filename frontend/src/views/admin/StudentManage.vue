@@ -601,7 +601,7 @@
           <el-input
             v-model="addForm.studentNo"
             maxlength="20"
-            placeholder="必填，系统内唯一"
+            placeholder="必填，系统内唯一；同时作为登录用户名"
           />
 
         </el-form-item>
@@ -622,20 +622,6 @@
 
 
         <el-form-item
-          label="用户名"
-          prop="username"
-        >
-
-          <el-input
-            v-model="addForm.username"
-            maxlength="50"
-            placeholder="必填，用于登录，系统内唯一"
-          />
-
-        </el-form-item>
-
-
-        <el-form-item
           label="班级"
           prop="className"
         >
@@ -643,7 +629,7 @@
           <el-input
             v-model="addForm.className"
             maxlength="100"
-            placeholder="选填，例如：25级7班"
+            placeholder="必填，例如：2025级7班"
           />
 
         </el-form-item>
@@ -1873,8 +1859,6 @@ function createEmptyAddForm() {
 
     realName: '',
 
-    username: '',
-
     className: '',
 
     phone: '',
@@ -1910,10 +1894,10 @@ const addRules = {
     },
   ],
 
-  username: [
+  className: [
     {
       required: true,
-      message: '请输入用户名',
+      message: '请输入班级',
       trigger: 'blur',
     },
   ],
@@ -1987,15 +1971,18 @@ async function submitAddStudent() {
       studentNo:
         form.studentNo.trim(),
 
+      /*
+       * 登录用户名固定使用学号
+       */
+
+      username:
+        form.studentNo.trim(),
+
       realName:
         form.realName.trim(),
 
-      username:
-        form.username.trim(),
-
       className:
-        form.className.trim()
-        || undefined,
+        form.className.trim(),
 
       phone:
         form.phone.trim()

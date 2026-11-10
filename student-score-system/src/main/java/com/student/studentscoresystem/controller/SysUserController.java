@@ -1038,6 +1038,11 @@ public class SysUserController {
                         dto.getRealName()
                 );
 
+        String className =
+                trimToNull(
+                        dto.getClassName()
+                );
+
 
         if (studentNo == null) {
 
@@ -1047,11 +1052,15 @@ public class SysUserController {
         }
 
 
+        /*
+         * 登录用户名固定使用学号：
+         * 调用方未传 username 时自动取学号，
+         * 保持接口向后兼容。
+         */
+
         if (username == null) {
 
-            return Result.fail(
-                    "用户名不能为空"
-            );
+            username = studentNo;
         }
 
 
@@ -1059,6 +1068,14 @@ public class SysUserController {
 
             return Result.fail(
                     "姓名不能为空"
+            );
+        }
+
+
+        if (className == null) {
+
+            return Result.fail(
+                    "班级不能为空"
             );
         }
 
@@ -1175,9 +1192,7 @@ public class SysUserController {
         );
 
         user.setClassName(
-                trimToNull(
-                        dto.getClassName()
-                )
+                className
         );
 
         user.setStatus(
