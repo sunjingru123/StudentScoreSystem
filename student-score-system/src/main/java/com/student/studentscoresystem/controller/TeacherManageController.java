@@ -14,6 +14,7 @@ import com.student.studentscoresystem.mapper.SysDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.utils.NamePinyinUtil;
 import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.TeacherVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -122,6 +123,52 @@ public class TeacherManageController {
         }
 
         return positionName.trim();
+    }
+
+    /**
+     * 根据教师姓名生成唯一登录账号。
+     *
+     * 账号 = 姓名全拼；同名时自动追加序号，
+     * 例如 zhangsan、zhangsan2。
+     */
+    private String generateUniqueUsername(String realName) {
+
+        String base = NamePinyinUtil.toAccount(realName);
+
+        if (base.isEmpty()) {
+            // 姓名无法转换为拼音（如全为符号）时的兜底
+            base = "teacher";
+        }
+
+        String candidate = base;
+        int suffix = 2;
+
+        while (usernameExists(candidate)) {
+
+            candidate = base + suffix;
+            suffix++;
+
+            // 兜底：避免极端情况下死循环
+            if (suffix > 9999) {
+                candidate = base + System.currentTimeMillis();
+                break;
+            }
+        }
+
+        return candidate;
+    }
+
+    /**
+     * 判断账号是否已存在
+     */
+    private boolean usernameExists(String username) {
+
+        Long count = sysUserMapper.selectCount(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+        );
+
+        return count != null && count > 0;
     }
 
     /**
@@ -405,9 +452,14 @@ public class TeacherManageController {
 
     /**
      * 新增辅导员
+     *
+     * 账号不需要前端填写：
+     * 由教师姓名的完整拼音自动生成（如：孙靖茹 -> sunjingru），
+     * 同名时自动追加序号，生成结果通过 data 返回。
      */
     @PostMapping("/add")
-    public Result<Void> add(
+    @Transactional(rollbackFor = Exception.class)
+    public Result<String> add(
             @RequestBody TeacherAddDTO dto,
             HttpServletRequest request
     ) {
@@ -424,10 +476,6 @@ public class TeacherManageController {
                 ? ""
                 : dto.getRealName().trim();
 
-        String username = dto.getUsername() == null
-                ? ""
-                : dto.getUsername().trim();
-
         String password = dto.getPassword() == null
                 ? ""
                 : dto.getPassword();
@@ -436,22 +484,12 @@ public class TeacherManageController {
             return Result.fail("老师姓名不能为空");
         }
 
-        if (username.isEmpty()) {
-            return Result.fail("账号不能为空");
-        }
-
         if (password.isEmpty()) {
             return Result.fail("密码不能为空");
         }
 
-        Long usernameCount = sysUserMapper.selectCount(
-                new LambdaQueryWrapper<SysUser>()
-                        .eq(SysUser::getUsername, username)
-        );
-
-        if (usernameCount != null && usernameCount > 0) {
-            return Result.fail("账号已经存在");
-        }
+        // 账号由姓名全拼自动生成，忽略前端传入的账号
+        String username = generateUniqueUsername(realName);
 
         String positionName = normalizePositionName(dto.getPositionName());
 
@@ -554,7 +592,8 @@ public class TeacherManageController {
             }
         }
 
-        return Result.success(null);
+        // 返回自动生成的账号，便于管理员告知教师
+        return Result.success(username);
     }
 
     /**

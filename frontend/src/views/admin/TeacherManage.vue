@@ -244,6 +244,10 @@
             v-model="form.realName"
             placeholder="请输入教师姓名"
           />
+
+          <div v-if="!isEdit" class="form-tip">
+            登录账号自动取姓名全拼，例如：孙靖茹 → sunjingru
+          </div>
         </el-form-item>
 
         <el-form-item label="岗位" prop="positionName">
@@ -287,13 +291,13 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="账号" prop="username">
+        <el-form-item v-if="isEdit" label="账号" prop="username">
           <el-input
             v-model="form.username"
             placeholder="请输入登录账号"
           />
           <div class="form-tip">
-            建议使用教师姓名的完整拼音，例如：孙靖茹 → sunjingru
+            新增教师时账号由姓名全拼自动生成，此处仅供修改
           </div>
         </el-form-item>
 
@@ -461,16 +465,20 @@ const rules = {
       },
       trigger: 'change'
     }
-  ],
-
-  username: [
-    {
-      required: true,
-      message: '请输入账号',
-      trigger: 'blur'
-    }
   ]
 }
+
+/*
+ * 账号只在编辑教师时校验：
+ * 新增教师时账号由后端根据姓名全拼自动生成。
+ */
+const usernameRule = [
+  {
+    required: true,
+    message: '请输入账号',
+    trigger: 'blur'
+  }
+]
 
 /*
  * 密码只在新增教师时填写与校验；
@@ -480,7 +488,10 @@ const formRules = computed(() => {
 
   if (isEdit.value) {
 
-    return rules
+    return {
+      ...rules,
+      username: usernameRule
+    }
   }
 
   return {
@@ -655,15 +666,21 @@ async function submitTeacher() {
           realName: form.value.realName,
           positionName: form.value.positionName,
           departmentIds: form.value.departmentIds,
-          username: form.value.username,
           password: form.value.password || '123456'
         })
       }
 
       if (res?.code === 200) {
-        ElMessage.success(
-          isEdit.value ? '教师修改成功' : '教师新增成功'
-        )
+
+        if (isEdit.value) {
+          ElMessage.success('教师修改成功')
+        } else {
+          ElMessage.success(
+            res?.data
+              ? `教师新增成功，登录账号：${res.data}`
+              : '教师新增成功'
+          )
+        }
 
         dialogVisible.value = false
         await loadTeacherList()

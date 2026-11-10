@@ -101,6 +101,13 @@
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
+
+        <!-- ==================== 拼音（教师账号自动生成） ==================== -->
+        <dependency>
+            <groupId>com.belerweb</groupId>
+            <artifactId>pinyin4j</artifactId>
+            <version>2.5.1</version>
+        </dependency>
         <!-- ==================== Lombok ==================== -->
         <dependency>
             <groupId>org.projectlombok</groupId>
