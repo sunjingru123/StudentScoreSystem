@@ -57,6 +57,7 @@ public class SysUserController {
      * realName
      * className
      * status
+     * povertyStatus（1 = 贫困生，0 = 非贫困生，不传表示不筛选）
      *
      *
      * keyword 支持：
@@ -98,7 +99,10 @@ public class SysUserController {
             String className,
 
             @RequestParam(required = false)
-            Short status
+            Short status,
+
+            @RequestParam(required = false)
+            Short povertyStatus
 
     ) {
 
@@ -414,6 +418,24 @@ public class SysUserController {
             wrapper.eq(
                     SysUser::getStatus,
                     status
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 13-1. 贫困生筛选
+         * =====================================================
+         *
+         * poverty_status 在数据库中为 NOT NULL DEFAULT 0，
+         * 因此只需按等值过滤，无需处理 NULL 情况。
+         */
+
+        if (povertyStatus != null) {
+
+            wrapper.eq(
+                    SysUser::getPovertyStatus,
+                    povertyStatus
             );
         }
 
@@ -1475,6 +1497,13 @@ public class SysUserController {
 
         vo.setStatus(
                 user.getStatus()
+        );
+
+
+        vo.setPovertyStatus(
+                user.getPovertyStatus() != null
+                        ? user.getPovertyStatus().intValue()
+                        : 0
         );
 
 

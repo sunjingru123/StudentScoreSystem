@@ -79,6 +79,27 @@
           </el-input>
 
 
+          <el-select
+            v-model="povertyFilter"
+            placeholder="学生分类"
+            clearable
+            style="width: 150px"
+            @change="handleSearch"
+          >
+
+            <el-option
+              label="贫困生"
+              value="1"
+            />
+
+            <el-option
+              label="非贫困生"
+              value="0"
+            />
+
+          </el-select>
+
+
           <el-button
             type="primary"
             @click="handleSearch"
@@ -135,9 +156,21 @@
 
               <div class="student-info">
 
-                <strong>
-                  {{ scope.row.studentName || '未知学生' }}
-                </strong>
+                <div class="student-name">
+
+                  <strong>
+                    {{ scope.row.studentName || '未知学生' }}
+                  </strong>
+
+                  <el-tag
+                    v-if="Number(scope.row.povertyStatus) === 1"
+                    type="danger"
+                    size="small"
+                  >
+                    贫困生
+                  </el-tag>
+
+                </div>
 
                 <span>
                   {{ scope.row.username || '' }}
@@ -518,6 +551,11 @@ const total = ref(0)
 const searchKeyword = ref('')
 
 
+/* 学生分类筛选：'' = 全部，'1' = 贫困生，'0' = 非贫困生 */
+
+const povertyFilter = ref('')
+
+
 /* =========================================================
    学生详情
 ========================================================= */
@@ -561,6 +599,22 @@ async function load() {
 
       params.keyword =
         searchKeyword.value.trim()
+
+    }
+
+
+    /* =========================
+       贫困生筛选
+    ========================== */
+
+    if (
+      povertyFilter.value !== '' &&
+      povertyFilter.value !== null &&
+      povertyFilter.value !== undefined
+    ) {
+
+      params.povertyStatus =
+        povertyFilter.value
 
     }
 
@@ -777,6 +831,8 @@ function handleSearch() {
 function resetSearch() {
 
   searchKeyword.value = ''
+
+  povertyFilter.value = ''
 
   pageNum.value = 1
 
@@ -1249,6 +1305,15 @@ onMounted(() => {
   flex-direction: column;
 
   gap: 3px;
+}
+
+
+.student-name {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
 }
 
 
