@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.TeacherAddDTO;
 import com.student.studentscoresystem.entity.Department;
@@ -16,6 +17,7 @@ import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.TeacherVO;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -559,6 +561,7 @@ public class TeacherManageController {
      * 修改辅导员
      */
     @PutMapping("/update/{id}")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> update(
             @PathVariable Long id,
             @RequestBody TeacherAddDTO dto,
@@ -741,8 +744,21 @@ public class TeacherManageController {
                 }
 
                 if (!keep) {
-                    boundDepartment.setTeacherId(null);
-                    departmentMapper.updateById(boundDepartment);
+                    /*
+                     * 注意：MyBatis-Plus 默认 update-strategy 为 NOT_NULL，
+                     * updateById 会忽略值为 null 的字段，
+                     * 直接 setTeacherId(null) 后 updateById 不会生成
+                     * teacher_id = NULL 的 SQL，解绑会静默失败。
+                     * 因此这里必须使用 UpdateWrapper 显式置空。
+                     */
+                    if (boundDepartment.getId() != null) {
+                        departmentMapper.update(
+                                null,
+                                new LambdaUpdateWrapper<Department>()
+                                        .eq(Department::getId, boundDepartment.getId())
+                                        .set(Department::getTeacherId, null)
+                        );
+                    }
                 }
             }
         }
