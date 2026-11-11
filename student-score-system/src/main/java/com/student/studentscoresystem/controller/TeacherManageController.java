@@ -717,16 +717,16 @@ public class TeacherManageController {
         user.setRealName(realName);
         user.setUsername(username);
 
-        // 编辑时密码为空代表不修改密码
-        if (dto.getPassword() != null
-                && !dto.getPassword().isEmpty()) {
-
-            user.setPassword(PasswordUtil.encode(dto.getPassword()));
-
-            // 管理员重新设置密码后，要求教师下次登录修改
-            user.setFirstLogin((short) 1);
-        }
-
+        /*
+         * 编辑教师只更新姓名、账号、岗位和负责部门：
+         * 密码与「首次登录」状态一律保持不变。
+         *
+         * 之前这里会根据 dto.password 重置密码并置 first_login = 1，
+         * 导致管理员只改管理部门时，教师下次登录被强制要求修改密码
+         * （前端旧版本仍会带上默认密码 123456）。
+         *
+         * 需要修改密码请使用「重置密码」接口。
+         */
         sysUserMapper.updateById(user);
 
         if (relation == null) {
