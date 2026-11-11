@@ -117,6 +117,60 @@ public class SysSemesterController {
 
     /**
      * =========================================================
+     * 判断学期时间区间是否与已有学期重叠
+     * =========================================================
+     *
+     * 重叠公式：[start, end] 与 [已有.start, 已有.end] 有交集
+     * 即 已有.start <= end 且 已有.end >= start。
+     *
+     * @param excludeId 编辑时需要排除自身的 ID，新增传 null
+     */
+    private boolean hasDateOverlap(
+            Long excludeId,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+
+        if (startDate == null || endDate == null) {
+
+            return false;
+        }
+
+
+        LambdaQueryWrapper<SysSemester> wrapper =
+                new LambdaQueryWrapper<SysSemester>()
+                        .le(
+                                SysSemester::getStartDate,
+                                endDate
+                        )
+                        .ge(
+                                SysSemester::getEndDate,
+                                startDate
+                        );
+
+
+        if (excludeId != null) {
+
+            wrapper.ne(
+                    SysSemester::getId,
+                    excludeId
+            );
+        }
+
+
+        Long count =
+                sysSemesterMapper.selectCount(
+                        wrapper
+                );
+
+
+        return count != null
+                && count > 0;
+    }
+
+
+    /**
+     * =========================================================
      * 查询全部学期
      * =========================================================
      *
@@ -288,6 +342,20 @@ public class SysSemesterController {
 
             return Result.fail(
                     "结束日期不能早于开始日期"
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 2.1 检查时间区间是否与已有学期重叠
+         * =====================================================
+         */
+
+        if (hasDateOverlap(null, startDate, endDate)) {
+
+            return Result.fail(
+                    "该时间段与已有学期区间重叠，请检查开始 / 结束日期"
             );
         }
 
@@ -499,6 +567,20 @@ public class SysSemesterController {
 
             return Result.fail(
                     "结束日期不能早于开始日期"
+            );
+        }
+
+
+        /*
+         * =====================================================
+         * 3.1 检查时间区间是否与已有学期重叠（排除自身）
+         * =====================================================
+         */
+
+        if (hasDateOverlap(id, startDate, endDate)) {
+
+            return Result.fail(
+                    "该时间段与已有学期区间重叠，请检查开始 / 结束日期"
             );
         }
 
