@@ -585,11 +585,19 @@
       :close-on-click-modal="false"
     >
 
+      <!--
+        autocomplete="off"：
+        避免浏览器把已保存的登录凭据自动填到
+        「邮箱」「初始密码」等字段里
+        （测试报告 BUG-04）。
+      -->
+
       <el-form
         ref="addFormRef"
         :model="addForm"
         :rules="addRules"
         label-width="96px"
+        autocomplete="off"
         @submit.prevent
       >
 
@@ -601,6 +609,7 @@
           <el-input
             v-model="addForm.studentNo"
             maxlength="20"
+            autocomplete="off"
             placeholder="必填，系统内唯一；同时作为登录用户名"
           />
 
@@ -615,6 +624,7 @@
           <el-input
             v-model="addForm.realName"
             maxlength="50"
+            autocomplete="off"
             placeholder="必填"
           />
 
@@ -629,6 +639,7 @@
           <el-input
             v-model="addForm.className"
             maxlength="100"
+            autocomplete="off"
             placeholder="必填，例如：2025级7班"
           />
 
@@ -643,6 +654,7 @@
           <el-input
             v-model="addForm.phone"
             maxlength="20"
+            autocomplete="off"
             placeholder="选填"
           />
 
@@ -657,6 +669,7 @@
           <el-input
             v-model="addForm.email"
             maxlength="100"
+            autocomplete="off"
             placeholder="选填"
           />
 
@@ -673,6 +686,7 @@
             type="password"
             show-password
             maxlength="50"
+            autocomplete="new-password"
             placeholder="留空则使用默认密码 123456"
           />
 

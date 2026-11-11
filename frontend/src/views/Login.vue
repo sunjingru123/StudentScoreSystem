@@ -11,6 +11,23 @@
         学生综合测评系统
       </h2>
 
+      <!--
+        登录失败提示：
+
+        用页面内的持久提示条（不再只靠 3 秒就消失的 toast），
+        并直接展示后端区分好的原因
+        （账号不存在 / 密码错误 / 账号已停用 等）。
+      -->
+
+      <el-alert
+        v-if="loginError"
+        class="login-error"
+        :title="loginError"
+        type="error"
+        :closable="false"
+        show-icon
+      />
+
       <el-form-item>
         <el-input
           v-model="form.username"
@@ -70,6 +87,14 @@ const loading =
   ref(false)
 
 
+/*
+ * 登录失败提示（页面内持久显示）
+ */
+
+const loginError =
+  ref('')
+
+
 const form =
   reactive({
 
@@ -106,6 +131,9 @@ const handleLogin =
     loading.value =
       true
 
+    loginError.value =
+      ''
+
 
     try {
 
@@ -124,9 +152,12 @@ const handleLogin =
 
       if (res.code !== 200) {
 
+        loginError.value =
+          res.message
+          || '登录失败'
+
         ElMessage.error(
-          res.message ||
-          '登录失败'
+          loginError.value
         )
 
         return
@@ -139,8 +170,11 @@ const handleLogin =
 
       if (!user) {
 
+        loginError.value =
+          '登录信息异常，请稍后重试'
+
         ElMessage.error(
-          '登录信息异常'
+          loginError.value
         )
 
         return
@@ -231,12 +265,15 @@ const handleLogin =
       )
 
 
-      ElMessage.error(
+      loginError.value =
         error?.response?.data?.message
-        ||
-        error?.message
-        ||
-        '请求异常，请稍后重试'
+        || error?.response?.data?.msg
+        || error?.message
+        || '请求异常，请稍后重试'
+
+
+      ElMessage.error(
+        loginError.value
       )
 
     } finally {
@@ -261,6 +298,13 @@ const handleLogin =
   min-height: 100vh;
 
   background: #f5f7fa;
+
+}
+
+
+.login-error {
+
+  margin-bottom: 16px;
 
 }
 

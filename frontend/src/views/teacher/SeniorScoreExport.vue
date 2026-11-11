@@ -24,11 +24,25 @@
 
         <!-- 学期 -->
 
-        <el-form-item label="学期">
+        <el-form-item
+          label="学期"
+          required
+        >
 
           <el-select
             v-model="form.semesterId"
-            placeholder="请选择学期"
+            :loading="semesterLoading"
+            :disabled="semesterLoading"
+            :placeholder="
+              semesterLoading
+                ? '学期加载中…'
+                : '请选择学期'
+            "
+            :no-data-text="
+              semesterLoading
+                ? '加载中…'
+                : '暂无学期数据'
+            "
             style="width: 100%"
           >
 
@@ -40,6 +54,26 @@
             />
 
           </el-select>
+
+          <!-- 学期加载失败：给出原因与重试入口 -->
+
+          <div
+            v-if="semesterError"
+            class="semester-error"
+          >
+
+            <span>{{ semesterError }}</span>
+
+            <el-button
+              link
+              type="primary"
+              :loading="semesterLoading"
+              @click="loadSemesters"
+            >
+              重新加载
+            </el-button>
+
+          </div>
 
         </el-form-item>
 
@@ -172,6 +206,14 @@ const semesters = ref([])
 
 const loading = ref(false)
 
+/*
+ * 学期加载态与错误态：
+ * 未就绪时下拉不能渲染成「无数据」。
+ */
+const semesterLoading = ref(false)
+
+const semesterError = ref('')
+
 const options = reactive({
 
   grades: [],
@@ -213,6 +255,16 @@ function unwrap(res) {
 
 const loadSemesters = async () => {
 
+  if (semesterLoading.value) {
+
+    return
+
+  }
+
+  semesterLoading.value = true
+
+  semesterError.value = ''
+
   try {
 
     const result = unwrap(
@@ -223,9 +275,35 @@ const loadSemesters = async () => {
 
       semesters.value = result.data || []
 
+
+      /* 默认选中当前学期（status === 1） */
+      if (!form.semesterId && semesters.value.length > 0) {
+
+        const current =
+          semesters.value.find(
+            item => Number(item.status) === 1
+          )
+
+
+        form.semesterId =
+          current
+            ? current.id
+            : semesters.value[0].id
+
+      }
+
+
+      if (semesters.value.length === 0) {
+
+        semesterError.value =
+          '系统暂时没有学期数据，请先让管理员在「学期管理」中创建学期'
+
+      }
+
     } else {
 
-      ElMessage.error(result?.message || '获取学期失败')
+      semesterError.value =
+        result?.message || '获取学期失败'
 
     }
 
@@ -233,7 +311,14 @@ const loadSemesters = async () => {
 
     console.error('获取学期失败：', error)
 
-    ElMessage.error('获取学期失败')
+    semesterError.value =
+      error?.response?.data?.message
+      || error?.response?.data?.msg
+      || '获取学期失败'
+
+  } finally {
+
+    semesterLoading.value = false
 
   }
 
@@ -444,6 +529,25 @@ onMounted(() => {
 .page-header {
 
   margin-bottom: 20px;
+
+}
+
+
+.semester-error {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  margin-top: 6px;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+
+  color: #f56c6c;
 
 }
 

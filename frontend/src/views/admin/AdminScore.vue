@@ -504,7 +504,11 @@ import request from '@/utils/request'
  * 基础状态
  * ========================================================= */
 
-const loading = ref(false)
+/*
+ * 初始即为加载中：
+ * 避免首次渲染先闪一下「暂无学生数据」。
+ */
+const loading = ref(true)
 
 const detailLoading = ref(false)
 

@@ -3960,10 +3960,20 @@ async function submitDepartment() {
   }
 
 
-  const valid =
+  /*
+   * Element Plus 的 validate() 校验失败是 reject，
+   * 不是返回 false，必须用 try/catch 阻断提交。
+   */
+
+  try {
+
     await departmentFormRef.value.validate()
 
-  if (!valid) {
+  } catch {
+
+    ElMessage.warning(
+      '请先完善表单中标红的必填项'
+    )
 
     return
 

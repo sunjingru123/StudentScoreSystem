@@ -3,7 +3,12 @@
     <el-card>
       <template #header> 我的申请记录 </template>
 
-      <el-table :data="list" style="width: 100%">
+      <el-table
+        v-loading="loading"
+        :data="list"
+        :empty-text="loading ? '加载中…' : '暂无申请记录'"
+        style="width: 100%"
+      >
         <!--
           个人证书申请不绑定规则（ruleId 为空），
           后端把「项目名称」放在 title 里（= 获奖名称），
@@ -49,9 +54,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
+import { ElMessage } from 'element-plus'
+
 import request from '@/api/request'
 
 const list = ref([])
+
+/*
+ * 初始就是加载中，避免先闪一下「暂无申请记录」。
+ */
+const loading = ref(true)
 
 /*
  * =========================================================
@@ -94,11 +106,26 @@ function formatScore(row) {
   return score > 0 ? `+${score}` : `${score}`
 }
 
-onMounted(() => {
-  request.get('/scoreApply/my').then((res) => {
+async function loadRecords() {
+  loading.value = true
+
+  try {
+    const res = await request.get('/scoreApply/my')
 
     list.value = res?.data ?? []
-  })
+  } catch (error) {
+    console.error('获取申请记录失败：', error)
+
+    ElMessage.error(
+      error?.response?.data?.message || '获取申请记录失败'
+    )
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadRecords()
 })
 </script>
 

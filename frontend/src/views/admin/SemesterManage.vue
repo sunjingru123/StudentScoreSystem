@@ -72,6 +72,31 @@
 
 
     <!-- =====================================================
+         当前学期已过期提醒
+    ====================================================== -->
+
+    <el-alert
+      v-if="currentSemester && currentSemesterExpired"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="current-alert"
+      title="当前学期已超过结束日期，但仍在生效"
+    >
+
+      <div>
+
+        当前学期已于
+        <strong>{{ currentSemester.endDate }}</strong>
+        结束，成绩统计仍会归入该学期。
+        请尽快在下方设置新的当前学期。
+
+      </div>
+
+    </el-alert>
+
+
+    <!-- =====================================================
          学期列表
     ====================================================== -->
 
@@ -357,6 +382,41 @@ const semesters =
 
 const currentSemester =
   ref(null)
+
+
+/*
+ * 当前学期是否已经过期
+ *
+ * 现状：有效期结束后 status 仍然为 1，
+ * 成绩统计依然把它当作当前学期。
+ *
+ * 这里给出明确提醒，避免“过期学期一直在用”。
+ */
+
+const currentSemesterExpired =
+  computed(() => {
+
+    const endDate =
+      currentSemester.value?.endDate
+
+    if (!endDate) {
+
+      return false
+
+    }
+
+    const end =
+      new Date(`${endDate}T23:59:59`)
+
+    if (Number.isNaN(end.getTime())) {
+
+      return false
+
+    }
+
+    return end.getTime() < Date.now()
+
+  })
 
 
 const loading =

@@ -289,6 +289,19 @@ const rules = {
   confirmPassword: [
 
     {
+
+      required: true,
+
+      message:
+        '请再次输入新密码',
+
+      trigger:
+        'blur',
+
+    },
+
+    {
+
       validator:
       validateConfirmPassword,
 
@@ -316,6 +329,15 @@ const handleSubmit =
       await formRef.value.validate()
 
     } catch {
+
+      /*
+       * 校验失败时除了字段红字，
+       * 再给一条统一提示，避免用户以为什么都没发生。
+       */
+
+      ElMessage.warning(
+        '请先完善表单中标红的必填项'
+      )
 
       return
     }

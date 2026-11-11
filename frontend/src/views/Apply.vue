@@ -704,6 +704,22 @@ watch(
 
     }
 
+
+    /*
+     * 切换“有/无”凭证时，
+     * 另一分支的校验红字必须同步清除，
+     * 否则选“有”之后还挂着“请上传获奖凭证”之类的旧提示。
+     *
+     * 等用户真的触发校验（上传/提交）时再重新提示。
+     */
+
+    formRef.value?.clearValidate?.(
+      [
+        'materialFile',
+        'certificateReason',
+      ]
+    )
+
   }
 )
 
@@ -1135,24 +1151,40 @@ onBeforeUnmount(
 
 async function submitApply() {
 
+  /*
+   * 表单校验
+   *
+   * 注意：Element Plus 的 validate() 在校验失败时
+   * 会 reject，而不是返回 false。
+   *
+   * 所以不能用 `const valid = await validate()` + `if (!valid)`，
+   * 那样拿不到返回值，会直接跳到外层 catch，
+   * 弹出「申报提交失败，请稍后重试」这种误导性接口错误。
+   */
+
+  if (!formRef.value) {
+
+    return
+
+  }
+
+
   try {
 
-    /*
-     * 表单校验
-     */
+    await formRef.value.validate()
 
-    const valid =
-      await formRef.value.validate()
+  } catch {
+
+    ElMessage.warning(
+      '请先完善表单中标红的必填项'
+    )
+
+    return
+
+  }
 
 
-    if (
-      !valid
-    ) {
-
-      return
-
-    }
-
+  try {
 
     /*
      * 有凭证必须已经上传

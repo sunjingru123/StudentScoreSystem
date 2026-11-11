@@ -117,8 +117,15 @@
         <div class="detail-count">{{ detailList.length }} 条记录</div>
       </div>
 
+      <!-- 加载中 -->
+      <div v-if="loading" class="loading">
+        <div class="empty-icon">⏳</div>
+
+        <div class="empty-title">成绩加载中…</div>
+      </div>
+
       <!-- 空数据 -->
-      <div v-if="detailList.length === 0" class="empty">
+      <div v-else-if="detailList.length === 0" class="empty">
         <div class="empty-icon">📋</div>
 
         <div class="empty-title">暂无成绩记录</div>
@@ -179,6 +186,14 @@ import { getScore } from '@/api/score'
  * 学生姓名
  */
 const studentName = ref('')
+
+/*
+ * 加载状态：
+ *
+ * 初始就是加载中，
+ * 避免首次渲染先闪一下「暂无成绩记录」。
+ */
+const loading = ref(true)
 
 /*
  * 后端统计数据
@@ -336,6 +351,8 @@ async function loadScore() {
   if (!user) {
     console.warn('当前没有登录用户')
 
+    loading.value = false
+
     return
   }
 
@@ -347,8 +364,12 @@ async function loadScore() {
   if (!studentId) {
     console.error('无法获取学生ID')
 
+    loading.value = false
+
     return
   }
+
+  loading.value = true
 
   try {
     const res = await getScore(studentId)
@@ -402,6 +423,8 @@ async function loadScore() {
     }
   } catch (error) {
     console.error('查询成绩失败：', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -757,6 +780,11 @@ onMounted(() => {
 }
 
 /* 空状态 */
+
+.loading {
+  text-align: center;
+  padding: 70px 20px;
+}
 
 .empty {
   text-align: center;

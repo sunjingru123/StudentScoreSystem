@@ -87,7 +87,7 @@
           </el-icon>
 
           <span>
-            个人加分申报
+            个人证书申报
           </span>
 
         </el-menu-item>
@@ -261,7 +261,7 @@
 
         <el-menu-item index="/home/apply">
           <el-icon><DocumentAdd /></el-icon>
-          <span>个人加分申报</span>
+          <span>个人证书申报</span>
         </el-menu-item>
 
         <el-menu-item index="/home/record">

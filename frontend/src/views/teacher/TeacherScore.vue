@@ -530,7 +530,11 @@ import request from '@/utils/request'
 
 const list = ref([])
 
-const loading = ref(false)
+/*
+ * 初始即为加载中：
+ * 避免首次渲染先闪一下「暂无成绩数据」。
+ */
+const loading = ref(true)
 
 
 /* =========================================================
