@@ -195,6 +195,12 @@ public class FileInfoController {
                 originalFilename.toLowerCase();
 
 
+        /*
+         * 凭证材料支持：
+         *   PDF、图片（jpg / jpeg / png）、
+         *   Word 文档（doc / docx）
+         */
+
         boolean extensionAllowed =
                 lowerName.endsWith(".pdf")
                         ||
@@ -202,7 +208,11 @@ public class FileInfoController {
                         ||
                         lowerName.endsWith(".jpeg")
                         ||
-                        lowerName.endsWith(".png");
+                        lowerName.endsWith(".png")
+                        ||
+                        lowerName.endsWith(".doc")
+                        ||
+                        lowerName.endsWith(".docx");
 
 
         if (
@@ -210,7 +220,7 @@ public class FileInfoController {
         ) {
 
             return Result.error(
-                    "只允许上传 PDF、JPG、PNG 文件"
+                    "只允许上传 PDF、JPG、PNG、Word（doc / docx）文件"
             );
 
         }
@@ -655,6 +665,31 @@ public class FileInfoController {
 
         /*
          * =====================================================
+         * 4.1 探测失败时的按扩展名兜底
+         *
+         * 精简容器里没有 /etc/mime.types 时，
+         * Files.probeContentType 会返回 null，
+         * 此时 Word / PDF 只能拿到
+         * application/octet-stream，浏览器无法识别。
+         * =====================================================
+         */
+
+        if (
+                MediaType.APPLICATION_OCTET_STREAM.equals(
+                        mediaType
+                )
+        ) {
+
+            mediaType =
+                    resolveMediaTypeByFileName(
+                            fileInfo.getFileName()
+                    );
+
+        }
+
+
+        /*
+         * =====================================================
          * 5. 返回文件
          * =====================================================
          */
@@ -682,6 +717,49 @@ public class FileInfoController {
      * 取值与 sys_position.name 保持一致，
      * 不新增角色，仅覆盖现有审核岗位。
      */
+    /**
+     * 按文件名后缀推断 Content-Type。
+     *
+     * 只覆盖系统允许上传的凭证格式，
+     * 未知后缀仍然返回 application/octet-stream。
+     */
+    private MediaType resolveMediaTypeByFileName(String fileName) {
+
+        if (fileName == null || fileName.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        String lowerName = fileName.toLowerCase();
+
+        if (lowerName.endsWith(".pdf")) {
+            return MediaType.APPLICATION_PDF;
+        }
+
+        if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+            return MediaType.IMAGE_JPEG;
+        }
+
+        if (lowerName.endsWith(".png")) {
+            return MediaType.IMAGE_PNG;
+        }
+
+        if (lowerName.endsWith(".docx")) {
+            return MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            );
+        }
+
+        if (lowerName.endsWith(".doc")) {
+            return MediaType.parseMediaType(
+                    "application/msword"
+            );
+        }
+
+        return MediaType.APPLICATION_OCTET_STREAM;
+
+    }
+
+
     private static final Set<String> REVIEWER_POSITIONS = Set.of(
             "管理员",
             "辅导员",

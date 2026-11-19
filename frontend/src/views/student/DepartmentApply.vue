@@ -404,6 +404,36 @@
 
 
         <!-- ================================================== -->
+        <!-- 凭证材料 -->
+        <!-- ================================================== -->
+
+        <el-table-column
+          label="凭证"
+          width="110"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-button
+              v-if="row.evidenceUrl"
+              link
+              type="primary"
+              @click="openEvidence(row.evidenceUrl)"
+            >
+              查看材料
+            </el-button>
+
+            <span v-else>
+              无
+            </span>
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- ================================================== -->
         <!-- 申报时间 -->
         <!-- ================================================== -->
 
@@ -859,6 +889,73 @@
             readonly
             placeholder="选择加减分项目后自动显示项目说明"
           />
+
+        </el-form-item>
+
+
+
+        <!-- ================================================== -->
+        <!-- 凭证材料 -->
+        <!-- ================================================== -->
+
+        <el-form-item label="凭证材料">
+
+          <!-- 已上传 -->
+
+          <div
+            v-if="departmentForm.evidenceUrl"
+            style="display: flex; align-items: center; gap: 12px"
+          >
+
+            <el-tag type="success">
+              凭证已上传
+            </el-tag>
+
+            <el-button
+              link
+              type="primary"
+              @click="previewEvidence"
+            >
+              查看
+            </el-button>
+
+            <el-button
+              link
+              type="danger"
+              @click="removeEvidence"
+            >
+              重新上传
+            </el-button>
+
+          </div>
+
+
+          <!-- 未上传 -->
+
+          <el-upload
+            v-else
+            action="/api/file/upload"
+            name="file"
+            :headers="evidenceUploadHeaders"
+            :limit="1"
+            :show-file-list="false"
+            :before-upload="beforeEvidenceUpload"
+            :on-success="handleEvidenceUploadSuccess"
+            :on-error="handleEvidenceUploadError"
+          >
+
+            <el-button>
+              上传凭证
+            </el-button>
+
+          </el-upload>
+
+
+          <div class="form-tip">
+            可选。支持 Word（doc / docx）、PDF、JPG、JPEG、PNG，
+            单个文件不超过 10MB；
+            同一次提交的多名学生共用这一份凭证。
+          </div>
 
         </el-form-item>
 
@@ -1762,6 +1859,10 @@ import {
 
 import request from '@/utils/request'
 
+import {
+  openProtectedFile,
+} from '@/utils/filePreview'
+
 
 
 /* ====================================================== */
@@ -1863,6 +1964,15 @@ const departmentForm = reactive({
   newScore: null,
 
   newDescription: '',
+
+
+  /*
+   * 凭证材料地址（可选）
+   *
+   * 支持 Word / PDF / 图片，由 /file/upload 上传后回写。
+   */
+
+  evidenceUrl: '',
 
 })
 
@@ -3943,6 +4053,199 @@ async function submitImport() {
  * 单个失败不影响其他学生。
  */
 
+/* ====================================================== */
+/* 部门申报凭证材料 */
+/* ====================================================== */
+
+const EVIDENCE_MAX_SIZE = 10 * 1024 * 1024
+
+/*
+ * 后端 /file/upload 允许的凭证格式：
+ * Word（doc / docx）、PDF、图片。
+ */
+
+const EVIDENCE_EXTENSIONS = [
+  '.pdf',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.doc',
+  '.docx',
+]
+
+/*
+ * el-upload 不经过 axios，
+ * 必须自己带 Authorization。
+ */
+
+const evidenceUploadHeaders = {
+
+  Authorization:
+    localStorage.getItem('token')
+      ? 'Bearer ' +
+        localStorage.getItem('token')
+      : '',
+
+}
+
+
+function beforeEvidenceUpload(file) {
+
+  const fileName =
+    file?.name
+      ? file.name.toLowerCase()
+      : ''
+
+
+  const extensionAllowed =
+    EVIDENCE_EXTENSIONS.some(
+      (extension) => fileName.endsWith(extension)
+    )
+
+
+  if (!extensionAllowed) {
+
+    ElMessage.error(
+      '凭证只支持 Word（doc / docx）、PDF、JPG、JPEG、PNG 文件'
+    )
+
+    return false
+
+  }
+
+
+  if (file.size > EVIDENCE_MAX_SIZE) {
+
+    ElMessage.error(
+      '凭证文件大小不能超过 10MB'
+    )
+
+    return false
+
+  }
+
+
+  return true
+
+}
+
+
+function handleEvidenceUploadSuccess(response) {
+
+  /*
+   * HTTP 200 但业务失败（例如文件过大、目录不可写）
+   */
+
+  if (
+    response &&
+    response.code !== undefined &&
+    Number(response.code) !== 200
+  ) {
+
+    console.error(
+      '凭证上传后端返回失败：',
+      response
+    )
+
+    ElMessage.error(
+      response.message ||
+      response.msg ||
+      '凭证上传失败，请稍后重试'
+    )
+
+    return
+
+  }
+
+
+  const fileData =
+    response?.data && response.data.url
+      ? response.data
+      : response
+
+
+  if (!fileData || !fileData.url) {
+
+    console.error(
+      '凭证上传成功，但没有返回文件地址：',
+      response
+    )
+
+    ElMessage.error(
+      '凭证上传成功，但服务器没有返回文件地址'
+    )
+
+    return
+
+  }
+
+
+  departmentForm.evidenceUrl =
+    fileData.url
+
+
+  ElMessage.success(
+    '凭证上传成功'
+  )
+
+}
+
+
+function handleEvidenceUploadError() {
+
+  ElMessage.error(
+    '凭证上传失败，请检查文件格式与大小后重试'
+  )
+
+}
+
+
+function removeEvidence() {
+
+  departmentForm.evidenceUrl = ''
+
+}
+
+
+async function previewEvidence() {
+
+  if (!departmentForm.evidenceUrl) {
+
+    ElMessage.warning('还没有上传凭证')
+
+    return
+
+  }
+
+
+  await openProtectedFile(
+    departmentForm.evidenceUrl
+  )
+
+}
+
+
+/*
+ * 审核表格里查看申报人上传的凭证。
+ */
+
+function openEvidence(url) {
+
+  if (!url) {
+
+    ElMessage.warning('该申报没有上传凭证')
+
+    return
+
+  }
+
+
+  openProtectedFile(url)
+
+}
+
+
+
 async function submitDepartment() {
 
   if (!departmentFormRef.value) {
@@ -4179,6 +4482,13 @@ async function submitOneStudent(studentId) {
       templateId:
       departmentForm.templateId,
 
+      /*
+       * 凭证材料（可选）
+       */
+
+      evidenceUrl:
+      departmentForm.evidenceUrl || null,
+
     }
 
 
@@ -4276,6 +4586,9 @@ function resetDepartment() {
   departmentForm.templateId = null
 
 
+  departmentForm.evidenceUrl = ''
+
+
   /*
    * 清空新活动填写内容
    */
@@ -4321,6 +4634,8 @@ function resetDepartment() {
 function resetDepartmentAfterSubmit() {
 
   departmentForm.studentIds = []
+
+  departmentForm.evidenceUrl = ''
 
   departmentForm.newScoreType = 1
 

@@ -699,6 +699,11 @@ ALTER TABLE public.department_score_apply
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS activity_date DATE;
 
+-- 凭证材料（可选）：部门副部长 / 部长申报时上传的 Word / PDF / 图片地址
+-- 只新增列，不回填、不修改任何历史数据
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS evidence_url VARCHAR(1000);
+
 -- ==========================================
 -- 5.6 成绩记录来源唯一约束
 --
