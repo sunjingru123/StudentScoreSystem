@@ -1,6 +1,7 @@
 package com.student.studentscoresystem.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.common.Result;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 @RestController
 @RequestMapping("/user")
@@ -521,6 +524,52 @@ public class SysUserController {
 
         return Result.success(
                 voPage
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 学生班级列表（去重）
+     * =========================================================
+     *
+     * GET /user/student/classes
+     *
+     * 返回 sys_user.class_name 去重后的非空班级名称（升序）。
+     *
+     * 取数口径与 /scoreExport/senior/options 的班级列表一致，
+     * 供辅导员端、管理员端成绩查看的「班级」筛选下拉使用。
+     *
+     * =========================================================
+     */
+    @GetMapping("/student/classes")
+    public Result<List<String>> studentClasses() {
+
+        List<SysUser> classRows = sysUserMapper.selectList(
+                new QueryWrapper<SysUser>()
+                        .select("DISTINCT class_name")
+                        .isNotNull("class_name")
+                        .ne("class_name", "")
+        );
+
+        Set<String> classNames = new TreeSet<>();
+
+        if (classRows != null) {
+            for (SysUser row : classRows) {
+                if (row == null || row.getClassName() == null) {
+                    continue;
+                }
+
+                String className = row.getClassName().trim();
+
+                if (!className.isEmpty()) {
+                    classNames.add(className);
+                }
+            }
+        }
+
+        return Result.success(
+                new ArrayList<>(classNames)
         );
     }
 

@@ -100,6 +100,25 @@
           </el-select>
 
 
+          <el-select
+            v-model="classFilter"
+            placeholder="班级"
+            clearable
+            filterable
+            style="width: 180px"
+            @change="handleSearch"
+          >
+
+            <el-option
+              v-for="item in classOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+
+          </el-select>
+
+
           <el-button
             type="primary"
             @click="handleSearch"
@@ -560,6 +579,16 @@ const searchKeyword = ref('')
 const povertyFilter = ref('')
 
 
+/* 班级筛选：'' = 全部，其他为具体班级名称 */
+
+const classFilter = ref('')
+
+
+/* 班级下拉选项（来自后端去重后的班级列表） */
+
+const classOptions = ref([])
+
+
 /* =========================================================
    学生详情
 ========================================================= */
@@ -571,6 +600,37 @@ const detailLoading = ref(false)
 const detailRecords = ref([])
 
 const detailStudent = ref({})
+
+
+/* =========================================================
+   班级下拉选项
+========================================================= */
+
+async function loadClassOptions() {
+
+  try {
+
+    const res = await request.get(
+      '/user/student/classes'
+    )
+
+    const data = res?.data
+
+    classOptions.value =
+      Array.isArray(data) ? data : []
+
+  } catch (error) {
+
+    console.error(
+      '加载班级列表失败:',
+      error
+    )
+
+    classOptions.value = []
+
+  }
+
+}
 
 
 /* =========================================================
@@ -619,6 +679,21 @@ async function load() {
 
       params.povertyStatus =
         povertyFilter.value
+
+    }
+
+
+    /* =========================
+       班级筛选
+    ========================== */
+
+    if (
+      classFilter.value &&
+      classFilter.value.trim()
+    ) {
+
+      params.className =
+        classFilter.value.trim()
 
     }
 
@@ -837,6 +912,8 @@ function resetSearch() {
   searchKeyword.value = ''
 
   povertyFilter.value = ''
+
+  classFilter.value = ''
 
   pageNum.value = 1
 
@@ -1183,6 +1260,8 @@ function formatTime(time) {
 ========================================================= */
 
 onMounted(() => {
+
+  loadClassOptions()
 
   load()
 

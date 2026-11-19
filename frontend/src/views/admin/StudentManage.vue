@@ -89,6 +89,29 @@
         </el-form-item>
 
 
+        <el-form-item label="班级">
+
+          <el-select
+            v-model="classFilter"
+            placeholder="全部班级"
+            clearable
+            filterable
+            style="width: 180px"
+            @change="handleSearch"
+          >
+
+            <el-option
+              v-for="item in classOptions"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+
+          </el-select>
+
+        </el-form-item>
+
+
         <el-form-item>
 
           <el-button
@@ -861,6 +884,57 @@ const keyword =
   ref('')
 
 
+/* 班级筛选：'' = 全部班级 */
+
+const classFilter =
+  ref('')
+
+
+/* 班级下拉选项：来自后端 /user/student/classes */
+
+const classOptions =
+  ref([])
+
+
+/* =========================================================
+ * 班级下拉选项
+ * ========================================================= */
+
+async function loadClassOptions() {
+
+  try {
+
+    const res =
+      await request.get(
+        '/user/student/classes'
+      )
+
+
+    const data =
+      unwrapResult(res)
+
+
+    classOptions.value =
+      Array.isArray(data)
+        ? data
+        : []
+
+  } catch (error) {
+
+    /*
+     * 班级下拉加载失败不影响学生列表本身，
+     * 只记录错误，保留关键字搜索能力。
+     */
+    console.error(
+      '加载班级列表失败：',
+      error
+    )
+
+    classOptions.value = []
+  }
+}
+
+
 /* =========================================================
  * 成绩抽屉
  * ========================================================= */
@@ -966,6 +1040,10 @@ async function loadStudents() {
 
             keyword:
               keyword.value.trim()
+              || undefined,
+
+            className:
+              classFilter.value
               || undefined,
 
           },
@@ -1162,6 +1240,9 @@ function handleSearch() {
 function handleReset() {
 
   keyword.value =
+    ''
+
+  classFilter.value =
     ''
 
   pageNum.value =
@@ -2075,6 +2156,8 @@ async function submitAddStudent() {
  * ========================================================= */
 
 onMounted(() => {
+
+  loadClassOptions()
 
   loadStudents()
 
