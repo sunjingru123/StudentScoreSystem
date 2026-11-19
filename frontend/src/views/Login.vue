@@ -64,6 +64,7 @@
 <script setup>
 
 import {
+  onMounted,
   reactive,
   ref
 } from 'vue'
@@ -85,6 +86,33 @@ const router =
 
 const loading =
   ref(false)
+
+
+/*
+ * 被其它设备登录顶下线的提示
+ *
+ * request.js 在 401 时把后端 message 写入 loginNotice，
+ * 这里取出后立即清除，避免下次进入登录页重复提示。
+ */
+onMounted(() => {
+
+  const notice =
+    localStorage.getItem(
+      'loginNotice'
+    )
+
+
+  if (notice) {
+
+    localStorage.removeItem(
+      'loginNotice'
+    )
+
+    ElMessage.warning(
+      notice
+    )
+  }
+})
 
 
 /*

@@ -23,9 +23,16 @@ request.interceptors.response.use(
   },
   error => {
     if (error.response?.status === 401) {
+      const message = error.response?.data?.message
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      location.href = '/login'
+      // 记录失效原因（例如「账号已在其他设备登录」），登录页展示后清除
+      if (message) {
+        localStorage.setItem('loginNotice', message)
+      }
+      if (!location.pathname.startsWith('/login')) {
+        location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

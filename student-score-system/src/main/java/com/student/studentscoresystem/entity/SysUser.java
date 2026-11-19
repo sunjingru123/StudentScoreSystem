@@ -119,6 +119,18 @@ public class SysUser implements Serializable {
     private Short povertyStatus;
 
     /**
+     * 当前有效登录会话 ID
+     *
+     * 用于「同一账号不允许同时登录」：
+     * 登录时写入新的会话 ID，Token 中携带同样的 sid，
+     * 两者不一致即视为旧会话，立即失效。
+     *
+     * 属于内部状态，禁止通过 JSON 序列化返回前端。
+     */
+    @JsonIgnore
+    private String activeSessionId;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

@@ -1,5 +1,6 @@
 package com.student.studentscoresystem.interceptor;
 
+import com.student.studentscoresystem.service.UserSessionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
@@ -11,6 +12,19 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
 public class JwtInterceptor implements HandlerInterceptor {
+
+    /**
+     * 单账号登录会话校验
+     */
+    private final UserSessionService userSessionService;
+
+    public JwtInterceptor(
+            UserSessionService userSessionService
+    ) {
+
+        this.userSessionService =
+                userSessionService;
+    }
 
 
     @Override
@@ -214,7 +228,57 @@ public class JwtInterceptor implements HandlerInterceptor {
 
 
         // ==============================
-        // 8. 将 userId 放入 request
+        // 8. 单账号登录校验
+        // ==============================
+        //
+        // Token 中的 sid 必须等于该账号当前的会话 ID，
+        // 否则说明同一账号已在其它设备登录，
+        // 当前 Token 立即失效。
+        // ==============================
+
+        String sessionId = null;
+
+        try {
+
+            sessionId =
+                    claims.get(
+                            "sid",
+                            String.class
+                    );
+
+        } catch (
+                Exception e
+        ) {
+
+            sessionId = null;
+
+        }
+
+
+        if (
+                !userSessionService.isActiveSession(
+                        userId,
+                        sessionId
+                )
+        ) {
+
+            response.setStatus(401);
+
+            response.setContentType(
+                    "application/json;charset=UTF-8"
+            );
+
+            response.getWriter().write(
+                    "{\"message\":\"账号已在其他设备登录，请重新登录\"}"
+            );
+
+            return false;
+
+        }
+
+
+        // ==============================
+        // 9. 将 userId 放入 request
         // ==============================
         //
         // 后面的 Controller 可以直接：
@@ -231,7 +295,7 @@ public class JwtInterceptor implements HandlerInterceptor {
 
 
         // ==============================
-        // 9. Token 验证通过
+        // 10. Token 验证通过
         // ==============================
 
         return true;

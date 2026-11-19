@@ -39,13 +39,34 @@ public class JwtUtil {
     }
 
     public static String createToken(Long userId, String username) {
-        return Jwts.builder()
+        return createToken(userId, username, null);
+    }
+
+    /**
+     * 生成 Token
+     *
+     * sessionId 会写入 sid 声明，
+     * 供单账号登录校验使用（同一账号只允许一处在线）。
+     */
+    public static String createToken(
+            Long userId,
+            String username,
+            String sessionId
+    ) {
+
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(username)
                 .claim("userId", userId)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(SECRET_KEY)
-                .compact();
+                .signWith(SECRET_KEY);
+
+        if (sessionId != null && !sessionId.isBlank()) {
+
+            builder.claim("sid", sessionId);
+        }
+
+        return builder.compact();
     }
 
     public static Claims parseToken(String token) {

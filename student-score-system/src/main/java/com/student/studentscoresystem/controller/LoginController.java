@@ -13,6 +13,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.ISysUserService;
+import com.student.studentscoresystem.service.UserSessionService;
 import com.student.studentscoresystem.utils.JwtUtil;
 import com.student.studentscoresystem.utils.LegacyCompatPasswordEncoder;
 import com.student.studentscoresystem.utils.LoginFailureTracker;
@@ -48,6 +49,11 @@ public class LoginController {
     private final DepartmentMapper departmentMapper;
 
     /**
+     * 单账号登录会话
+     */
+    private final UserSessionService userSessionService;
+
+    /**
      * 密码编码器
      *
      * 统一使用 BCrypt，并兼容历史明文口令的恒定时间校验。
@@ -60,7 +66,8 @@ public class LoginController {
             SysUserPositionMapper sysUserPositionMapper,
             SysPositionMapper sysPositionMapper,
             SysUserDepartmentMapper sysUserDepartmentMapper,
-            DepartmentMapper departmentMapper
+            DepartmentMapper departmentMapper,
+            UserSessionService userSessionService
     ) {
 
         this.sysUserService =
@@ -77,6 +84,9 @@ public class LoginController {
 
         this.departmentMapper =
                 departmentMapper;
+
+        this.userSessionService =
+                userSessionService;
     }
 
     /**
@@ -368,12 +378,21 @@ public class LoginController {
 
         // =====================================================
         // 11. 创建 Token
+        //
+        // 同时开启新会话：同一账号只允许一处登录，
+        // 先前的 Token 会因会话 ID 不匹配而失效。
         // =====================================================
+
+        String sessionId =
+                userSessionService.startSession(
+                        user.getId()
+                );
 
         String token =
                 JwtUtil.createToken(
                         user.getId(),
-                        user.getUsername()
+                        user.getUsername(),
+                        sessionId
                 );
 
         vo.setToken(token);

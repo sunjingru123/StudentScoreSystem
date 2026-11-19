@@ -665,6 +665,15 @@ ALTER TABLE public.score_record
 ALTER TABLE public.sys_user
     ADD COLUMN IF NOT EXISTS first_login SMALLINT DEFAULT 0;
 
+-- 5.4.0 单账号登录会话标识
+--
+-- 同一账号同一时间只允许一处登录：
+-- 登录时写入新的会话 ID，Token 中携带同样的 sid，
+-- 两者不一致即视为旧会话，立即失效。
+-- 只新增列，不回填、不修改任何历史数据。
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS active_session_id VARCHAR(64);
+
 -- 5.4.1 困难学生标识（1 = 困难学生，0 = 普通学生）
 --
 -- 由辅导员端「导入困难学生名单」维护，
