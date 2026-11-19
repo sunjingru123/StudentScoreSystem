@@ -504,6 +504,32 @@ class DepartmentScoreApplyImportServiceTest {
         assertEquals(0, saved.size());
     }
 
+    /**
+     * 干事不再具备部门加减分申报（导入）权限
+     */
+    @Test
+    void officerCannotImport() throws Exception {
+
+        lenient()
+                .when(userDepartmentMapper.selectOne(any()))
+                .thenReturn(relation("干事"));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> importRows(
+                        new String[][]{
+                                {STUDENT_NO, STUDENT_NAME, "", PROJECT_NAME, "", ""}
+                        }
+                )
+        );
+
+        assertTrue(
+                error.getMessage().contains("申报权限")
+        );
+
+        assertEquals(0, saved.size());
+    }
+
     @Test
     void invalidDateFails() throws Exception {
 

@@ -61,7 +61,7 @@ import java.util.Set;
  *
  * 业务约束（与单条申报 /departmentScoreApply/add 保持一致）：
  *
- * 1. 只有该部门在职的干事 / 副部长 / 部长可以导入；
+ * 1. 只有该部门在职的副部长 / 部长可以导入（干事不具备该权限）；
  * 2. 项目必须来自本部门已启用的 department_score_template；
  * 3. 加分 / 减分类型和分值以项目模板为准，
  *    导入文件里的「分值」仅用于交叉校验，不会覆盖模板；
@@ -1295,7 +1295,7 @@ public class DepartmentScoreApplyImportService {
      * =========================================================
      * 校验当前用户具备该部门的申报权限
      *
-     * 岗位沿用系统现有数据：干事 / 副部长 / 部长
+     * 只有副部长 / 部长可以导入，干事不具备该权限。
      * =========================================================
      */
     private void requireApplyPermission(
@@ -1335,8 +1335,7 @@ public class DepartmentScoreApplyImportService {
                 relation.getPosition();
 
         boolean canApply =
-                "干事".equals(position)
-                        || "副部长".equals(position)
+                "副部长".equals(position)
                         || "部长".equals(position);
 
         if (!canApply) {

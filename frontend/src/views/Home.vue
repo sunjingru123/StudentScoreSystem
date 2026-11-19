@@ -428,9 +428,9 @@ const departments =
 //
 // 部长
 // 副部长
-// 干事
 //
-// 都可以进行部门加减分申报。
+// 可以进行部门加减分申报。
+// 干事不再具备该权限。
 // =========================================================
 
 function canDepartmentApply(position) {
@@ -439,9 +439,7 @@ function canDepartmentApply(position) {
 
     position === '部长' ||
 
-    position === '副部长' ||
-
-    position === '干事'
+    position === '副部长'
 
   )
 

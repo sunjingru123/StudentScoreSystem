@@ -95,15 +95,7 @@
 
           <div class="department-tip">
 
-            <span
-              v-if="item.position === '干事'"
-            >
-              你可以提交本部门学生加减分申报
-            </span>
-
-            <span
-              v-else
-            >
+            <span>
               你可以提交本部门学生加减分申报，并审核本部门其他成员提交的申报
             </span>
 
@@ -2440,7 +2432,7 @@ async function loadPermission() {
     /*
      * 部门申报权限
      *
-     * 干事 / 副部长 / 部长
+     * 副部长 / 部长
      */
 
     permission.canDepartmentApply =

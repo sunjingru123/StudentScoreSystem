@@ -160,7 +160,7 @@
             </div>
 
             <!--
-              部门申报（部长 / 副部长 / 干事）填写的备注
+              部门申报（部长 / 副部长）填写的备注
             -->
             <div v-if="item.remark" class="detail-remark">
               {{ item.remark }}
