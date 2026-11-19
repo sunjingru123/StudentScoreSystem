@@ -381,7 +381,7 @@ export function decideAccess({
   }
 
 
-  /* ---------- 学生端：困难学生名单导入（勤工助学部部长 / 副部长） ---------- */
+  /* ---------- 学生端：困难学生名单导入（勤工助学部部长 / 副部长、档案部部长） ---------- */
 
   if (flags.requiresPovertyImport) {
 
@@ -393,7 +393,7 @@ export function decideAccess({
 
         path: area,
 
-        warning: '只有勤工助学部的部长 / 副部长可以导入困难学生名单',
+        warning: '只有勤工助学部的部长 / 副部长或档案部部长可以导入困难学生名单',
 
       }
 

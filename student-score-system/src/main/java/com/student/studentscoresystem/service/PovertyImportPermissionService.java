@@ -8,6 +8,7 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * =========================================================
@@ -22,6 +23,11 @@ import java.util.List;
  *      sys_user_department.status = 1
  *      且 position 为 部长 / 副部长
  *      且所属部门为「勤工助学部」并被启用。
+ *
+ * 3. 「档案部」的部长
+ *      sys_user_department.status = 1
+ *      且 position 为 部长
+ *      且所属部门为「档案部」并被启用。
  *
  * 说明：
  *
@@ -44,10 +50,37 @@ public class PovertyImportPermissionService {
             "勤工助学部";
 
     /**
-     * 可导入困难学生名单的部门岗位
+     * 档案部名称
+     */
+    private static final String ARCHIVE_DEPARTMENT_NAME =
+            "档案部";
+
+    /**
+     * 部门 -> 可导入困难学生名单的岗位
+     *
+     * 勤工助学部：部长 / 副部长
+     * 档案部    ：部长
+     *
+     * 后续如需调整，只改这张映射表，不动其它判定逻辑。
+     */
+    private static final Map<String, List<String>> IMPORT_POSITIONS_BY_DEPARTMENT =
+            Map.of(
+                    WORK_STUDY_DEPARTMENT_NAME,
+                    List.of("部长", "副部长"),
+                    ARCHIVE_DEPARTMENT_NAME,
+                    List.of("部长")
+            );
+
+    /**
+     * 可导入困难学生名单的岗位（各平台并集，用于 SQL 预过滤）
      */
     private static final List<String> IMPORT_POSITIONS =
-            List.of("部长", "副部长");
+            IMPORT_POSITIONS_BY_DEPARTMENT
+                    .values()
+                    .stream()
+                    .flatMap(List::stream)
+                    .distinct()
+                    .toList();
 
 
     private final ScoreManagerPermissionService scoreManagerPermissionService;
@@ -122,11 +155,21 @@ public class PovertyImportPermissionService {
             }
 
 
+            String position =
+                    relation.getPosition();
+
+
+            if (position == null) {
+
+                continue;
+            }
+
+
             /*
              * 岗位二次校验：
              * 避免调用方传入异常数据时误放行。
              */
-            if (!IMPORT_POSITIONS.contains(relation.getPosition())) {
+            if (!IMPORT_POSITIONS.contains(position.trim())) {
 
                 continue;
             }
@@ -153,9 +196,25 @@ public class PovertyImportPermissionService {
             }
 
 
-            if (WORK_STUDY_DEPARTMENT_NAME.equals(
-                    department.getName().trim()
-            )) {
+            /*
+             * 按部门取可导入岗位：
+             *
+             * 勤工助学部：部长 / 副部长
+             * 档案部    ：部长
+             */
+            List<String> allowedPositions =
+                    IMPORT_POSITIONS_BY_DEPARTMENT.get(
+                            department.getName().trim()
+                    );
+
+
+            if (allowedPositions == null) {
+
+                continue;
+            }
+
+
+            if (allowedPositions.contains(position.trim())) {
 
                 return true;
             }

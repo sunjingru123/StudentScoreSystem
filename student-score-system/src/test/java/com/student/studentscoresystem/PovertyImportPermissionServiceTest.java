@@ -27,12 +27,14 @@ import static org.mockito.Mockito.when;
  *   1. 管理员
  *   2. 勤工助学部部长
  *   3. 勤工助学部副部长
+ *   4. 档案部部长
  *
  * 拒绝：
- *   4. 勤工助学部干事
- *   5. 其他部门部长
- *   6. 普通学生
- *   7. 未登录
+ *   5. 勤工助学部干事
+ *   6. 档案部副部长
+ *   7. 其他部门部长
+ *   8. 普通学生
+ *   9. 未登录
  * =========================================================
  */
 class PovertyImportPermissionServiceTest {
@@ -49,9 +51,15 @@ class PovertyImportPermissionServiceTest {
 
     private static final long STUDENT_ID = 6L;
 
+    private static final long ARCHIVE_MINISTER_ID = 7L;
+
+    private static final long ARCHIVE_DEPUTY_ID = 8L;
+
     private static final long WORK_STUDY_DEPARTMENT_ID = 10L;
 
     private static final long OTHER_DEPARTMENT_ID = 20L;
+
+    private static final long ARCHIVE_DEPARTMENT_ID = 30L;
 
     private ScoreManagerPermissionService scoreManagerPermissionService;
 
@@ -169,13 +177,45 @@ class PovertyImportPermissionServiceTest {
     }
 
     @Test
+    void archiveMinisterCanImport() {
+
+        givenMember(
+                ARCHIVE_MINISTER_ID,
+                "部长",
+                ARCHIVE_DEPARTMENT_ID,
+                "档案部"
+        );
+
+        assertTrue(
+                service.canImportPovertyList(ARCHIVE_MINISTER_ID),
+                "档案部部长可以导入困难学生名单"
+        );
+    }
+
+    @Test
+    void archiveDeputyCannotImport() {
+
+        givenMember(
+                ARCHIVE_DEPUTY_ID,
+                "副部长",
+                ARCHIVE_DEPARTMENT_ID,
+                "档案部"
+        );
+
+        assertFalse(
+                service.canImportPovertyList(ARCHIVE_DEPUTY_ID),
+                "档案部副部长不在授权范围内"
+        );
+    }
+
+    @Test
     void otherDepartmentMinisterCannotImport() {
 
         givenMember(
                 OTHER_DEPARTMENT_MINISTER_ID,
                 "部长",
                 OTHER_DEPARTMENT_ID,
-                "档案部"
+                "学习部"
         );
 
         assertFalse(

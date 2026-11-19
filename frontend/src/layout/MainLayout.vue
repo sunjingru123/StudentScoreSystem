@@ -180,8 +180,8 @@
 
 
         <!--
- ★ 勤工助学部困难学生名单导入
- ★ 仅部长 / 副部长
+ ★ 困难学生名单导入
+ ★ 勤工助学部部长 / 副部长、档案部部长
 -->
 
         <el-menu-item
@@ -502,7 +502,7 @@ const archiveApplyAudit =
   ref(false)
 
 
-// 勤工助学部部长 / 副部长：导入困难学生名单
+// 勤工助学部部长 / 副部长、档案部部长：导入困难学生名单
 const povertyImporter =
   ref(false)
 
@@ -671,7 +671,7 @@ async function loadPermission() {
     /*
      * 困难学生名单导入：
      *
-     * 仅勤工助学部的部长 / 副部长，
+     * 勤工助学部部长 / 副部长、档案部部长，
      * 以后端返回的 canImportPoverty 为准
      */
 

@@ -1210,7 +1210,7 @@ public class DepartmentScoreApplyController {
 
         /*
          * 困难学生名单导入权限：
-         * 仅勤工助学部的部长 / 副部长（以及管理员）可以导入。
+         * 勤工助学部的部长 / 副部长、档案部部长（以及管理员）。
          */
         data.put(
                 "canImportPoverty",
