@@ -42,7 +42,7 @@
           :closable="false"
           show-icon
           title="没有导入权限"
-          description="只有勤工助学部的部长 / 副部长或档案部部长可以导入困难学生名单。"
+          description="只有档案部部长可以导入困难学生名单。"
         />
 
       </div>

@@ -301,7 +301,7 @@ const router = createRouter({
         // ===================================================
         // 困难学生名单导入
         //
-        // 勤工助学部部长 / 副部长、档案部部长
+        // 档案部部长
         // ===================================================
 
         {
@@ -854,7 +854,7 @@ async function loadAuthContext(storedUser) {
 
       /*
        * 困难学生名单导入：
-       * 勤工助学部部长 / 副部长、档案部部长，以后端返回为准。
+       * 档案部部长，以后端返回为准。
        */
       canImportPoverty =
         data.canImportPoverty === true || Number(data.canImportPoverty) === 1

@@ -25,11 +25,11 @@ import static org.mockito.Mockito.when;
  *
  * 允许：
  *   1. 管理员
- *   2. 勤工助学部部长
- *   3. 勤工助学部副部长
- *   4. 档案部部长
+ *   2. 档案部部长
  *
  * 拒绝：
+ *   3. 勤工助学部部长
+ *   4. 勤工助学部副部长
  *   5. 勤工助学部干事
  *   6. 档案部副部长
  *   7. 其他部门部长
@@ -132,7 +132,7 @@ class PovertyImportPermissionServiceTest {
     }
 
     @Test
-    void workStudyMinisterCanImport() {
+    void workStudyMinisterCannotImport() {
 
         givenMember(
                 WORK_STUDY_MINISTER_ID,
@@ -141,13 +141,14 @@ class PovertyImportPermissionServiceTest {
                 "勤工助学部"
         );
 
-        assertTrue(
-                service.canImportPovertyList(WORK_STUDY_MINISTER_ID)
+        assertFalse(
+                service.canImportPovertyList(WORK_STUDY_MINISTER_ID),
+                "导入权限已从勤工助学部收回"
         );
     }
 
     @Test
-    void workStudyDeputyCanImport() {
+    void workStudyDeputyCannotImport() {
 
         givenMember(
                 WORK_STUDY_DEPUTY_ID,
@@ -156,8 +157,9 @@ class PovertyImportPermissionServiceTest {
                 "勤工助学部"
         );
 
-        assertTrue(
-                service.canImportPovertyList(WORK_STUDY_DEPUTY_ID)
+        assertFalse(
+                service.canImportPovertyList(WORK_STUDY_DEPUTY_ID),
+                "导入权限已从勤工助学部收回"
         );
     }
 
