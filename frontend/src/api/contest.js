@@ -8,7 +8,7 @@ import request from '@/utils/request'
  *   keyword       学号 / 姓名 / 班级
  *   awardLevel    国家级 / 省级 / 校级 / 院级
  *   awardCategory A / B / C / OTHER
- *   povertyStatus 1 = 贫困生，0 = 非贫困生
+ *   povertyStatus 1 = 困难学生，0 = 普通学生
  * =========================================================
  */
 

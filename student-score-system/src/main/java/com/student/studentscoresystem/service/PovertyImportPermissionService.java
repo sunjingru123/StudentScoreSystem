@@ -11,10 +11,10 @@ import java.util.List;
 
 /**
  * =========================================================
- * 贫困生名单导入权限判定
+ * 困难学生名单导入权限判定
  * =========================================================
  *
- * 谁可以导入贫困生名单：
+ * 谁可以导入困难学生名单：
  *
  * 1. 系统管理员（运维需要）；
  *
@@ -44,7 +44,7 @@ public class PovertyImportPermissionService {
             "勤工助学部";
 
     /**
-     * 可导入贫困生名单的部门岗位
+     * 可导入困难学生名单的部门岗位
      */
     private static final List<String> IMPORT_POSITIONS =
             List.of("部长", "副部长");
@@ -74,7 +74,7 @@ public class PovertyImportPermissionService {
     }
 
     /**
-     * 当前用户是否可以导入贫困生名单
+     * 当前用户是否可以导入困难学生名单
      */
     public boolean canImportPovertyList(Long userId) {
 

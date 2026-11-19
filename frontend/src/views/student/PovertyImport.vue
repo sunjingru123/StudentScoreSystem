@@ -15,12 +15,12 @@
 
             <el-icon><Upload /></el-icon>
 
-            <span>贫困生名单导入</span>
+            <span>困难学生名单导入</span>
 
           </div>
 
           <div class="card-subtitle">
-            下载模板后填写学号、姓名，再上传即可把名单中的学生标记为贫困生
+            下载模板后填写学号、姓名，再上传即可把名单中的学生标记为困难学生
           </div>
 
         </div>
@@ -42,7 +42,7 @@
           :closable="false"
           show-icon
           title="没有导入权限"
-          description="只有勤工助学部的部长 / 副部长可以导入贫困生名单。"
+          description="只有勤工助学部的部长 / 副部长可以导入困难学生名单。"
         />
 
       </div>
@@ -83,7 +83,7 @@
           </el-radio>
 
           <el-radio value="replace">
-            按名单覆盖（清除名单外的贫困生标记）
+            按名单覆盖（清除名单外的困难学生标记）
           </el-radio>
 
         </el-radio-group>
@@ -93,7 +93,7 @@
           v-if="importMode === 'replace'"
           class="mode-tip"
         >
-          覆盖模式下，本次名单即最终结果：名单外的学生会被取消贫困生标记。
+          覆盖模式下，本次名单即最终结果：名单外的学生会被取消困难学生标记。
         </div>
 
 
@@ -296,7 +296,7 @@ async function loadPermission() {
   } catch (error) {
 
     console.error(
-      '获取贫困生导入权限失败：',
+      '获取困难学生导入权限失败：',
       error
     )
 
@@ -368,7 +368,7 @@ async function downloadTemplate() {
 
     link.href = url
 
-    link.download = '贫困生名单导入模板.xlsx'
+    link.download = '困难学生名单导入模板.xlsx'
 
     document.body.appendChild(link)
 
@@ -429,7 +429,7 @@ async function submitImport() {
 
 
   /*
-   * 覆盖模式会清除名单外学生的贫困生标记，
+   * 覆盖模式会清除名单外学生的困难学生标记，
    * 属于批量数据变更，提交前必须二次确认。
    */
   if (importMode.value === 'replace') {
@@ -437,7 +437,7 @@ async function submitImport() {
     try {
 
       await ElMessageBox.confirm(
-        '覆盖模式会把本次名单作为最终结果，名单外的学生将被取消贫困生标记。确定继续吗？',
+        '覆盖模式会把本次名单作为最终结果，名单外的学生将被取消困难学生标记。确定继续吗？',
         '确认覆盖导入',
         {
           type: 'warning',

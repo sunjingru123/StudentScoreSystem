@@ -57,7 +57,7 @@ public class SysUserController {
      * realName
      * className
      * status
-     * povertyStatus（1 = 贫困生，0 = 非贫困生，不传表示不筛选）
+     * povertyStatus（1 = 困难学生，0 = 普通学生，不传表示不筛选）
      *
      *
      * keyword 支持：
@@ -424,7 +424,7 @@ public class SysUserController {
 
         /*
          * =====================================================
-         * 13-1. 贫困生筛选
+         * 13-1. 困难学生筛选
          * =====================================================
          *
          * poverty_status 在数据库中为 NOT NULL DEFAULT 0，

@@ -28,12 +28,12 @@ import static org.mockito.Mockito.when;
 
 /**
  * =========================================================
- * 贫困生名单导入单元测试
+ * 困难学生名单导入单元测试
  * =========================================================
  *
  * 重点验证：
  *
- * 1. 名单中的学号会被标记为贫困生；
+ * 1. 名单中的学号会被标记为困难学生；
  * 2. 学号不存在 / 为空只记录失败，不影响其他行；
  * 3. 文件内重复学号只处理一次；
  * 4. 无权限、空文件直接阻断。
@@ -73,7 +73,7 @@ class PovertyStudentImportServiceTest {
                 new ByteArrayOutputStream();
 
         EasyExcel.write(out, PovertyStudentExcelRow.class)
-                .sheet("贫困生名单")
+                .sheet("困难学生名单")
                 .doWrite(rows);
 
         return new MockMultipartFile(

@@ -18,11 +18,11 @@ import java.util.Map;
 
 /**
  * =========================================================
- * 贫困生管理
+ * 困难学生管理
  * =========================================================
  *
- * 勤工助学部的部长 / 副部长导入贫困生名单，
- * 用于后续按「贫困生 / 非贫困生」筛选学生参加的比赛。
+ * 勤工助学部的部长 / 副部长导入困难学生名单，
+ * 用于后续按「困难学生 / 普通学生」筛选学生参加的比赛。
  *
  * 所有权限均以后端判定为准，前端只控制按钮显示。
  * =========================================================
@@ -48,7 +48,7 @@ public class PovertyStudentController {
     }
 
     /**
-     * 当前用户是否可以导入贫困生名单
+     * 当前用户是否可以导入困难学生名单
      */
     @GetMapping("/permission")
     public Result<Map<String, Object>> permission(
@@ -86,7 +86,7 @@ public class PovertyStudentController {
     }
 
     /**
-     * 下载贫困生名单导入模板
+     * 下载困难学生名单导入模板
      */
     @GetMapping("/template")
     public void template(
@@ -143,7 +143,7 @@ public class PovertyStudentController {
 
         String fileName =
                 URLEncoder.encode(
-                        "贫困生名单导入模板.xlsx",
+                        "困难学生名单导入模板.xlsx",
                         StandardCharsets.UTF_8
                 ).replace("+", "%20");
 
@@ -173,10 +173,10 @@ public class PovertyStudentController {
     }
 
     /**
-     * 导入贫困生名单
+     * 导入困难学生名单
      *
      * mode = append（默认）：只新增 / 修正标记，不清除名单外学生；
-     * mode = replace        ：以本次名单为准，清除名单外的贫困生标记。
+     * mode = replace        ：以本次名单为准，清除名单外的困难学生标记。
      */
     @PostMapping("/import")
     public Result<Map<String, Object>> importPovertyStudents(

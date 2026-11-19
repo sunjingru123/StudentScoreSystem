@@ -88,12 +88,12 @@
           >
 
             <el-option
-              label="贫困生"
+              label="困难学生"
               value="1"
             />
 
             <el-option
-              label="非贫困生"
+              label="普通学生"
               value="0"
             />
 
@@ -167,7 +167,7 @@
                     type="danger"
                     size="small"
                   >
-                    贫困生
+                    困难学生
                   </el-tag>
 
                 </div>
@@ -555,7 +555,7 @@ const total = ref(0)
 const searchKeyword = ref('')
 
 
-/* 学生分类筛选：'' = 全部，'1' = 贫困生，'0' = 非贫困生 */
+/* 学生分类筛选：'' = 全部，'1' = 困难学生，'0' = 普通学生 */
 
 const povertyFilter = ref('')
 
@@ -608,7 +608,7 @@ async function load() {
 
 
     /* =========================
-       贫困生筛选
+       困难学生筛选
     ========================== */
 
     if (

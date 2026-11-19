@@ -8,7 +8,7 @@
       <div class="title-box">
         <div>
           <h2>比赛筛选</h2>
-          <p>按获奖级别、获奖类别、贫困生分类筛选学生参加的比赛（仅统计已通过的）</p>
+          <p>按获奖级别、获奖类别、困难学生分类筛选学生参加的比赛（仅统计已通过的）</p>
         </div>
 
         <div class="title-actions">
@@ -82,12 +82,12 @@
           @change="handleSearch"
         >
           <el-option
-            label="贫困生"
+            label="困难学生"
             value="1"
           />
 
           <el-option
-            label="非贫困生"
+            label="普通学生"
             value="0"
           />
         </el-select>
@@ -161,14 +161,14 @@
               v-if="Number(scope.row.povertyStatus) === 1"
               type="danger"
             >
-              贫困生
+              困难学生
             </el-tag>
 
             <el-tag
               v-else
               type="info"
             >
-              非贫困生
+              普通学生
             </el-tag>
           </template>
         </el-table-column>

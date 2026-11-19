@@ -29,9 +29,9 @@ public class StudentVO {
 
 
     /**
-     * 贫困生标识
+     * 困难学生标识
      *
-     * 1 = 贫困生，0 = 非贫困生
+     * 1 = 困难学生，0 = 普通学生
      */
     private Integer povertyStatus;
 

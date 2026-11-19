@@ -1120,7 +1120,7 @@ public class ScoreApplyController {
      * 筛选维度：
      *   1. 获奖级别 awardLevel（国家级 / 省级 / 校级 / 院级）
      *   2. 获奖类别 awardCategory（A / B / C / OTHER）
-     *   3. 贫困生 povertyStatus（1 = 贫困生，0 = 非贫困生）
+     *   3. 困难学生 povertyStatus（1 = 困难学生，0 = 普通学生）
      *   4. 关键字 keyword（学号 / 姓名 / 班级）
      *
      * 权限：辅导员 / 高级辅导员 / 教师 / 档案部部长·副部长 / 管理员，
@@ -1441,9 +1441,9 @@ public class ScoreApplyController {
 
 
     /**
-     * 解析贫困生筛选参数
+     * 解析困难学生筛选参数
      *
-     * 空值 / 非法值返回 null，表示不按贫困生过滤。
+     * 空值 / 非法值返回 null，表示不按困难学生过滤。
      */
     private Integer parsePovertyStatus(
             String value
@@ -1486,7 +1486,7 @@ public class ScoreApplyController {
 
     /**
      * ========================================================
-     * 按学号 / 姓名 / 班级 / 贫困生标识筛出候选学生
+     * 按学号 / 姓名 / 班级 / 困难学生标识筛出候选学生
      *
      * 返回 null 表示学生条件为空，不做学生维度限制。
      * ========================================================
@@ -2869,7 +2869,7 @@ public class ScoreApplyController {
                 );
 
                 /*
-                 * 贫困生标识
+                 * 困难学生标识
                  */
                 vo.setPovertyStatus(
                         user.getPovertyStatus() != null

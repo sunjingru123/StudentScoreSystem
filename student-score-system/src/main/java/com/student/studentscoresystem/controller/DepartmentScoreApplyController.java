@@ -1209,7 +1209,7 @@ public class DepartmentScoreApplyController {
 
 
         /*
-         * 贫困生名单导入权限：
+         * 困难学生名单导入权限：
          * 仅勤工助学部的部长 / 副部长（以及管理员）可以导入。
          */
         data.put(

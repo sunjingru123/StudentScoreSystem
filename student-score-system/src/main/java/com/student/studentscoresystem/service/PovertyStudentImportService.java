@@ -28,7 +28,7 @@ import java.util.Set;
 
 /**
  * =========================================================
- * 贫困生名单导入
+ * 困难学生名单导入
  * =========================================================
  *
  * 业务约定：
@@ -36,7 +36,7 @@ import java.util.Set;
  * 1. 模板固定两列：学号 | 姓名；
  * 2. 学号与姓名必须同时与 sys_user 一致，
  *    只有两者都对上才认为是同一个学生；
- * 3. 只把名单中的学生标记为贫困生（poverty_status = 1），
+ * 3. 只把名单中的学生标记为困难学生（poverty_status = 1），
  *    不在名单中的学生保持原有状态，不清空历史标记；
  * 4. 单行失败只记录原因（行号 / 学号 / 原因），
  *    不影响其他行导入；
@@ -80,7 +80,7 @@ public class PovertyStudentImportService {
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             XSSFSheet sheet =
-                    workbook.createSheet("贫困生名单");
+                    workbook.createSheet("困难学生名单");
 
             CellStyle headerStyle =
                     workbook.createCellStyle();
@@ -118,7 +118,7 @@ public class PovertyStudentImportService {
         } catch (IOException e) {
 
             throw new IllegalStateException(
-                    "生成贫困生导入模板失败：" + e.getMessage(),
+                    "生成困难学生导入模板失败：" + e.getMessage(),
                     e
             );
         }
@@ -126,7 +126,7 @@ public class PovertyStudentImportService {
 
     /**
      * =========================================================
-     * 导入贫困生名单
+     * 导入困难学生名单
      *
      * 返回结构与其他 Excel 导入保持一致：
      *   totalCount / successCount / failCount / clearedCount / mode / errors
@@ -140,7 +140,7 @@ public class PovertyStudentImportService {
 
         /*
          * 默认模式：只新增 / 修正标记，
-         * 不取消任何人的贫困生标记，
+         * 不取消任何人的困难学生标记，
          * 避免传错文件时静默清空全校标记。
          */
         return importPovertyStudents(
@@ -153,22 +153,22 @@ public class PovertyStudentImportService {
 
     /**
      * =========================================================
-     * 导入贫困生名单（支持覆盖模式）
+     * 导入困难学生名单（支持覆盖模式）
      * =========================================================
      *
      * append （replaceMode = false）：
-     *    只把名单中的学生标记为贫困生，
+     *    只把名单中的学生标记为困难学生，
      *    不影响名单之外的学生。
      *
      * replace（replaceMode = true）：
      *    以本次名单为权威结果：
-     *    文件中出现过的学号保留 / 标记为贫困生，
-     *    其余已标记的学生取消贫困生标记。
+     *    文件中出现过的学号保留 / 标记为困难学生，
+     *    其余已标记的学生取消困难学生标记。
      *
      * 安全保护：
      *    1. 名单中没有任何有效学号时中止；
      *    2. 全部行都导入失败时中止；
-     *    避免一份错误文件把全部贫困生标记清空。
+     *    避免一份错误文件把全部困难学生标记清空。
      * =========================================================
      */
     @Transactional(rollbackFor = Exception.class)
@@ -319,7 +319,7 @@ public class PovertyStudentImportService {
             /*
              * 学号与姓名必须同时匹配：
              * 只有学号对上、姓名对不上时视为填错了学生，
-             * 一律不标记为贫困生。
+             * 一律不标记为困难学生。
              */
             if (!trim(user.getRealName()).equals(realName)) {
 
@@ -335,7 +335,7 @@ public class PovertyStudentImportService {
 
 
             /*
-             * 已经是贫困生则直接计入成功，
+             * 已经是困难学生则直接计入成功，
              * 避免重复导入反复写库。
              */
             if (user.getPovertyStatus() != null
@@ -363,11 +363,11 @@ public class PovertyStudentImportService {
          * 覆盖模式：
          *
          * 以「文件中出现过的学号」为权威名单，
-         * 取消名单之外学生已有的贫困生标记。
+         * 取消名单之外学生已有的困难学生标记。
          *
          * 只按学号判定：
          * 即使某行姓名写错（该行本身导入失败），
-         * 也不会因此取消该学生的贫困生标记，
+         * 也不会因此取消该学生的困难学生标记，
          * 避免手误造成误清。
          */
         int clearedCount = 0;
@@ -378,7 +378,7 @@ public class PovertyStudentImportService {
 
                 throw new IllegalArgumentException(
                         "本次导入没有有效学号，已中止覆盖，"
-                                + "避免清空全部贫困生标记"
+                                + "避免清空全部困难学生标记"
                 );
             }
 
@@ -387,7 +387,7 @@ public class PovertyStudentImportService {
 
                 throw new IllegalArgumentException(
                         "本次导入没有任何成功记录，已中止覆盖，"
-                                + "避免清空全部贫困生标记"
+                                + "避免清空全部困难学生标记"
                 );
             }
 
@@ -429,7 +429,7 @@ public class PovertyStudentImportService {
         if (!permissionService.canImportPovertyList(currentUserId)) {
 
             throw new SecurityException(
-                    "你没有导入贫困生名单的权限"
+                    "你没有导入困难学生名单的权限"
             );
         }
     }

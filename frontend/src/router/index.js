@@ -299,7 +299,7 @@ const router = createRouter({
         },
 
         // ===================================================
-        // 贫困生名单导入
+        // 困难学生名单导入
         //
         // 仅勤工助学部的部长 / 副部长
         // ===================================================
@@ -312,7 +312,7 @@ const router = createRouter({
           component: () => import('@/views/student/PovertyImport.vue'),
 
           meta: {
-            title: '贫困生名单导入',
+            title: '困难学生名单导入',
 
             requiresPovertyImport: true,
           },
@@ -562,7 +562,7 @@ const router = createRouter({
         },
 
         // ---------------------------------------------------
-        // 比赛筛选（含贫困生分类筛选）
+        // 比赛筛选（含困难学生分类筛选）
         // ---------------------------------------------------
 
         {
@@ -853,7 +853,7 @@ async function loadAuthContext(storedUser) {
         data.canArchiveAudit === true || Number(data.canArchiveAudit) === 1
 
       /*
-       * 贫困生名单导入：
+       * 困难学生名单导入：
        * 仅勤工助学部的部长 / 副部长，以后端返回为准。
        */
       canImportPoverty =

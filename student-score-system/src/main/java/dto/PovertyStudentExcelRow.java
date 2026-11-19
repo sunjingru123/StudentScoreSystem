@@ -4,7 +4,7 @@ import com.alibaba.excel.annotation.ExcelProperty;
 import lombok.Data;
 
 /**
- * 贫困生名单导入 Excel 行
+ * 困难学生名单导入 Excel 行
  *
  * 列（固定顺序）：
  *
