@@ -131,6 +131,16 @@ public class UserSessionService {
             return false;
         }
 
+        /*
+         * 已软删除的学生立即失效登录态，
+         * 避免已删除账号继续携带旧 Token 访问业务接口。
+         */
+        if (user.getDeleted() != null
+                && user.getDeleted() == 1) {
+
+            return false;
+        }
+
         String activeSessionId =
                 user.getActiveSessionId();
 

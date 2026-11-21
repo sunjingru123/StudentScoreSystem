@@ -6,6 +6,7 @@ import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.service.StudentAccountManageService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -34,7 +35,8 @@ class SysUserControllerStudentClassesTest {
         return new SysUserController(
                 sysUserMapper,
                 mock(SysUserPositionMapper.class),
-                mock(SysPositionMapper.class)
+                mock(SysPositionMapper.class),
+                mock(StudentAccountManageService.class)
         );
     }
 

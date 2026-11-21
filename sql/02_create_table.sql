@@ -682,6 +682,28 @@ ALTER TABLE public.sys_user
 ALTER TABLE public.sys_user
     ADD COLUMN IF NOT EXISTS poverty_status SMALLINT NOT NULL DEFAULT 0;
 
+-- 5.4.2 学生软删除（回收站）
+--
+-- 删除学生只标记，不物理删除：
+-- 历史成绩、加减分、获奖、活动参与和审核记录全部保留。
+-- NOT NULL DEFAULT 0 会给存量数据回填 0（正常），
+-- 不修改、不删除任何已有业务数据。
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS deleted SMALLINT NOT NULL DEFAULT 0;
+
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS deleted_time TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS deleted_by BIGINT;
+
+ALTER TABLE public.sys_user
+    ADD COLUMN IF NOT EXISTS delete_reason VARCHAR(500);
+
+-- 回收站列表按 deleted 过滤，补一个索引
+CREATE INDEX IF NOT EXISTS idx_sys_user_deleted
+    ON public.sys_user (deleted);
+
 -- 5.5 部门申报 department_score_apply（部门初审 -> 辅导员终审）
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS applicant_id BIGINT;

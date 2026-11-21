@@ -31,6 +31,13 @@
       >
 
         <el-button
+          plain
+          @click="openRecycleDialog"
+        >
+          回收站
+        </el-button>
+
+        <el-button
           type="primary"
           @click="openAddDialog"
         >
@@ -252,7 +259,7 @@
 
         <el-table-column
           label="操作"
-          width="250"
+          width="330"
           fixed="right"
           align="center"
         >
@@ -274,6 +281,15 @@
               @click="handleResetPassword(row)"
             >
               重置密码
+            </el-button>
+
+            <el-button
+              v-if="isAdmin"
+              type="danger"
+              link
+              @click="openStudentDeleteDialog(row)"
+            >
+              删除
             </el-button>
 
           </template>
@@ -745,6 +761,231 @@
 
     </el-dialog>
 
+
+    <!-- =====================================================
+         删除学生（软删除，进入回收站）
+         ===================================================== -->
+
+    <el-dialog
+      v-model="deleteDialogVisible"
+      title="删除学生"
+      width="480px"
+      :close-on-click-modal="false"
+    >
+
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+        title="删除后学生将无法登录，
+        历史成绩、加减分、获奖和审核记录都会保留，可在回收站恢复。"
+        style="margin-bottom: 16px"
+      />
+
+
+      <div
+        v-if="deleteTarget"
+        class="delete-target"
+      >
+        学生：
+        <strong>
+          {{ deleteTarget.realName || '-' }}
+        </strong>
+        （{{ deleteTarget.studentNo || '-' }}）
+      </div>
+
+
+      <el-form
+        label-width="80px"
+        @submit.prevent
+      >
+
+        <el-form-item
+          label="删除原因"
+          required
+        >
+
+          <el-input
+            v-model="deleteReason"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="必填，例如：学生已退学 / 重复录入"
+          />
+
+        </el-form-item>
+
+      </el-form>
+
+
+      <template #footer>
+
+        <el-button
+          @click="deleteDialogVisible = false"
+        >
+          取消
+        </el-button>
+
+        <el-button
+          type="danger"
+          :loading="deleteSubmitting"
+          @click="submitDeleteStudent"
+        >
+          确认删除
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
+
+    <!-- =====================================================
+         回收站
+         ===================================================== -->
+
+    <el-dialog
+      v-model="recycleVisible"
+      title="学生回收站"
+      width="980px"
+      :close-on-click-modal="false"
+    >
+
+      <div class="recycle-toolbar">
+
+        <el-input
+          v-model="recycleKeyword"
+          placeholder="学号 / 姓名 / 用户名 / 班级"
+          clearable
+          style="width: 300px"
+          @keyup.enter="handleRecycleSearch"
+          @clear="handleRecycleSearch"
+        />
+
+
+        <el-button
+          type="primary"
+          @click="handleRecycleSearch"
+        >
+          搜索
+        </el-button>
+
+      </div>
+
+
+      <el-table
+        :data="recycleList"
+        border
+        stripe
+        v-loading="recycleLoading"
+      >
+
+        <el-table-column
+          prop="studentNo"
+          label="学号"
+          width="140"
+        />
+
+        <el-table-column
+          prop="realName"
+          label="姓名"
+          width="110"
+        />
+
+        <el-table-column
+          prop="className"
+          label="班级"
+          min-width="140"
+        />
+
+        <el-table-column
+          label="删除时间"
+          width="170"
+        >
+
+          <template #default="{ row }">
+
+            {{ formatDateTime(row.deletedTime) }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <el-table-column
+          label="操作管理员"
+          width="120"
+        >
+
+          <template #default="{ row }">
+
+            {{ row.deletedByName || '-' }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <el-table-column
+          prop="deleteReason"
+          label="删除原因"
+          min-width="180"
+          show-overflow-tooltip
+        />
+
+
+        <el-table-column
+          label="操作"
+          width="100"
+          fixed="right"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-button
+              type="success"
+              link
+              @click="handleRestoreStudent(row)"
+            >
+              恢复
+            </el-button>
+
+          </template>
+
+        </el-table-column>
+
+      </el-table>
+
+
+      <el-empty
+        v-if="
+          !recycleLoading &&
+          recycleList.length === 0
+        "
+        description="回收站为空"
+      />
+
+
+      <div
+        v-if="recycleTotal > 0"
+        class="pagination-wrapper"
+      >
+
+        <el-pagination
+          v-model:current-page="recyclePageNum"
+          :page-size="recyclePageSize"
+          layout="total, prev, pager, next"
+          :total="recycleTotal"
+          background
+          :hide-on-single-page="false"
+          @current-change="handleRecyclePageChange"
+        />
+
+      </div>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -787,6 +1028,9 @@ import request from '@/api/request'
 import {
   addStudent,
   resetStudentPassword,
+  deleteStudentWithReason,
+  restoreStudent,
+  getRecycleStudents,
 } from '@/api/student'
 
 
@@ -1931,6 +2175,432 @@ async function handleResetPassword(row) {
 
 
 /* =========================================================
+ * 学生删除（软删除）/ 回收站
+ *
+ * 权限：仅管理员（后端 @RequireRole 校验）
+ * ========================================================= */
+
+const deleteDialogVisible =
+  ref(false)
+
+
+const deleteSubmitting =
+  ref(false)
+
+
+const deleteTarget =
+  ref(null)
+
+
+const deleteReason =
+  ref('')
+
+
+function openStudentDeleteDialog(row) {
+
+  deleteTarget.value =
+    row
+
+  deleteReason.value =
+    ''
+
+  deleteDialogVisible.value =
+    true
+
+}
+
+
+async function submitDeleteStudent() {
+
+  if (!deleteTarget.value) {
+
+    return
+
+  }
+
+
+  const reason =
+    deleteReason.value.trim()
+
+
+  if (!reason) {
+
+    ElMessage.warning(
+      '请填写删除原因',
+    )
+
+    return
+
+  }
+
+
+  try {
+
+    /*
+     * 二次确认
+     */
+
+    await ElMessageBox.confirm(
+      `确定删除学生「${deleteTarget.value.realName || deleteTarget.value.studentNo || ''}」吗？\n\n删除后该学生无法登录，历史成绩与审核记录会保留，可在回收站恢复。`,
+      '确认删除',
+      {
+        type: 'warning',
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+      },
+    )
+
+  }
+  catch (error) {
+
+    if (error === 'cancel' || error === 'close') {
+
+      return
+
+    }
+
+    throw error
+
+  }
+
+
+  deleteSubmitting.value =
+    true
+
+  try {
+
+    const res =
+      await deleteStudentWithReason(
+        deleteTarget.value.id,
+        reason,
+      )
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '删除学生失败',
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      '学生已移入回收站',
+    )
+
+
+    deleteDialogVisible.value =
+      false
+
+
+    await loadStudents()
+
+
+    /*
+     * 删除的是当前页最后一条时，回退一页，
+     * 避免停在一个空页上。
+     */
+    if (
+      students.value.length === 0 &&
+      pageNum.value > 1
+    ) {
+
+      pageNum.value =
+        pageNum.value - 1
+
+      await loadStudents()
+
+    }
+
+  }
+  catch (error) {
+
+    console.error(
+      '删除学生失败：',
+      error,
+    )
+
+    ElMessage.error(
+      error?.response?.data?.message
+      || error?.message
+      || '删除学生失败',
+    )
+
+  }
+  finally {
+
+    deleteSubmitting.value =
+      false
+
+  }
+
+}
+
+
+/* =========================================================
+ * 回收站
+ * ========================================================= */
+
+const recycleVisible =
+  ref(false)
+
+
+const recycleLoading =
+  ref(false)
+
+
+const recycleList =
+  ref([])
+
+
+const recycleTotal =
+  ref(0)
+
+
+const recyclePageNum =
+  ref(1)
+
+
+const recyclePageSize =
+  10
+
+
+const recycleKeyword =
+  ref('')
+
+
+async function openRecycleDialog() {
+
+  recycleVisible.value =
+    true
+
+  recyclePageNum.value =
+    1
+
+  recycleKeyword.value =
+    ''
+
+  await loadRecycleStudents()
+
+}
+
+
+async function loadRecycleStudents() {
+
+  recycleLoading.value =
+    true
+
+  try {
+
+    const res =
+      await getRecycleStudents({
+        pageNum:
+          recyclePageNum.value,
+
+        pageSize:
+          recyclePageSize,
+
+        keyword:
+          recycleKeyword.value.trim()
+          || undefined,
+      })
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '回收站加载失败',
+      )
+
+      recycleList.value =
+        []
+
+      recycleTotal.value =
+        0
+
+      return
+
+    }
+
+
+    const data =
+      unwrapResult(res)
+
+
+    if (data && Array.isArray(data.records)) {
+
+      recycleList.value =
+        data.records
+
+      recycleTotal.value =
+        Number(data.total || 0)
+
+    }
+    else {
+
+      recycleList.value =
+        []
+
+      recycleTotal.value =
+        0
+
+    }
+
+  }
+  catch (error) {
+
+    console.error(
+      '回收站加载失败：',
+      error,
+    )
+
+    recycleList.value =
+      []
+
+    recycleTotal.value =
+      0
+
+    ElMessage.error(
+      '回收站加载失败',
+    )
+
+  }
+  finally {
+
+    recycleLoading.value =
+      false
+
+  }
+
+}
+
+
+function handleRecycleSearch() {
+
+  recyclePageNum.value =
+    1
+
+  loadRecycleStudents()
+
+}
+
+
+function handleRecyclePageChange(page) {
+
+  recyclePageNum.value =
+    page
+
+  loadRecycleStudents()
+
+}
+
+
+async function handleRestoreStudent(row) {
+
+  try {
+
+    await ElMessageBox.confirm(
+      `确定恢复学生「${row.realName || row.studentNo || ''}」吗？恢复后该学生将重新出现在学生列表中。`,
+      '恢复学生',
+      {
+        type: 'warning',
+        confirmButtonText: '确定恢复',
+        cancelButtonText: '取消',
+      },
+    )
+
+  }
+  catch (error) {
+
+    if (error === 'cancel' || error === 'close') {
+
+      return
+
+    }
+
+    throw error
+
+  }
+
+
+  try {
+
+    const res =
+      await restoreStudent(
+        row.id,
+      )
+
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message
+        || '恢复学生失败',
+      )
+
+      return
+
+    }
+
+
+    ElMessage.success(
+      '学生已恢复',
+    )
+
+
+    await loadRecycleStudents()
+
+    await loadStudents()
+
+  }
+  catch (error) {
+
+    console.error(
+      '恢复学生失败：',
+      error,
+    )
+
+    ElMessage.error(
+      error?.response?.data?.message
+      || error?.message
+      || '恢复学生失败',
+    )
+
+  }
+
+}
+
+
+/* =========================================================
+ * 时间格式化（LocalDateTime -> yyyy-MM-dd HH:mm:ss）
+ * ========================================================= */
+
+function formatDateTime(value) {
+
+  if (!value) {
+
+    return '-'
+
+  }
+
+
+  const text =
+    String(value).replace('T', ' ')
+
+
+  return text.length > 19
+    ? text.slice(0, 19)
+    : text
+
+}
+
+
+/* =========================================================
  * 添加学生
  * ========================================================= */
 
@@ -2209,6 +2879,21 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
+}
+
+
+.delete-target {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #303133;
+}
+
+
+.recycle-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 

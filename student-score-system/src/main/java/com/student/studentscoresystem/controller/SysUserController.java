@@ -6,14 +6,18 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.student.studentscoresystem.annotation.RequireRole;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.dto.StudentAddDTO;
+import com.student.studentscoresystem.dto.StudentDeleteDTO;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
+import com.student.studentscoresystem.service.StudentAccountManageService;
 import com.student.studentscoresystem.utils.PasswordUtil;
+import com.student.studentscoresystem.vo.RecycledStudentVO;
 import com.student.studentscoresystem.vo.StudentVO;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,15 +36,19 @@ public class SysUserController {
 
     private final SysPositionMapper positionMapper;
 
+    private final StudentAccountManageService studentAccountManageService;
+
 
     public SysUserController(
             SysUserMapper sysUserMapper,
             SysUserPositionMapper userPositionMapper,
-            SysPositionMapper positionMapper
+            SysPositionMapper positionMapper,
+            StudentAccountManageService studentAccountManageService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.userPositionMapper = userPositionMapper;
         this.positionMapper = positionMapper;
+        this.studentAccountManageService = studentAccountManageService;
     }
 
 
@@ -445,6 +453,20 @@ public class SysUserController {
 
         /*
          * =====================================================
+         * 13-2. 排除已删除学生
+         * =====================================================
+         *
+         * 已删除学生只出现在回收站中，
+         * 正常学生列表不展示。
+         */
+
+        applyNotDeleted(
+                wrapper
+        );
+
+
+        /*
+         * =====================================================
          * 14. 固定排序
          * =====================================================
          */
@@ -709,16 +731,28 @@ public class SysUserController {
         }
 
 
+        LambdaQueryWrapper<SysUser> userWrapper =
+                new LambdaQueryWrapper<SysUser>()
+                        .in(
+                                SysUser::getId,
+                                userIds
+                        );
+
+        /*
+         * 已删除学生不能参与新的业务（成绩调整、部门申报选人等）
+         */
+        applyNotDeleted(
+                userWrapper
+        );
+
+        userWrapper.orderByAsc(
+                SysUser::getStudentNo
+        );
+
+
         List<SysUser> users =
                 sysUserMapper.selectList(
-                        new LambdaQueryWrapper<SysUser>()
-                                .in(
-                                        SysUser::getId,
-                                        userIds
-                                )
-                                .orderByAsc(
-                                        SysUser::getStudentNo
-                                )
+                        userWrapper
                 );
 
 
@@ -905,42 +939,53 @@ public class SysUserController {
         }
 
 
+        LambdaQueryWrapper<SysUser> searchWrapper =
+                new LambdaQueryWrapper<SysUser>()
+                        .in(
+                                SysUser::getId,
+                                userIds
+                        )
+                        .and(
+                                condition ->
+                                        condition
+                                                .like(
+                                                        SysUser::getStudentNo,
+                                                        key
+                                                )
+                                                .or()
+                                                .like(
+                                                        SysUser::getRealName,
+                                                        key
+                                                )
+                                                .or()
+                                                .like(
+                                                        SysUser::getUsername,
+                                                        key
+                                                )
+                                                .or()
+                                                .like(
+                                                        SysUser::getClassName,
+                                                        key
+                                                )
+                        );
+
+        /*
+         * 已删除学生不能被检索到
+         */
+        applyNotDeleted(
+                searchWrapper
+        );
+
+        searchWrapper.orderByAsc(
+                SysUser::getStudentNo
+        );
+
+
         SysUser user =
                 sysUserMapper.selectOne(
-                        new LambdaQueryWrapper<SysUser>()
-                                .in(
-                                        SysUser::getId,
-                                        userIds
-                                )
-                                .and(
-                                        condition ->
-                                                condition
-                                                        .like(
-                                                                SysUser::getStudentNo,
-                                                                key
-                                                        )
-                                                        .or()
-                                                        .like(
-                                                                SysUser::getRealName,
-                                                                key
-                                                        )
-                                                        .or()
-                                                        .like(
-                                                                SysUser::getUsername,
-                                                                key
-                                                        )
-                                                        .or()
-                                                        .like(
-                                                                SysUser::getClassName,
-                                                                key
-                                                        )
-                                )
-                                .orderByAsc(
-                                        SysUser::getStudentNo
-                                )
-                                .last(
-                                        "LIMIT 1"
-                                )
+                        searchWrapper.last(
+                                "LIMIT 1"
+                        )
                 );
 
 
@@ -1044,6 +1089,159 @@ public class SysUserController {
 
     /**
      * =========================================================
+     * 删除学生（软删除，进入回收站）
+     * =========================================================
+     *
+     * PUT /user/student/delete/{id}
+     *
+     * 请求体：
+     *
+     * {
+     *   "reason": "删除原因"
+     * }
+     *
+     * 说明：
+     *
+     * 1. 只标记 sys_user.deleted = 1，不物理删除学生；
+     * 2. 历史成绩、加减分、获奖、活动参与和审核记录全部保留；
+     * 3. 只能删除学生账号，管理员 / 辅导员 / 组织人员不可删除；
+     * 4. 仅管理员可用（后端校验为准）。
+     * =========================================================
+     */
+    @PutMapping("/student/delete/{id}")
+    @RequireRole("管理员")
+    public Result<Void> deleteStudent(
+            @PathVariable Long id,
+            @RequestBody(required = false) StudentDeleteDTO dto,
+            HttpServletRequest request
+    ) {
+
+        try {
+
+            studentAccountManageService.softDeleteStudent(
+                    id,
+                    dto == null ? null : dto.getReason(),
+                    currentUserId(
+                            request
+                    )
+            );
+
+            return Result.success(
+                    null
+            );
+
+        } catch (IllegalArgumentException e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+
+        } catch (Exception e) {
+
+            return Result.error(
+                    "删除学生失败："
+                            + e.getMessage()
+            );
+        }
+    }
+
+
+    /**
+     * =========================================================
+     * 恢复已删除学生
+     * =========================================================
+     *
+     * PUT /user/student/restore/{id}
+     *
+     * 仅管理员可用（后端校验为准）。
+     * =========================================================
+     */
+    @PutMapping("/student/restore/{id}")
+    @RequireRole("管理员")
+    public Result<Void> restoreStudent(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+
+        try {
+
+            studentAccountManageService.restoreStudent(
+                    id,
+                    currentUserId(
+                            request
+                    )
+            );
+
+            return Result.success(
+                    null
+            );
+
+        } catch (IllegalArgumentException e) {
+
+            return Result.fail(
+                    e.getMessage()
+            );
+
+        } catch (Exception e) {
+
+            return Result.error(
+                    "恢复学生失败："
+                            + e.getMessage()
+            );
+        }
+    }
+
+
+    /**
+     * =========================================================
+     * 回收站：分页查询已删除学生
+     * =========================================================
+     *
+     * GET /user/student/recycle
+     *
+     * 仅管理员可用（后端校验为准）。
+     * =========================================================
+     */
+    @GetMapping("/student/recycle")
+    @RequireRole("管理员")
+    public Result<Page<RecycledStudentVO>> recycleStudents(
+
+            @RequestParam(defaultValue = "1")
+            long pageNum,
+
+            @RequestParam(defaultValue = "10")
+            long pageSize,
+
+            @RequestParam(required = false)
+            String keyword,
+
+            @RequestParam(required = false)
+            String className
+    ) {
+
+        try {
+
+            return Result.success(
+                    studentAccountManageService.pageRecycledStudents(
+                            pageNum,
+                            pageSize,
+                            keyword,
+                            className
+                    )
+            );
+
+        } catch (Exception e) {
+
+            return Result.error(
+                    "查询回收站失败："
+                            + e.getMessage()
+            );
+        }
+    }
+
+
+    /**
+     * =========================================================
      * 添加学生
      * =========================================================
      *
@@ -1138,16 +1336,31 @@ public class SysUserController {
          * =====================================================
          */
 
-        Long sameStudentNo =
-                sysUserMapper.selectCount(
+        SysUser sameStudentNoUser =
+                sysUserMapper.selectOne(
                         new LambdaQueryWrapper<SysUser>()
                                 .eq(
                                         SysUser::getStudentNo,
                                         studentNo
                                 )
+                                .last(
+                                        "LIMIT 1"
+                                )
                 );
 
-        if (sameStudentNo != null && sameStudentNo > 0) {
+        if (sameStudentNoUser != null) {
+
+            /*
+             * 回收站里的学生占用同一学号：
+             * 提示管理员先去回收站恢复，而不是让人不明所以。
+             */
+            if (sameStudentNoUser.getDeleted() != null
+                    && sameStudentNoUser.getDeleted() == 1) {
+
+                return Result.fail(
+                        "该学号的学生已在回收站中，请先在回收站恢复"
+                );
+            }
 
             return Result.fail(
                     "学号已存在"
@@ -1572,6 +1785,59 @@ public class SysUserController {
 
 
         return vo;
+    }
+
+
+    /**
+     * =========================================================
+     * 只保留未删除（deleted = 0 或存量数据为 NULL）的学生
+     * =========================================================
+     */
+    private void applyNotDeleted(
+            LambdaQueryWrapper<SysUser> wrapper
+    ) {
+
+        wrapper.and(
+                condition ->
+                        condition
+                                .eq(
+                                        SysUser::getDeleted,
+                                        (short) 0
+                                )
+                                .or()
+                                .isNull(
+                                        SysUser::getDeleted
+                                )
+        );
+    }
+
+
+    /**
+     * =========================================================
+     * 当前登录用户 ID
+     *
+     * JwtInterceptor 已将 userId 写入 request。
+     * =========================================================
+     */
+    private Long currentUserId(
+            HttpServletRequest request
+    ) {
+
+        if (request == null) {
+
+            return null;
+        }
+
+        Object userId =
+                request.getAttribute(
+                        "userId"
+                );
+
+        return userId == null
+                ? null
+                : Long.valueOf(
+                        userId.toString()
+                );
     }
 
 

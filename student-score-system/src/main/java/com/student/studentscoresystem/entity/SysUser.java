@@ -108,6 +108,32 @@ public class SysUser implements Serializable {
     private Short status;
 
     /**
+     * 软删除标识（学生回收站）
+     *
+     * 0 = 正常
+     * 1 = 已删除
+     *
+     * 删除只做标记，不物理删除，
+     * 历史成绩、加减分、获奖、活动参与和审核记录全部保留。
+     */
+    private Short deleted;
+
+    /**
+     * 删除时间
+     */
+    private LocalDateTime deletedTime;
+
+    /**
+     * 执行删除的管理员 ID
+     */
+    private Long deletedBy;
+
+    /**
+     * 删除原因
+     */
+    private String deleteReason;
+
+    /**
      * 困难学生标识
      *
      * 1 = 困难学生
