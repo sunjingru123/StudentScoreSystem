@@ -1837,6 +1837,78 @@
 
     </el-dialog>
 
+
+    <!-- =====================================================
+         凭证材料预览
+
+         开在新页面容易被浏览器拦截，
+         这里直接在页面内展示，保证学生能看到自己上传的材料。
+         ===================================================== -->
+
+    <el-dialog
+      v-model="evidencePreviewVisible"
+      title="凭证材料"
+      width="760px"
+      top="6vh"
+      @closed="resetEvidencePreview"
+    >
+
+      <div
+        v-loading="evidencePreviewLoading"
+        class="evidence-preview"
+      >
+
+        <img
+          v-if="evidencePreviewType === 'image'"
+          :src="evidencePreviewUrl"
+          alt="凭证材料"
+        />
+
+
+        <iframe
+          v-else-if="evidencePreviewType === 'pdf'"
+          :src="evidencePreviewUrl"
+        />
+
+
+        <div
+          v-else
+          class="evidence-fallback"
+        >
+
+          <p>
+            Word 等格式无法在页面内直接预览，请下载后查看。
+          </p>
+
+          <el-button
+            type="primary"
+            @click="downloadEvidence"
+          >
+            下载查看
+          </el-button>
+
+        </div>
+
+      </div>
+
+
+      <template #footer>
+
+        <el-button
+          v-if="evidencePreviewType === 'image' || evidencePreviewType === 'pdf'"
+          @click="openEvidenceInNewWindow"
+        >
+          在新窗口打开
+        </el-button>
+
+        <el-button @click="evidencePreviewVisible = false">
+          关闭
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
   </div>
 </template>
 
@@ -1860,7 +1932,8 @@ import {
 import request from '@/utils/request'
 
 import {
-  openProtectedFile,
+  loadProtectedFile,
+  resolveProtectedFileError,
 } from '@/utils/filePreview'
 
 
@@ -4207,6 +4280,27 @@ function removeEvidence() {
 }
 
 
+/* =========================================================
+ * 凭证材料预览
+ *
+ * 先在页面内加载并展示，
+ * 失败时根据后端返回的真实原因提示，
+ * 不再统一提示「请检查登录状态」。
+ * ========================================================= */
+
+const evidencePreviewVisible =
+  ref(false)
+
+const evidencePreviewLoading =
+  ref(false)
+
+const evidencePreviewUrl =
+  ref('')
+
+const evidencePreviewType =
+  ref('other')
+
+
 async function previewEvidence() {
 
   if (!departmentForm.evidenceUrl) {
@@ -4218,9 +4312,153 @@ async function previewEvidence() {
   }
 
 
-  await openProtectedFile(
+  await openEvidencePreview(
     departmentForm.evidenceUrl
   )
+
+}
+
+
+/*
+ * 打开凭证预览（表单内 / 申报表格共用）
+ */
+
+async function openEvidencePreview(url) {
+
+  if (!url) {
+
+    ElMessage.warning('该申报没有上传凭证')
+
+    return
+
+  }
+
+
+  evidencePreviewType.value =
+    'other'
+
+  evidencePreviewUrl.value =
+    ''
+
+  evidencePreviewVisible.value =
+    true
+
+  evidencePreviewLoading.value =
+    true
+
+
+  try {
+
+    const { objectUrl, blob } =
+      await loadProtectedFile(url)
+
+
+    evidencePreviewUrl.value =
+      objectUrl
+
+
+    const mimeType =
+      blob && blob.type
+        ? blob.type.toLowerCase()
+        : ''
+
+
+    if (mimeType.startsWith('image/')) {
+
+      evidencePreviewType.value =
+        'image'
+
+    } else if (mimeType === 'application/pdf') {
+
+      evidencePreviewType.value =
+        'pdf'
+
+    } else {
+
+      evidencePreviewType.value =
+        'other'
+
+    }
+
+  } catch (error) {
+
+    evidencePreviewVisible.value =
+      false
+
+
+    console.error(
+      '加载凭证材料失败：',
+      error
+    )
+
+
+    ElMessage.error(
+      await resolveProtectedFileError(error)
+    )
+
+  } finally {
+
+    evidencePreviewLoading.value =
+      false
+
+  }
+
+}
+
+
+/*
+ * 下载凭证（Word 等无法内嵌预览的格式）
+ */
+
+function downloadEvidence() {
+
+  if (!evidencePreviewUrl.value) {
+
+    return
+
+  }
+
+
+  const link =
+    document.createElement('a')
+
+
+  link.href =
+    evidencePreviewUrl.value
+
+  link.download =
+    '凭证材料'
+
+  document.body.appendChild(link)
+
+  link.click()
+
+  document.body.removeChild(link)
+
+}
+
+
+function openEvidenceInNewWindow() {
+
+  if (evidencePreviewUrl.value) {
+
+    window.open(
+      evidencePreviewUrl.value,
+      '_blank'
+    )
+
+  }
+
+}
+
+
+function resetEvidencePreview() {
+
+  evidencePreviewUrl.value =
+    ''
+
+  evidencePreviewType.value =
+    'other'
 
 }
 
@@ -4240,7 +4478,7 @@ function openEvidence(url) {
   }
 
 
-  openProtectedFile(url)
+  openEvidencePreview(url)
 
 }
 
@@ -5282,6 +5520,63 @@ onMounted(async () => {
 
   line-height:
     1.5;
+
+}
+
+
+/* ====================================================== */
+/* 凭证材料预览 */
+/* ====================================================== */
+
+.evidence-preview {
+
+  min-height:
+    320px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+}
+
+.evidence-preview img {
+
+  max-width:
+    100%;
+
+  max-height:
+    70vh;
+
+  object-fit:
+    contain;
+
+}
+
+.evidence-preview iframe {
+
+  width:
+    100%;
+
+  height:
+    70vh;
+
+  border:
+    none;
+
+}
+
+.evidence-fallback {
+
+  text-align:
+    center;
+
+  color:
+    #606266;
 
 }
 

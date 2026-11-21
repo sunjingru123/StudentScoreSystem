@@ -121,6 +121,113 @@ export async function loadProtectedFile(url) {
 
 
 /*
+ * 从失败响应中解析出真实原因。
+ *
+ * 文件接口以 blob 方式请求，
+ * 后端出错时返回的是 JSON（被包在 Blob 里），
+ * 这里把它解出来展示，避免一律提示「请检查登录状态」。
+ */
+
+function defaultMessageForError(error) {
+
+  const status =
+    error?.response?.status
+
+  if (status === 401) {
+    return '登录已失效，请重新登录后再查看'
+  }
+
+  if (status === 403) {
+    return '无权查看该材料'
+  }
+
+  if (status === 404) {
+    return '材料文件已丢失，请重新上传'
+  }
+
+  if (error?.code === 'ECONNABORTED') {
+    return '加载材料超时，请稍后重试'
+  }
+
+  return '查看材料失败，请稍后重试'
+
+}
+
+
+export async function resolveProtectedFileError(error) {
+
+  const fallback =
+    defaultMessageForError(error)
+
+  const data =
+    error?.response?.data
+
+  if (!data) {
+    return fallback
+  }
+
+  /*
+   * responseType: 'blob' 时错误体是 Blob
+   */
+
+  if (data instanceof Blob) {
+
+    try {
+
+      const text = await data.text()
+
+      if (!text) {
+        return fallback
+      }
+
+      try {
+
+        const json = JSON.parse(text)
+
+        if (json && json.message) {
+          return json.message
+        }
+
+      } catch (ignored) {
+        // 不是 JSON，忽略
+      }
+
+    } catch (ignored) {
+      // 读取失败，忽略
+    }
+
+    return fallback
+
+  }
+
+  if (typeof data === 'string') {
+
+    try {
+
+      const json = JSON.parse(data)
+
+      if (json && json.message) {
+        return json.message
+      }
+
+    } catch (ignored) {
+      // 不是 JSON，忽略
+    }
+
+    return data.slice(0, 120) || fallback
+
+  }
+
+  if (data.message) {
+    return data.message
+  }
+
+  return fallback
+
+}
+
+
+/*
  * 只取对象地址。
  */
 
@@ -223,7 +330,10 @@ export async function openProtectedFile(url) {
     }
 
 
-    ElMessage.error('查看材料失败，请检查登录状态后重试')
+    const message =
+      await resolveProtectedFileError(error)
+
+    ElMessage.error(message)
 
   }
 

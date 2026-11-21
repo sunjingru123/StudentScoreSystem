@@ -1,16 +1,23 @@
 package com.student.studentscoresystem.controller;
 
 import com.student.studentscoresystem.common.Result;
+import com.student.studentscoresystem.entity.DepartmentScoreApply;
 import com.student.studentscoresystem.entity.FileInfo;
+import com.student.studentscoresystem.entity.ScoreApply;
+import com.student.studentscoresystem.mapper.DepartmentScoreApplyMapper;
 import com.student.studentscoresystem.mapper.FileInfoMapper;
+import com.student.studentscoresystem.mapper.ScoreApplyMapper;
 import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.entity.SysPosition;
 import com.student.studentscoresystem.entity.SysUserPosition;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,6 +34,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +49,17 @@ public class FileInfoController {
     private final SysPositionMapper positionMapper;
 
     /**
+     * 用于判断「文件是否附在本人申报单上」，
+     * 让学生能看到自己申报所附的凭证材料。
+     */
+    private final DepartmentScoreApplyMapper departmentScoreApplyMapper;
+
+    private final ScoreApplyMapper scoreApplyMapper;
+
+    private static final Logger log =
+            LoggerFactory.getLogger(FileInfoController.class);
+
+    /**
      * 文件上传目录
      */
     private final Path uploadPath =
@@ -49,13 +69,17 @@ public class FileInfoController {
     public FileInfoController(
             FileInfoMapper fileInfoMapper,
             SysUserPositionMapper userPositionMapper,
-            SysPositionMapper positionMapper
+            SysPositionMapper positionMapper,
+            DepartmentScoreApplyMapper departmentScoreApplyMapper,
+            ScoreApplyMapper scoreApplyMapper
     ) {
 
         this.fileInfoMapper =
                 fileInfoMapper;
         this.userPositionMapper = userPositionMapper;
         this.positionMapper = positionMapper;
+        this.departmentScoreApplyMapper = departmentScoreApplyMapper;
+        this.scoreApplyMapper = scoreApplyMapper;
 
     }
 
@@ -521,20 +545,20 @@ public class FileInfoController {
      * ========================================================
      */
     @GetMapping("/view/{id}")
-    public ResponseEntity<Resource> view(
+    public ResponseEntity<?> view(
             @PathVariable Long id,
             HttpServletRequest request
     ) {
 
         Object userIdObj = request.getAttribute("userId");
         if (userIdObj == null) {
-            return ResponseEntity.status(403).build();
+            return jsonError(401, "请先登录后再查看材料");
         }
         Long currentUserId;
         try {
             currentUserId = Long.valueOf(userIdObj.toString());
         } catch (NumberFormatException ex) {
-            return ResponseEntity.status(403).build();
+            return jsonError(401, "登录用户信息无效，请重新登录");
         }
 
         /*
@@ -553,9 +577,7 @@ public class FileInfoController {
                 fileInfo == null
         ) {
 
-            return ResponseEntity
-                    .notFound()
-                    .build();
+            return jsonError(404, "材料不存在（文件记录已丢失）");
 
         }
 
@@ -565,14 +587,13 @@ public class FileInfoController {
          *   1. 上传者本人；
          *   2. 管理员；
          *   3. 参与申报审核的岗位
-         *      （辅导员、部长、副部长、干事）。
-         *
-         * 学生只能查看自己上传的文件。
+         *      （辅导员、部长、副部长、干事）；
+         *   4. 学生查看挂在自己申报单上的凭证。
          * =====================================================
          */
 
-        if (!canViewFile(currentUserId, fileInfo.getUploaderId())) {
-            return ResponseEntity.status(403).build();
+        if (!canViewFile(currentUserId, fileInfo)) {
+            return jsonError(403, "无权查看该材料");
         }
 
 
@@ -582,10 +603,41 @@ public class FileInfoController {
          * =====================================================
          */
 
-        Path path =
-                Paths.get(
-                        fileInfo.getFilePath()
-                );
+        String storedPath =
+                fileInfo.getFilePath();
+
+
+        if (storedPath == null
+                || storedPath.isBlank()) {
+
+            return jsonError(404, "材料文件已丢失，请重新上传");
+
+        }
+
+
+        Path path;
+
+
+        try {
+
+            path =
+                    Paths.get(
+                            storedPath
+                    );
+
+        } catch (
+                Exception e
+        ) {
+
+            log.warn(
+                    "查看材料失败：文件路径非法 fileId={}, path={}",
+                    id,
+                    storedPath
+            );
+
+            return jsonError(404, "材料文件路径无效，请重新上传");
+
+        }
 
 
         Resource resource;
@@ -602,9 +654,7 @@ public class FileInfoController {
                 MalformedURLException e
         ) {
 
-            return ResponseEntity
-                    .notFound()
-                    .build();
+            return jsonError(404, "材料文件路径无效，请重新上传");
 
         }
 
@@ -620,9 +670,17 @@ public class FileInfoController {
                         !resource.isReadable()
         ) {
 
-            return ResponseEntity
-                    .notFound()
-                    .build();
+            /*
+             * 磁盘上找不到文件时记录日志，
+             * 方便定位「容器迁移 / 临时目录导致文件丢失」的问题。
+             */
+            log.warn(
+                    "查看材料失败：文件不存在 fileId={}, path={}",
+                    id,
+                    storedPath
+            );
+
+            return jsonError(404, "材料文件已丢失，请重新上传");
 
         }
 
@@ -691,24 +749,94 @@ public class FileInfoController {
         /*
          * =====================================================
          * 5. 返回文件
+         *
+         * Content-Disposition 统一用 RFC 5987 编码，
+         * 避免中文文件名直接写进响应头带来的兼容性问题。
          * =====================================================
          */
 
-        return ResponseEntity
-                .ok()
-                .contentType(
-                        mediaType
-                )
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"" +
-                                fileInfo.getFileName() +
-                                "\""
-                )
-                .body(
-                        resource
-                );
+        ContentDisposition disposition =
+                ContentDisposition.inline()
+                        .filename(
+                                fileInfo.getFileName() == null
+                                        ? "material"
+                                        : fileInfo.getFileName(),
+                                StandardCharsets.UTF_8
+                        )
+                        .build();
 
+
+        ResponseEntity.BodyBuilder builder =
+                ResponseEntity.ok()
+                        .contentType(
+                                mediaType
+                        )
+                        .header(
+                                HttpHeaders.CONTENT_DISPOSITION,
+                                disposition.toString()
+                        );
+
+
+        try {
+
+            long length =
+                    resource.contentLength();
+
+
+            if (length >= 0) {
+
+                builder.contentLength(
+                        length
+                );
+            }
+
+        } catch (
+                IOException ignored
+        ) {
+
+        }
+
+
+        return builder.body(
+                resource
+        );
+
+    }
+
+
+    /**
+     * 统一的错误响应体。
+     *
+     * 前端以 blob 方式请求文件，
+     * 这里返回 JSON，便于前端解析出真实的失败原因。
+     */
+    private ResponseEntity<Map<String, Object>> jsonError(
+            int status,
+            String message
+    ) {
+
+        Map<String, Object> body =
+                new LinkedHashMap<>();
+
+
+        body.put(
+                "code",
+                status
+        );
+
+
+        body.put(
+                "message",
+                message
+        );
+
+
+        return ResponseEntity
+                .status(status)
+                .contentType(
+                        MediaType.APPLICATION_JSON
+                )
+                .body(body);
     }
 
     /**
@@ -773,16 +901,102 @@ public class FileInfoController {
      *
      * 规则：
      *   1. 上传者本人可查看；
-     *   2. 拥有管理员 / 审核岗位的用户可查看。
+     *   2. 拥有管理员 / 审核岗位的用户可查看；
+     *   3. 学生可查看自己申报单所附的凭证
+     *      （例如部长代为提交，但学生本人仍需能看到自己的证明）。
      */
-    private boolean canViewFile(Long currentUserId, Long uploaderId) {
+    private boolean canViewFile(Long currentUserId, FileInfo fileInfo) {
         if (currentUserId == null) {
             return false;
         }
 
-        if (currentUserId.equals(uploaderId)) {
+        if (currentUserId.equals(fileInfo.getUploaderId())) {
             return true;
         }
+
+        if (hasReviewerPosition(currentUserId)) {
+            return true;
+        }
+
+        return isEvidenceOfOwnApplication(
+                currentUserId,
+                fileInfo.getId()
+        );
+    }
+
+    /**
+     * 文件是否挂在当前用户自己的申报单上。
+     *
+     * 部门加减分申报：department_score_apply.student_id / applicant_id
+     * 个人证书申报：score_apply.student_id / material_file
+     */
+    private boolean isEvidenceOfOwnApplication(
+            Long currentUserId,
+            Long fileId
+    ) {
+
+        if (fileId == null) {
+            return false;
+        }
+
+        String fileUrl =
+                "/api/file/view/" + fileId;
+
+
+        Long departmentApplyCount =
+                departmentScoreApplyMapper.selectCount(
+                        new LambdaQueryWrapper<DepartmentScoreApply>()
+                                .eq(
+                                        DepartmentScoreApply::getEvidenceUrl,
+                                        fileUrl
+                                )
+                                .and(
+                                        condition ->
+                                                condition
+                                                        .eq(
+                                                                DepartmentScoreApply::getStudentId,
+                                                                currentUserId
+                                                        )
+                                                        .or()
+                                                        .eq(
+                                                                DepartmentScoreApply::getApplicantId,
+                                                                currentUserId
+                                                        )
+                                )
+                );
+
+
+        if (departmentApplyCount != null
+                && departmentApplyCount > 0) {
+
+            return true;
+        }
+
+
+        Long scoreApplyCount =
+                scoreApplyMapper.selectCount(
+                        new LambdaQueryWrapper<ScoreApply>()
+                                .eq(
+                                        ScoreApply::getMaterialFile,
+                                        fileUrl
+                                )
+                                .eq(
+                                        ScoreApply::getStudentId,
+                                        currentUserId
+                                )
+                );
+
+
+        return scoreApplyCount != null
+                && scoreApplyCount > 0;
+    }
+
+    /**
+     * 判断是否拥有管理员 / 审核岗位
+     */
+    private boolean hasReviewerPosition(
+            Long currentUserId
+    ) {
 
         List<SysUserPosition> userPositions = userPositionMapper.selectList(
                 new LambdaQueryWrapper<SysUserPosition>()
