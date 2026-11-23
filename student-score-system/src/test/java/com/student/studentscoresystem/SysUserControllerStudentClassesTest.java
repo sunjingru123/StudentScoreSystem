@@ -53,7 +53,9 @@ class SysUserControllerStudentClassesTest {
         List<SysUser> rows = new ArrayList<>(Arrays.asList(
                 userWithClassName(" 25级7班 "),
                 userWithClassName("25级7班"),
+                userWithClassName("2025级7班"),
                 userWithClassName("24级1班"),
+                userWithClassName("2024级1班"),
                 userWithClassName(""),
                 userWithClassName("   "),
                 userWithClassName(null),
@@ -67,7 +69,12 @@ class SysUserControllerStudentClassesTest {
         assertNotNull(result);
         List<String> data = result.getData();
         assertNotNull(data);
-        assertEquals(Arrays.asList("24级1班", "25级7班"), data);
+
+        /*
+         * 历史短写法（25级7班）与规范写法（2025级7班）
+         * 合并为同一个班级选项。
+         */
+        assertEquals(Arrays.asList("2024级1班", "2025级7班"), data);
     }
 
     @Test

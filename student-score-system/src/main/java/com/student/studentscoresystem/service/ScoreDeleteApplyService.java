@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 /**
  * =========================================================
@@ -623,7 +624,11 @@ public class ScoreDeleteApplyService {
 
                 vo.setStudentNo(student.getStudentNo());
 
-                vo.setClassName(student.getClassName());
+                vo.setClassName(
+                        ClassNameUtils.normalize(
+                                student.getClassName()
+                        )
+                );
             }
 
 

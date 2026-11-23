@@ -14,6 +14,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.StudentAccountManageService;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.RecycledStudentVO;
 import com.student.studentscoresystem.vo.StudentVO;
@@ -411,9 +412,15 @@ public class SysUserController {
                         && !className.trim().isEmpty()
         ) {
 
+            /*
+             * 历史数据同时存在「25级1班」与「2025级1班」，
+             * 统一用短写法做 LIKE，两种写法都能命中。
+             */
             wrapper.like(
                     SysUser::getClassName,
-                    className.trim()
+                    ClassNameUtils.searchKeyword(
+                            className.trim()
+                    )
             );
         }
 
@@ -585,7 +592,16 @@ public class SysUserController {
                 String className = row.getClassName().trim();
 
                 if (!className.isEmpty()) {
-                    classNames.add(className);
+
+                    /*
+                     * 统一展示为四位年份写法，
+                     * 25级1班 与 2025级1班 合并为同一项。
+                     */
+                    classNames.add(
+                            ClassNameUtils.normalize(
+                                    className
+                            )
+                    );
                 }
             }
         }
@@ -1328,6 +1344,15 @@ public class SysUserController {
 
 
         /*
+         * 新建学生统一保存四位年份写法：
+         * 25级1班 → 2025级1班，避免历史两种写法继续增加。
+         */
+        className = ClassNameUtils.normalize(
+                className
+        );
+
+
+        /*
          * =====================================================
          * 0.1 重复校验
          *
@@ -1768,7 +1793,9 @@ public class SysUserController {
 
 
         vo.setClassName(
-                user.getClassName()
+                ClassNameUtils.normalize(
+                        user.getClassName()
+                )
         );
 
 

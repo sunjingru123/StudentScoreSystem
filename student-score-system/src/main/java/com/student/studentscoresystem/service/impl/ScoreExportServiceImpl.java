@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 @Service
 public class ScoreExportServiceImpl
@@ -229,6 +230,15 @@ public class ScoreExportServiceImpl
     private List<SysUser> queryStudentsByClassNameLike(
             String keyword) {
 
+        /*
+         * 兼容历史写法：
+         * LIKE '%25级1班%' 同时命中「25级1班」与「2025级1班」
+         */
+        String searchKeyword =
+                ClassNameUtils.searchKeyword(
+                        keyword
+                );
+
         List<SysUser> students =
                 sysUserMapper.selectList(
 
@@ -240,7 +250,7 @@ public class ScoreExportServiceImpl
                                  */
                                 .apply(
                                         "TRIM(class_name) LIKE CONCAT('%', {0}, '%')",
-                                        keyword
+                                        searchKeyword
                                 )
 
                                 /*

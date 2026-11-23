@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 /**
  * 学生账号软删除（回收站）实现。
@@ -242,7 +243,9 @@ public class StudentAccountManageServiceImpl
             );
 
             vo.setClassName(
-                    user.getClassName()
+                    ClassNameUtils.normalize(
+                            user.getClassName()
+                    )
             );
 
             vo.setPhone(

@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 /**
  * 部门成员管理实现。
@@ -220,7 +221,9 @@ public class DepartmentMemberManageServiceImpl
                 );
 
                 vo.setClassName(
-                        user.getClassName()
+                        ClassNameUtils.normalize(
+                                user.getClassName()
+                        )
                 );
             }
 

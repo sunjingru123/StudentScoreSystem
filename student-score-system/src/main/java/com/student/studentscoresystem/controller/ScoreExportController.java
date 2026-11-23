@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.SysPosition;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 import com.student.studentscoresystem.entity.SysSemester;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
@@ -886,7 +887,14 @@ public class ScoreExportController {
 
                 if (!className.isEmpty()) {
 
-                    classSet.add(className);
+                    /*
+                     * 25级1班 与 2025级1班 合并为同一项
+                     */
+                    classSet.add(
+                            ClassNameUtils.normalize(
+                                    className
+                            )
+                    );
                 }
             }
         }

@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 @RestController
 @RequestMapping("/admin/score")
@@ -119,7 +120,11 @@ public class AdminScoreController {
             vo.setStudentId(student.getId());
             vo.setStudentName(student.getRealName());
             vo.setStudentNo(student.getStudentNo());
-            vo.setClassName(student.getClassName());
+            vo.setClassName(
+                    ClassNameUtils.normalize(
+                            student.getClassName()
+                    )
+            );
 
             vo.setRuleName(names.resolve(record));
 

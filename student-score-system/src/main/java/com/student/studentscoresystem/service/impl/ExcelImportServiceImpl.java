@@ -21,6 +21,7 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.DepartmentMemberManageService;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
@@ -246,7 +247,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     trim(row.getRealName());
 
             String className =
-                    trim(row.getClassName());
+                    ClassNameUtils.normalize(
+                            trim(row.getClassName())
+                    );
 
             if (isEmpty(studentNo)) {
 

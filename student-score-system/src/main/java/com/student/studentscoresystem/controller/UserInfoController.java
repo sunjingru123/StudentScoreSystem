@@ -18,6 +18,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 
 import java.util.List;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 @RestController
 @RequestMapping("/user")
@@ -138,7 +139,9 @@ public class UserInfoController {
         );
 
         vo.setClassName(
-                user.getClassName()
+                ClassNameUtils.normalize(
+                        user.getClassName()
+                )
         );
 
         vo.setStatus(

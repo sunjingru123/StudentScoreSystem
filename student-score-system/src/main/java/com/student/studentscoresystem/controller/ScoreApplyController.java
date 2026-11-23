@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.student.studentscoresystem.utils.ClassNameUtils;
 
 @RestController
 @RequestMapping("/scoreApply")
@@ -2858,7 +2859,9 @@ public class ScoreApplyController {
                  * 班级
                  */
                 vo.setClassName(
-                        user.getClassName()
+                        ClassNameUtils.normalize(
+                                user.getClassName()
+                        )
                 );
 
                 /*
