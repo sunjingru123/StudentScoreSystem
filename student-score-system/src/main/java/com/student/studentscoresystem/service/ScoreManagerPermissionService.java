@@ -12,6 +12,7 @@ import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 
 /**
  * =========================================================
@@ -186,7 +187,7 @@ public class ScoreManagerPermissionService {
                                         (short) 1
                                 )
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         ARCHIVE_LEADER_POSITIONS
                                 )
                 );
@@ -207,12 +208,14 @@ public class ScoreManagerPermissionService {
 
 
             /*
-             * 岗位二次校验：
+             * 权限层级二次校验：
              *
-             * SQL 中已经按 部长 / 副部长 过滤，
+             * SQL 中已经按 部长 / 副部长 层级过滤，
              * 这里再校验一次，避免调用方传入异常数据时误放行。
              */
-            if (!ARCHIVE_LEADER_POSITIONS.contains(relation.getPosition())) {
+            if (!ARCHIVE_LEADER_POSITIONS.contains(
+                    OrgPositionLevel.levelOf(relation)
+            )) {
 
                 continue;
             }

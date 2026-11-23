@@ -7,6 +7,7 @@ import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,7 +133,8 @@ public class DepartmentMemberImportService {
 
                     if (!isValidPosition(position)) {
                         throw new IllegalArgumentException(
-                                "职位必须是：干事、副部长、部长"
+                                "职位必须是："
+                                        + OrgPositionLevel.titlesOfOrgType(null)
                         );
                     }
 
@@ -213,6 +215,9 @@ public class DepartmentMemberImportService {
                         relation.setUserId(user.getId());
                         relation.setDepartmentId(department.getId());
                         relation.setPosition(position);
+                        relation.setPositionLevel(
+                                OrgPositionLevel.resolveLevel(position)
+                        );
                         relation.setStatus((short) 1);
 
                         userDepartmentMapper.insert(relation);
@@ -227,6 +232,9 @@ public class DepartmentMemberImportService {
                         // ========================
 
                         relation.setPosition(position);
+                        relation.setPositionLevel(
+                                OrgPositionLevel.resolveLevel(position)
+                        );
                         relation.setStatus((short) 1);
 
                         userDepartmentMapper.updateById(relation);
@@ -270,9 +278,7 @@ public class DepartmentMemberImportService {
      */
     private boolean isValidPosition(String position) {
 
-        return "干事".equals(position)
-                || "副部长".equals(position)
-                || "部长".equals(position);
+        return OrgPositionLevel.isValidTitle(position);
     }
 
     /**

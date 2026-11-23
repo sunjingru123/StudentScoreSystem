@@ -4,7 +4,7 @@
     <div class="page-header">
       <div>
         <h2>Excel 数据导入</h2>
-        <p>用于批量导入学生名单和部门成员名单</p>
+        <p>用于批量导入学生名单、部门成员名单与社团成员名单</p>
       </div>
     </div>
 
@@ -127,7 +127,7 @@
           <p>
             以 Excel 名单为准覆盖部门成员：
             批量设置学生所属部门以及
-            干事、副部长、部长身份，
+            干事、副部长、部长、站长、副站长身份，
             名单中未出现的成员会被移出该部门。
           </p>
         </div>
@@ -177,7 +177,14 @@
             职位只能填写：
             <b>干事</b>、
             <b>副部长</b>、
-            <b>部长</b>。
+            <b>部长</b>、
+            <b>副站长</b>、
+            <b>站长</b>。
+          </p>
+
+          <p>
+            站长与部长系统权限完全一致，
+            副站长与副部长完全一致。
           </p>
 
           <p>
@@ -239,6 +246,152 @@
             @click="importDepartmentMembers"
           >
             导入部门成员
+          </el-button>
+
+        </div>
+
+      </div>
+
+    </el-card>
+
+    <!-- ========================= -->
+    <!-- 社团成员 -->
+    <!-- ========================= -->
+    <el-card class="import-card" shadow="never">
+
+      <div class="card-header">
+
+        <div>
+          <h3>社团成员名单导入</h3>
+
+          <p>
+            导入大社团 / 小社团成员：
+            大社团可设置理事长、副理事长或主席、副主席；
+            小社团可设置部长、副部长或主任、副主任。
+          </p>
+        </div>
+
+        <div class="header-actions">
+
+          <el-button
+            type="warning"
+            plain
+            :loading="clubTemplateDownloading"
+            @click="downloadClubTemplate"
+          >
+            <el-icon>
+              <Download />
+            </el-icon>
+            下载模板
+          </el-button>
+
+          <el-tag type="warning">
+            社团数据
+          </el-tag>
+
+        </div>
+
+      </div>
+
+      <div class="import-content">
+
+        <div class="excel-info">
+
+          <div class="info-title">
+            Excel 格式
+          </div>
+
+          <div class="columns">
+
+            <el-tag>大社团名称</el-tag>
+            <el-tag>小社团名称</el-tag>
+            <el-tag>姓名</el-tag>
+            <el-tag>学号</el-tag>
+            <el-tag type="warning">
+              职位
+            </el-tag>
+
+          </div>
+
+          <p>
+            大社团职位：
+            <b>理事长</b>、
+            <b>副理事长</b>、
+            <b>主席</b>、
+            <b>副主席</b>、
+            <b>干事</b>。
+          </p>
+
+          <p>
+            小社团职位：
+            <b>部长</b>、
+            <b>副部长</b>、
+            <b>主任</b>、
+            <b>副主任</b>、
+            <b>干事</b>。
+          </p>
+
+          <p>
+            <b>小社团名称留空</b>且填写了大社团时，
+            表示该成员直接属于大社团（例如理事长 / 主席）。
+          </p>
+
+          <p>
+            大社团与小社团名称<b>都留空</b>时，
+            自动继承上一行所属组织；
+            同一小社团的多人只要第一行写完整即可。
+          </p>
+
+          <p>
+            导入为“覆盖”模式：
+            Excel 中出现的组织，
+            不在名单内的原有成员会被撤掉职位（移出组织）。
+          </p>
+
+        </div>
+
+        <el-upload
+          ref="clubUploadRef"
+          class="upload-area"
+          action=""
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="handleClubFileChange"
+          :on-remove="removeClubFile"
+        >
+
+          <el-button type="warning">
+            选择社团成员 Excel
+          </el-button>
+
+          <template #tip>
+            <div class="upload-tip">
+              支持 .xlsx / .xls 文件
+            </div>
+          </template>
+
+        </el-upload>
+
+        <div
+          v-if="clubFile"
+          class="selected-file"
+        >
+
+          <el-icon>
+            <Document />
+          </el-icon>
+
+          <span>
+            {{ clubFile.name }}
+          </span>
+
+          <el-button
+            type="warning"
+            :loading="clubImporting"
+            @click="importClubMembers"
+          >
+            导入社团成员
           </el-button>
 
         </div>
@@ -424,15 +577,19 @@ import request from '@/utils/request'
 
 const studentUploadRef = ref(null)
 const departmentUploadRef = ref(null)
+const clubUploadRef = ref(null)
 
 const studentFile = ref(null)
 const departmentFile = ref(null)
+const clubFile = ref(null)
 
 const studentImporting = ref(false)
 const departmentImporting = ref(false)
+const clubImporting = ref(false)
 
 const studentTemplateDownloading = ref(false)
 const departmentTemplateDownloading = ref(false)
+const clubTemplateDownloading = ref(false)
 
 const lastImportResult = ref(null)
 
@@ -898,6 +1055,209 @@ async function importDepartmentMembers() {
   } finally {
 
     departmentImporting.value = false
+  }
+}
+
+async function downloadClubTemplate() {
+
+  clubTemplateDownloading.value = true
+
+  try {
+
+    const response = await request.get(
+      '/excel/import/club-members/template',
+      {
+        responseType: 'blob'
+      }
+    )
+
+    await saveTemplateBlob(
+      response,
+      '社团成员名单导入模板.xlsx',
+      '下载社团成员模板失败'
+    )
+
+  } catch (error) {
+
+    console.error('下载社团成员模板失败：', error)
+
+    ElMessage.error(
+      '下载社团成员模板失败'
+    )
+
+  } finally {
+
+    clubTemplateDownloading.value = false
+
+  }
+}
+
+
+/**
+ * =========================
+ * 社团成员 Excel
+ * =========================
+ */
+
+function handleClubFileChange(file) {
+
+  clubFile.value =
+    file.raw
+}
+
+function removeClubFile() {
+
+  clubFile.value = null
+}
+
+async function importClubMembers() {
+
+  if (!clubFile.value) {
+
+    ElMessage.warning(
+      '请先选择社团成员 Excel'
+    )
+
+    return
+  }
+
+  /*
+   * 覆盖模式确认，避免误操作导致成员被撤掉职位。
+   */
+  try {
+    await ElMessageBox.confirm(
+      '导入为“覆盖”模式：Excel 中出现的组织，其名单外的原有成员会被撤掉职位（移出组织）。确定继续吗？',
+      '社团成员覆盖导入',
+      {
+        type: 'warning',
+        confirmButtonText: '确定覆盖',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+  }
+
+  clubImporting.value = true
+
+  lastImportResult.value = null
+
+  try {
+
+    const formData = new FormData()
+
+    formData.append(
+      'file',
+      clubFile.value
+    )
+
+    const res =
+      await request.post(
+        '/excel/import/club-members',
+        formData,
+        {
+          headers: {
+            'Content-Type':
+              'multipart/form-data'
+          }
+        }
+      )
+
+    if (res?.code === 200) {
+
+      const result =
+        res.data || {}
+
+      lastImportResult.value =
+        result
+
+      const successCount =
+        result.successCount || 0
+
+      const failCount =
+        result.failCount || 0
+
+      const removedCount =
+        result.removedCount || 0
+
+      const skippedOrganizations =
+        Array.isArray(result.skippedDepartments)
+          ? result.skippedDepartments
+          : []
+
+      const summaryParts = [
+        `成功 ${successCount} 条`
+      ]
+
+      if (removedCount > 0) {
+
+        summaryParts.push(
+          `移出 ${removedCount} 条`
+        )
+      }
+
+      if (failCount > 0) {
+
+        summaryParts.push(
+          `失败 ${failCount} 条`
+        )
+      }
+
+      const summary =
+        summaryParts.join('，')
+
+      if (failCount > 0) {
+
+        ElMessage.warning(
+          `社团成员导入完成：${summary}`
+        )
+
+      } else {
+
+        ElMessage.success(
+          `社团成员导入成功：${summary}`
+        )
+      }
+
+      if (skippedOrganizations.length > 0) {
+
+        ElMessage.warning(
+          `以下组织因存在失败行已跳过覆盖（保留原有成员）：${skippedOrganizations.join('、')}`
+        )
+      }
+
+      clubFile.value = null
+
+      clubUploadRef
+        .value
+        ?.clearFiles()
+
+    } else {
+
+      ElMessage.error(
+        res?.message ||
+        '社团成员导入失败'
+      )
+    }
+
+  } catch (error) {
+
+    console.error(
+      '社团成员导入异常：',
+      error
+    )
+
+    ElMessage.error(
+      error?.response?.data?.message ||
+      error?.message ||
+      '社团成员导入失败'
+    )
+
+  } finally {
+
+    clubImporting.value = false
   }
 }
 

@@ -20,9 +20,11 @@ import com.student.studentscoresystem.service.DepartmentScoreArchiveAuditService
 import com.student.studentscoresystem.service.DepartmentScoreFinalizeService;
 import com.student.studentscoresystem.service.IDepartmentScoreApplyService;
 import com.student.studentscoresystem.service.IDepartmentScoreTemplateService;
+import com.student.studentscoresystem.service.OrgScopeService;
 import com.student.studentscoresystem.service.PovertyImportPermissionService;
 import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.vo.ArchiveScoreOptionsVO;
 import com.student.studentscoresystem.vo.BatchAuditResultVO;
 import io.jsonwebtoken.Claims;
@@ -69,6 +71,8 @@ public class DepartmentScoreApplyController {
 
     private final PovertyImportPermissionService povertyImportPermissionService;
 
+    private final OrgScopeService orgScopeService;
+
 
     public DepartmentScoreApplyController(
             IDepartmentScoreApplyService applyService,
@@ -80,7 +84,8 @@ public class DepartmentScoreApplyController {
             DepartmentScoreApplyImportService departmentScoreApplyImportService,
             ScoreManagerPermissionService scoreManagerPermissionService,
             DepartmentScoreArchiveAuditService departmentScoreArchiveAuditService,
-            PovertyImportPermissionService povertyImportPermissionService) {
+            PovertyImportPermissionService povertyImportPermissionService,
+            OrgScopeService orgScopeService) {
 
         this.applyService = applyService;
 
@@ -109,6 +114,9 @@ public class DepartmentScoreApplyController {
 
         this.povertyImportPermissionService =
                 povertyImportPermissionService;
+
+        this.orgScopeService =
+                orgScopeService;
     }
 
 
@@ -185,35 +193,56 @@ public class DepartmentScoreApplyController {
 
     /*
      * =========================================================
-     * 部门申报权限
+     * 组织申报权限
      *
-     * 副部长 / 部长
+     * 副职 / 正职（副部长、部长、副站长、站长、
+     * 理事长、副理事长、主任、副主任 …）可以提交申报。
      *
-     * 可以提交部门加减分申报。
-     *
-     * 干事不再具备部门加减分申报权限。
+     * 按权限层级判断，干事不再具备部门加减分申报权限。
      * =========================================================
      */
     private boolean canApply(
-            String position) {
+            String positionLevel) {
 
-        return "副部长".equals(position)
-                || "部长".equals(position);
+        return OrgPositionLevel.isLeaderOrDeputy(
+                normalizeLevel(positionLevel)
+        );
     }
 
 
     /*
      * =========================================================
-     * 部门审核权限
+     * 组织审核权限
      *
-     * 副部长 / 部长
+     * 副职 / 正职
      * =========================================================
      */
     private boolean canAudit(
-            String position) {
+            String positionLevel) {
 
-        return "副部长".equals(position)
-                || "部长".equals(position);
+        return OrgPositionLevel.isLeaderOrDeputy(
+                normalizeLevel(positionLevel)
+        );
+    }
+
+
+    /**
+     * 兼容历史数据：传入的可能是职位名称而不是层级
+     */
+    private String normalizeLevel(
+            String value) {
+
+        if (value == null || value.isBlank()) {
+
+            return null;
+        }
+
+        if (OrgPositionLevel.isLeaderOrDeputy(value)) {
+
+            return value;
+        }
+
+        return OrgPositionLevel.resolveLevel(value);
     }
 
 
@@ -324,7 +353,7 @@ public class DepartmentScoreApplyController {
 
 
         if (!canApply(
-                relation.getPosition()
+                OrgPositionLevel.levelOf(relation)
         )) {
 
             return Result.fail(
@@ -975,7 +1004,7 @@ public class DepartmentScoreApplyController {
 
 
             String position =
-                    relation.getPosition();
+                    OrgPositionLevel.levelOf(relation);
 
 
             System.out.println(
@@ -1394,7 +1423,7 @@ public class DepartmentScoreApplyController {
                                 )
 
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         List.of(
                                                 "副部长",
                                                 "部长"
@@ -1463,6 +1492,15 @@ public class DepartmentScoreApplyController {
                 "当前用户负责部门 = "
                         + departmentIds
         );
+
+        /*
+         * 大社团负责人负责本大社团及其下属小社团，
+         * 小社团负责人只能看到自己的小社团。
+         */
+        departmentIds =
+                orgScopeService.expandManagedOrganizationIds(
+                        departmentIds
+                );
 
 
         /*
@@ -1684,31 +1722,25 @@ public class DepartmentScoreApplyController {
 
 
         /*
-         * 审核人必须属于该部门
+         * 审核人必须能够管理该申报所属组织：
+         *
+         * - 同部门正副职；
+         * - 大社团正副职可以审核其下属小社团；
+         * - 小社团负责人不能越权到其它组织。
          */
-        SysUserDepartment reviewerRelation =
-
-                userDepartmentMapper.selectOne(
-
+        List<SysUserDepartment> reviewerRelations =
+                userDepartmentMapper.selectList(
                         new LambdaQueryWrapper<SysUserDepartment>()
-
                                 .eq(
                                         SysUserDepartment::getUserId,
                                         currentUserId
                                 )
-
-                                .eq(
-                                        SysUserDepartment::getDepartmentId,
-                                        apply.getDepartmentId()
-                                )
-
                                 .eq(
                                         SysUserDepartment::getStatus,
                                         (short) 1
                                 )
-
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         List.of(
                                                 "副部长",
                                                 "部长"
@@ -1716,11 +1748,30 @@ public class DepartmentScoreApplyController {
                                 )
                 );
 
+        List<Long> reviewerOrganizationIds =
+                new ArrayList<>();
 
-        if (reviewerRelation == null) {
+        if (reviewerRelations != null) {
+
+            for (SysUserDepartment relation : reviewerRelations) {
+
+                if (relation != null
+                        && relation.getDepartmentId() != null) {
+
+                    reviewerOrganizationIds.add(
+                            relation.getDepartmentId()
+                    );
+                }
+            }
+        }
+
+        if (!orgScopeService.covers(
+                reviewerOrganizationIds,
+                apply.getDepartmentId()
+        )) {
 
             return Result.fail(
-                    "你不是该部门的副部长或部长，没有审核权限"
+                    "你不是该组织的副部长或部长，没有审核权限"
             );
         }
 
@@ -1832,7 +1883,7 @@ public class DepartmentScoreApplyController {
                                 )
 
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         List.of(
                                                 "副部长",
                                                 "部长"
@@ -1875,6 +1926,22 @@ public class DepartmentScoreApplyController {
                     "你当前没有负责的部门"
             );
         }
+
+
+        /*
+         * 自己直接负责的组织（用于逐个校验越权）
+         */
+        List<Long> reviewerOrganizationIds =
+                new ArrayList<>(departmentIds);
+
+
+        /*
+         * 待审核查询范围：大社团包含其下属小社团
+         */
+        departmentIds =
+                orgScopeService.expandManagedOrganizationIds(
+                        departmentIds
+                );
 
 
         /*
@@ -1959,40 +2026,13 @@ public class DepartmentScoreApplyController {
 
 
             /*
-             * 再次确认审核人属于这个部门
+             * 再次确认审核人能够管理这个组织
+             *（大社团正副职可审核下属小社团）
              */
-            SysUserDepartment reviewerRelation =
-
-                    userDepartmentMapper.selectOne(
-
-                            new LambdaQueryWrapper<SysUserDepartment>()
-
-                                    .eq(
-                                            SysUserDepartment::getUserId,
-                                            currentUserId
-                                    )
-
-                                    .eq(
-                                            SysUserDepartment::getDepartmentId,
-                                            apply.getDepartmentId()
-                                    )
-
-                                    .eq(
-                                            SysUserDepartment::getStatus,
-                                            (short) 1
-                                    )
-
-                                    .in(
-                                            SysUserDepartment::getPosition,
-                                            List.of(
-                                                    "副部长",
-                                                    "部长"
-                                            )
-                                    )
-                    );
-
-
-            if (reviewerRelation == null) {
+            if (!orgScopeService.covers(
+                    reviewerOrganizationIds,
+                    apply.getDepartmentId()
+            )) {
 
                 continue;
             }

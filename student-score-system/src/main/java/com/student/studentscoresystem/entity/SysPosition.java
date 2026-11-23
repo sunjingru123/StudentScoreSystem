@@ -28,6 +28,17 @@ public class SysPosition implements Serializable {
 
     private String name;
 
+    /**
+     * 岗位对应的系统权限层级
+     *
+     * 例如：站长 / 理事长 / 主席 / 主任 = 部长，
+     *       副站长 / 副理事长 / 副主席 / 副主任 = 副部长。
+     *
+     * RoleInterceptor 同时匹配 name 与 level，
+     * 因此同一层级的不同职位名称拥有完全一致的系统权限。
+     */
+    private String level;
+
     private String description;
 
     private Short status;

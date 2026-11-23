@@ -458,6 +458,48 @@ CREATE INDEX IF NOT EXISTS idx_department_status ON public.department(status);
 CREATE INDEX IF NOT EXISTS idx_department_type ON public.department(department_type);
 
 -- =========================================================
+-- 1.1 组织层级（部门 / 大社团 / 小社团）
+--
+-- department_type：
+--   1 = 部门
+--   2 = 大社团
+--   3 = 小社团（隶属于某个大社团）
+--
+-- parent_id：
+--   仅小社团使用，指向所属大社团的 department.id；
+--   部门与大社团为 NULL。
+--
+-- 只新增列/索引与约束，不修改、不删除任何已有组织数据。
+-- =========================================================
+ALTER TABLE public.department
+    ADD COLUMN IF NOT EXISTS parent_id BIGINT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_department_parent_id
+    ON public.department(parent_id);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_department_type'
+    ) THEN
+        ALTER TABLE public.department
+            ADD CONSTRAINT ck_department_type
+            CHECK (department_type IN (1, 2, 3));
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_department_parent'
+    ) THEN
+        ALTER TABLE public.department
+            ADD CONSTRAINT fk_department_parent
+            FOREIGN KEY (parent_id) REFERENCES public.department(id);
+    END IF;
+END $$;
+
+-- =========================================================
 -- 2. 用户部门关联 sys_user_department
 -- =========================================================
 CREATE TABLE IF NOT EXISTS public.sys_user_department (
@@ -492,6 +534,107 @@ CREATE INDEX IF NOT EXISTS idx_user_department_user_id ON public.sys_user_depart
 CREATE INDEX IF NOT EXISTS idx_user_department_dept_id ON public.sys_user_department(department_id);
 CREATE INDEX IF NOT EXISTS idx_user_department_position ON public.sys_user_department(position);
 CREATE INDEX IF NOT EXISTS idx_user_department_status ON public.sys_user_department(status);
+
+-- =========================================================
+-- 2.1 成员职位层级 position_level
+--
+-- position       ：组织内真实职位名称（部长 / 站长 / 理事长 / 主任 …）
+-- position_level ：归一后的系统权限层级（干事 / 副部长 / 部长）
+--
+-- 系统权限一律按 position_level 判断，
+-- 因此站长与部长、副站长与副部长权限完全一致，
+-- 但界面上仍然保留原始职位名称。
+--
+-- 同时放开 position 的旧 CHECK 约束（只允许干事/副部长/部长），
+-- 以便保存 站长、理事长、主任 等真实职位名称。
+-- =========================================================
+ALTER TABLE public.sys_user_department
+    ADD COLUMN IF NOT EXISTS position_level VARCHAR(20) NOT NULL DEFAULT '干事';
+
+UPDATE public.sys_user_department
+SET position_level = CASE
+        WHEN position IN ('部长', '站长', '理事长', '主席', '主任')
+            THEN '部长'
+        WHEN position IN ('副部长', '副站长', '副理事长', '副主席', '副主任')
+            THEN '副部长'
+        ELSE '干事'
+    END
+WHERE position_level IS NULL
+   OR position_level NOT IN ('干事', '副部长', '部长');
+
+ALTER TABLE public.sys_user_department
+    DROP CONSTRAINT IF EXISTS ck_sys_user_department_position;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_sys_user_department_level'
+    ) THEN
+        ALTER TABLE public.sys_user_department
+            ADD CONSTRAINT ck_sys_user_department_level
+            CHECK (position_level IN ('干事', '副部长', '部长'));
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_user_department_level
+    ON public.sys_user_department(position_level);
+
+-- =========================================================
+-- 2.2 系统岗位增加 level 字段
+--
+-- sys_position.name  ：岗位显示名称（部长 / 站长 / 理事长 …）
+-- sys_position.level ：该岗位对应的系统权限层级
+--
+-- RoleInterceptor 同时匹配 name 与 level，
+-- 于是「站长」自动拥有「部长」的全部系统权限。
+-- =========================================================
+ALTER TABLE public.sys_position
+    ADD COLUMN IF NOT EXISTS level VARCHAR(20);
+
+UPDATE public.sys_position
+SET level = name
+WHERE level IS NULL OR level = '';
+
+-- 新增组织职位对应的系统岗位（幂等，只当不存在时插入）
+DO $$
+DECLARE
+    seq_name text;
+    item RECORD;
+BEGIN
+    FOR item IN
+        SELECT * FROM (VALUES
+            ('站长', '部门正职（权限等同部长）', '部长'),
+            ('副站长', '部门副职（权限等同副部长）', '副部长'),
+            ('理事长', '大社团正职（权限等同部长）', '部长'),
+            ('副理事长', '大社团副职（权限等同副部长）', '副部长'),
+            ('主席', '大社团正职（权限等同部长）', '部长'),
+            ('副主席', '大社团副职（权限等同副部长）', '副部长'),
+            ('主任', '小社团正职（权限等同部长）', '部长'),
+            ('副主任', '小社团副职（权限等同副部长）', '副部长')
+        ) AS t(name, description, level)
+    LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM public.sys_position WHERE name = item.name
+        ) THEN
+            seq_name := pg_get_serial_sequence('public.sys_position', 'id');
+            IF seq_name IS NOT NULL THEN
+                PERFORM setval(
+                    seq_name,
+                    (SELECT COALESCE(MAX(id), 0) + 1 FROM public.sys_position),
+                    false
+                );
+            END IF;
+
+            INSERT INTO public.sys_position (name, description, level, status)
+            VALUES (item.name, item.description, item.level, 1);
+        ELSE
+            UPDATE public.sys_position
+            SET level = item.level
+            WHERE name = item.name
+              AND (level IS NULL OR level = '' OR level = name);
+        END IF;
+    END LOOP;
+END $$;
 
 -- =========================================================
 -- 3. 部门加分申请表 department_score_apply

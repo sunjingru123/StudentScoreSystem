@@ -166,7 +166,7 @@ public class ScoreApplyController {
                                         (short) 1
                                 )
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         List.of(
                                                 "干事",
                                                 "副部长",
@@ -247,7 +247,7 @@ public class ScoreApplyController {
                                         (short) 1
                                 )
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         List.of(
                                                 "副部长",
                                                 "部长"

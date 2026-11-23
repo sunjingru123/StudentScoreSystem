@@ -21,9 +21,23 @@ public interface ExcelImportService {
     );
 
     /**
+     * 导入社团成员
+     *
+     * Excel 列：大社团名称 / 小社团名称 / 姓名 / 学号 / 职位
+     */
+    Map<String, Object> importClubMembers(
+            MultipartFile file
+    );
+
+    /**
      * 生成「学生名单导入」Excel 模板
      */
     byte[] buildStudentTemplateWorkbook();
+
+    /**
+     * 生成「社团成员名单导入」Excel 模板
+     */
+    byte[] buildClubMemberTemplateWorkbook();
 
     /**
      * 生成「部门成员名单导入」Excel 模板

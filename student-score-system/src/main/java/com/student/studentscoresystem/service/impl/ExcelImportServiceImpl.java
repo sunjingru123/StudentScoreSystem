@@ -2,6 +2,7 @@ package com.student.studentscoresystem.service.impl;
 
 import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.student.studentscoresystem.dto.ClubMemberExcelRow;
 import com.student.studentscoresystem.dto.DepartmentMemberExcelRow;
 import com.student.studentscoresystem.dto.ScoreRuleExcelRow;
 import com.student.studentscoresystem.dto.StudentExcelRow;
@@ -20,6 +21,7 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.DepartmentMemberManageService;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.service.DepartmentTemplateSyncService;
 import com.student.studentscoresystem.service.ExcelImportService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -699,7 +701,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                 errors.add(
                         error(
                                 rowNumber,
-                                "职位不合法，只允许：干事、副部长、部长"
+                                "职位不合法，只允许："
+                                        + OrgPositionLevel.titlesOfOrgType(null)
                         )
                 );
 
@@ -714,20 +717,8 @@ public class ExcelImportServiceImpl implements ExcelImportService {
              * =====================================================
              */
             SysPosition sysPosition =
-                    sysPositionMapper.selectOne(
-                            new LambdaQueryWrapper<SysPosition>()
-                                    .eq(
-                                            SysPosition::getName,
-                                            position
-                                    )
-                                    .eq(
-                                            SysPosition::getStatus,
-                                            (short) 1
-                                    )
-                                    .orderByAsc(
-                                            SysPosition::getId
-                                    )
-                                    .last("LIMIT 1")
+                    findSysPositionByTitleOrLevel(
+                            position
                     );
 
             if (sysPosition == null) {
@@ -786,6 +777,13 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         (short) 1
                 );
 
+                /*
+                 * 部门成员导入创建的是普通部门
+                 */
+                department.setDepartmentType(
+                        OrgPositionLevel.TYPE_DEPARTMENT
+                );
+
                 department.setCreateTime(
                         LocalDateTime.now()
                 );
@@ -825,6 +823,35 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                             department
                     );
                 }
+            }
+
+            /*
+             * 职位必须与组织类型匹配：
+             * 普通部门只允许：部长、副部长、站长、副站长、干事。
+             */
+            Integer orgType =
+                    department.getDepartmentType() == null
+                            ? (int) OrgPositionLevel.TYPE_DEPARTMENT
+                            : department.getDepartmentType().intValue();
+
+            if (!OrgPositionLevel.isValidTitleForOrgType(
+                    position,
+                    orgType
+            )) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "职位《"
+                                        + position
+                                        + "》不适用于该组织，只允许："
+                                        + OrgPositionLevel.titlesOfOrgType(orgType)
+                        )
+                );
+
+                continue;
             }
 
             /*
@@ -1035,6 +1062,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         position
                 );
 
+                relation.setPositionLevel(
+                        OrgPositionLevel.resolveLevel(position)
+                );
+
                 relation.setStatus(
                         (short) 1
                 );
@@ -1069,6 +1100,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
                 relation.setPosition(
                         position
+                );
+
+                relation.setPositionLevel(
+                        OrgPositionLevel.resolveLevel(position)
                 );
 
                 relation.setStatus(
@@ -1252,6 +1287,877 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         );
 
         return result;
+    }
+
+
+    /**
+     * =========================================================
+     * 导入社团成员
+     * =========================================================
+     *
+     * Excel 列：
+     *
+     * 大社团名称 | 小社团名称 | 姓名 | 学号 | 职位
+     *
+     * 规则：
+     *
+     * 1. 大社团名称留空时继承上一行；
+     * 2. 小社团名称留空表示该成员直接属于大社团
+     *    （理事长 / 副理事长 / 主席 / 副主席）；
+     * 3. 小社团名称不为空时自动创建（或复用）该大社团下的小社团；
+     * 4. 本导入为“新增 / 更新”模式，不会移除 Excel 中未出现的成员，
+     *    避免因名单不完整误删成员。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> importClubMembers(
+            MultipartFile file
+    ) {
+
+        List<ClubMemberExcelRow> rows;
+
+        try {
+
+            rows = EasyExcel
+                    .read(file.getInputStream())
+                    .head(ClubMemberExcelRow.class)
+                    .doReadAllSync();
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "社团成员 Excel 读取失败：" +
+                            e.getMessage(),
+                    e
+            );
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+
+        List<Map<String, Object>> errors =
+                new ArrayList<>();
+
+        if (rows == null || rows.isEmpty()) {
+
+            return buildResult(
+                    0,
+                    0,
+                    errors,
+                    "Excel 中没有数据"
+            );
+        }
+
+        Set<String> importedRelations =
+                new HashSet<>();
+
+        String currentBigClubName = null;
+
+        String currentSmallClubName = null;
+
+        /*
+         * 覆盖同步上下文：
+         *
+         * 以 Excel 中出现的每个组织（大社团 / 小社团）为单位，
+         * 记录行数与成功导入的成员；
+         * 导入结束后，把该组织内不在名单中的在编成员软移出（撤掉职位）。
+         */
+        Map<String, DepartmentRoster> rosters =
+                new LinkedHashMap<>();
+
+        int rowNumber = 1;
+
+        for (ClubMemberExcelRow row : rows) {
+
+            rowNumber++;
+
+            if (row == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "Excel 当前行数据为空"
+                        )
+                );
+
+                continue;
+            }
+
+            String bigClubName =
+                    trim(row.getBigClubName());
+
+            String smallClubName =
+                    trim(row.getSmallClubName());
+
+            String realName =
+                    trim(row.getRealName());
+
+            String studentNo =
+                    trim(row.getStudentNo());
+
+            String position =
+                    trim(row.getPosition());
+
+            /*
+             * 组织归属继承规则：
+             *
+             * 1. 只填大社团，小社团留空 → 该成员属于大社团本身；
+             * 2. 大社团、小社团都填 → 属于该小社团；
+             * 3. 大社团与小社团都留空 → 完全继承上一行；
+             * 4. 只填小社团 → 大社团继承上一行。
+             */
+            if (!isEmpty(bigClubName)) {
+
+                currentBigClubName =
+                        bigClubName;
+
+                if (!isEmpty(smallClubName)) {
+
+                    currentSmallClubName =
+                            smallClubName;
+
+                } else {
+
+                    currentSmallClubName = null;
+                }
+
+            } else {
+
+                bigClubName =
+                        currentBigClubName;
+
+                if (!isEmpty(smallClubName)) {
+
+                    currentSmallClubName =
+                            smallClubName;
+
+                } else {
+
+                    smallClubName =
+                            currentSmallClubName;
+                }
+            }
+
+            if (isEmpty(bigClubName)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "大社团名称不能为空，且没有可以继承的上一组织"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * 记录该组织在 Excel 中的行数。
+             *
+             * 只要该组织任意一行失败，就跳过它的覆盖同步，
+             * 避免因学号 / 姓名写错而误移出成员。
+             */
+            String organizationKey =
+                    isEmpty(smallClubName)
+                            ? bigClubName
+                            : smallClubName;
+
+            DepartmentRoster roster =
+                    rosters.computeIfAbsent(
+                            organizationKey,
+                            DepartmentRoster::new
+                    );
+
+            roster.incrementRowCount();
+
+            if (isEmpty(studentNo)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "学号不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            if (isEmpty(realName)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "姓名不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            if (isEmpty(position)) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "职位不能为空"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * 小社团名称为空 → 成员属于大社团
+             */
+            boolean belongToBigClub =
+                    isEmpty(smallClubName);
+
+            int orgType =
+                    belongToBigClub
+                            ? OrgPositionLevel.TYPE_BIG_CLUB
+                            : OrgPositionLevel.TYPE_SMALL_CLUB;
+
+            if (!OrgPositionLevel.isValidTitleForOrgType(
+                    position,
+                    orgType
+            )) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "职位《"
+                                        + position
+                                        + "》不适用于"
+                                        + (belongToBigClub ? "大社团" : "小社团")
+                                        + "，只允许："
+                                        + OrgPositionLevel.titlesOfOrgType(orgType)
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * 查询系统岗位（名称优先，回退到同层级）
+             */
+            SysPosition sysPosition =
+                    findSysPositionByTitleOrLevel(
+                            position
+                    );
+
+            if (sysPosition == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "系统中不存在有效岗位："
+                                        + position
+                                        + "，请先创建该岗位"
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * 查询 / 创建大社团
+             */
+            Department bigClub;
+
+            try {
+
+                bigClub =
+                        ensureOrganization(
+                                bigClubName,
+                                OrgPositionLevel.TYPE_BIG_CLUB,
+                                null
+                        );
+
+            } catch (IllegalArgumentException e) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                e.getMessage()
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * 确定成员所属组织
+             */
+            Department targetOrg;
+
+            if (belongToBigClub) {
+
+                targetOrg =
+                        bigClub;
+
+            } else {
+
+                try {
+
+                    targetOrg =
+                            ensureOrganization(
+                                    smallClubName,
+                                    OrgPositionLevel.TYPE_SMALL_CLUB,
+                                    bigClub.getId()
+                            );
+
+                } catch (IllegalArgumentException e) {
+
+                    failCount++;
+
+                    errors.add(
+                            error(
+                                    rowNumber,
+                                    e.getMessage()
+                            )
+                    );
+
+                    continue;
+                }
+            }
+
+            /*
+             * 组织已确定，记录到覆盖同步上下文
+             */
+            roster.setDepartmentId(
+                    targetOrg.getId()
+            );
+
+            /*
+             * 查询学生
+             */
+            SysUser user =
+                    sysUserMapper.selectOne(
+                            new LambdaQueryWrapper<SysUser>()
+                                    .eq(
+                                            SysUser::getStudentNo,
+                                            studentNo
+                                    )
+                                    .last("LIMIT 1")
+                    );
+
+            if (user == null) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "系统中不存在该学生：" +
+                                        studentNo
+                        )
+                );
+
+                continue;
+            }
+
+            if (!realName.equals(
+                    user.getRealName()
+            )) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "姓名与系统不一致：学号 "
+                                        + studentNo
+                                        + "，系统姓名："
+                                        + user.getRealName()
+                                        + "，Excel 姓名："
+                                        + realName
+                        )
+                );
+
+                continue;
+            }
+
+            /*
+             * Excel 内部重复
+             */
+            String relationKey =
+                    targetOrg.getId() +
+                            "_" +
+                            user.getId();
+
+            if (!importedRelations.add(
+                    relationKey
+            )) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "Excel 中重复出现该学生的组织关系"
+                        )
+                );
+
+                continue;
+            }
+
+            try {
+
+                /*
+                 * 1. 系统部门（sys_user_position 使用）
+                 */
+                SysDepartment sysDepartment =
+                        ensureSysDepartment(
+                                targetOrg.getName()
+                        );
+
+                /*
+                 * 2. 成员关系
+                 */
+                LocalDateTime now =
+                        LocalDateTime.now();
+
+                SysUserDepartment relation =
+                        userDepartmentMapper.selectOne(
+                                new LambdaQueryWrapper<SysUserDepartment>()
+                                        .eq(
+                                                SysUserDepartment::getUserId,
+                                                user.getId()
+                                        )
+                                        .eq(
+                                                SysUserDepartment::getDepartmentId,
+                                                targetOrg.getId()
+                                        )
+                                        .last("LIMIT 1")
+                        );
+
+                if (relation == null) {
+
+                    relation =
+                            new SysUserDepartment();
+
+                    relation.setUserId(
+                            user.getId()
+                    );
+
+                    relation.setDepartmentId(
+                            targetOrg.getId()
+                    );
+
+                    relation.setPosition(
+                            position
+                    );
+
+                    relation.setPositionLevel(
+                            OrgPositionLevel.resolveLevel(position)
+                    );
+
+                    relation.setStatus(
+                            (short) 1
+                    );
+
+                    relation.setJoinTime(
+                            now
+                    );
+
+                    userDepartmentMapper.insert(
+                            relation
+                    );
+
+                } else {
+
+                    relation.setPosition(
+                            position
+                    );
+
+                    relation.setPositionLevel(
+                            OrgPositionLevel.resolveLevel(position)
+                    );
+
+                    relation.setStatus(
+                            (short) 1
+                    );
+
+                    if (relation.getJoinTime() == null) {
+
+                        relation.setJoinTime(
+                                now
+                        );
+                    }
+
+                    userDepartmentMapper.updateById(
+                            relation
+                    );
+                }
+
+                /*
+                 * 3. 系统岗位关系
+                 */
+                SysUserPosition userPosition =
+                        sysUserPositionMapper.selectOne(
+                                new LambdaQueryWrapper<SysUserPosition>()
+                                        .eq(
+                                                SysUserPosition::getUserId,
+                                                user.getId()
+                                        )
+                                        .eq(
+                                                SysUserPosition::getDepartmentId,
+                                                sysDepartment.getId()
+                                        )
+                                        .last("LIMIT 1")
+                        );
+
+                if (userPosition == null) {
+
+                    userPosition =
+                            new SysUserPosition();
+
+                    userPosition.setUserId(
+                            user.getId()
+                    );
+
+                    userPosition.setDepartmentId(
+                            sysDepartment.getId()
+                    );
+
+                    userPosition.setPositionId(
+                            sysPosition.getId()
+                    );
+
+                    userPosition.setCreateTime(
+                            now
+                    );
+
+                    sysUserPositionMapper.insert(
+                            userPosition
+                    );
+
+                } else {
+
+                    userPosition.setPositionId(
+                            sysPosition.getId()
+                    );
+
+                    sysUserPositionMapper.updateById(
+                            userPosition
+                    );
+                }
+
+            } catch (Exception e) {
+
+                failCount++;
+
+                errors.add(
+                        error(
+                                rowNumber,
+                                "成员导入失败：" + e.getMessage()
+                        )
+                );
+
+                continue;
+            }
+
+            successCount++;
+
+            roster.getKeptUserIds().add(
+                    user.getId()
+            );
+        }
+
+        /*
+         * =========================================================
+         * 覆盖同步
+         *
+         * 对 Excel 中出现、且每一行都导入成功的组织，
+         * 以 Excel 名单为准，把不在名单中的在编成员移出
+         * （同时清理其部长 / 副部长 / 干事岗位）。
+         * =========================================================
+         */
+        int removedCount = 0;
+
+        List<String> skippedOrganizations =
+                new ArrayList<>();
+
+        for (DepartmentRoster item : rosters.values()) {
+
+            if (item.getDepartmentId() == null) {
+
+                continue;
+            }
+
+            if (item.getRowCount()
+                    != item.getKeptUserIds().size()) {
+
+                skippedOrganizations.add(
+                        item.getDepartmentName()
+                );
+
+                continue;
+            }
+
+            removedCount +=
+                    departmentMemberManageService.syncRoster(
+                            item.getDepartmentId(),
+                            item.getKeptUserIds()
+                    );
+        }
+
+        Map<String, Object> result =
+                buildResult(
+                        successCount,
+                        failCount,
+                        errors,
+                        "社团成员导入完成（覆盖模式：名单外的原有成员已撤掉职位）"
+                );
+
+        result.put(
+                "removedCount",
+                removedCount
+        );
+
+        result.put(
+                "skippedDepartments",
+                skippedOrganizations
+        );
+
+        return result;
+    }
+
+
+    /**
+     * 查询 / 创建组织
+     *
+     * @param name     组织名称（全局唯一）
+     * @param type     1 = 部门，2 = 大社团，3 = 小社团
+     * @param parentId 小社团所属大社团 ID，其它类型为 null
+     */
+    private Department ensureOrganization(
+            String name,
+            short type,
+            Long parentId
+    ) {
+
+        Department exist =
+                departmentMapper.selectOne(
+                        new LambdaQueryWrapper<Department>()
+                                .eq(Department::getName, name)
+                                .last("LIMIT 1")
+                );
+
+        if (exist != null) {
+
+            Short existType =
+                    exist.getDepartmentType();
+
+            if (existType != null
+                    && existType != type) {
+
+                throw new IllegalArgumentException(
+                        "已存在同名组织《"
+                                + name
+                                + "》，但类型不一致（当前为 "
+                                + typeNameOf(existType)
+                                + "），请先到组织管理中确认"
+                );
+            }
+
+            if (type == OrgPositionLevel.TYPE_SMALL_CLUB
+                    && parentId != null
+                    && exist.getParentId() != null
+                    && !parentId.equals(exist.getParentId())) {
+
+                throw new IllegalArgumentException(
+                        "小社团《"
+                                + name
+                                + "》已归属于其它大社团，不能同时挂在另一个大社团下"
+                );
+            }
+
+            boolean changed =
+                    false;
+
+            if (existType == null) {
+
+                exist.setDepartmentType(
+                        type
+                );
+
+                changed = true;
+            }
+
+            if (type == OrgPositionLevel.TYPE_SMALL_CLUB
+                    && exist.getParentId() == null
+                    && parentId != null) {
+
+                exist.setParentId(
+                        parentId
+                );
+
+                changed = true;
+            }
+
+            if (!Short.valueOf((short) 1).equals(
+                    exist.getStatus()
+            )) {
+
+                exist.setStatus(
+                        (short) 1
+                );
+
+                changed = true;
+            }
+
+            if (changed) {
+
+                departmentMapper.updateById(
+                        exist
+                );
+            }
+
+            return exist;
+        }
+
+        Department department =
+                new Department();
+
+        department.setName(
+                name
+        );
+
+        department.setDepartmentType(
+                type
+        );
+
+        department.setParentId(
+                type == OrgPositionLevel.TYPE_SMALL_CLUB
+                        ? parentId
+                        : null
+        );
+
+        department.setTeacherId(
+                null
+        );
+
+        department.setStatus(
+                (short) 1
+        );
+
+        department.setCreateTime(
+                LocalDateTime.now()
+        );
+
+        if (departmentMapper.insert(
+                department
+        ) <= 0) {
+
+            throw new IllegalArgumentException(
+                    "组织创建失败：" + name
+            );
+        }
+
+        return department;
+    }
+
+
+    /**
+     * 查询 / 创建系统部门（sys_department）
+     */
+    private SysDepartment ensureSysDepartment(
+            String name
+    ) {
+
+        SysDepartment sysDepartment =
+                sysDepartmentMapper.selectOne(
+                        new LambdaQueryWrapper<SysDepartment>()
+                                .eq(SysDepartment::getName, name)
+                                .last("LIMIT 1")
+                );
+
+        if (sysDepartment == null) {
+
+            sysDepartment =
+                    new SysDepartment();
+
+            sysDepartment.setName(
+                    name
+            );
+
+            sysDepartment.setDescription(
+                    "由社团成员 Excel 自动创建"
+            );
+
+            sysDepartment.setStatus(
+                    (short) 1
+            );
+
+            sysDepartment.setCreateTime(
+                    LocalDateTime.now()
+            );
+
+            sysDepartment.setUpdateTime(
+                    LocalDateTime.now()
+            );
+
+            sysDepartmentMapper.insert(
+                    sysDepartment
+            );
+
+            return sysDepartment;
+        }
+
+        if (!Short.valueOf((short) 1).equals(
+                sysDepartment.getStatus()
+        )) {
+
+            sysDepartment.setStatus(
+                    (short) 1
+            );
+
+            sysDepartment.setUpdateTime(
+                    LocalDateTime.now()
+            );
+
+            sysDepartmentMapper.updateById(
+                    sysDepartment
+            );
+        }
+
+        return sysDepartment;
+    }
+
+
+    private String typeNameOf(
+            Short type
+    ) {
+
+        if (type != null
+                && type == OrgPositionLevel.TYPE_BIG_CLUB) {
+
+            return "大社团";
+        }
+
+        if (type != null
+                && type == OrgPositionLevel.TYPE_SMALL_CLUB) {
+
+            return "小社团";
+        }
+
+        return "部门";
     }
 
     /**
@@ -1723,6 +2629,23 @@ public class ExcelImportServiceImpl implements ExcelImportService {
 
     /**
      * =========================================================
+     * 社团成员名单导入模板
+     * =========================================================
+     *
+     * 表头与 {@link ClubMemberExcelRow} 的 @ExcelProperty 完全一致。
+     */
+    @Override
+    public byte[] buildClubMemberTemplateWorkbook() {
+
+        return buildTemplateWorkbook(
+                new String[]{"大社团名称", "小社团名称", "姓名", "学号", "职位"},
+                new int[]{22, 22, 16, 20, 14}
+        );
+    }
+
+
+    /**
+     * =========================================================
      * 生成只有表头的导入模板
      * =========================================================
      *
@@ -1948,6 +2871,45 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     }
 
     /**
+     * 按职位名称查系统岗位；
+     * 名称不存在时回退到同层级岗位，保证权限不丢失。
+     */
+    private SysPosition findSysPositionByTitleOrLevel(
+            String title
+    ) {
+
+        SysPosition byName =
+                sysPositionMapper.selectOne(
+                        new LambdaQueryWrapper<SysPosition>()
+                                .eq(SysPosition::getName, title)
+                                .eq(SysPosition::getStatus, (short) 1)
+                                .orderByAsc(SysPosition::getId)
+                                .last("LIMIT 1")
+                );
+
+        if (byName != null) {
+
+            return byName;
+        }
+
+        String level =
+                OrgPositionLevel.resolveLevel(title);
+
+        if (level == null) {
+
+            return null;
+        }
+
+        return sysPositionMapper.selectOne(
+                new LambdaQueryWrapper<SysPosition>()
+                        .eq(SysPosition::getLevel, level)
+                        .eq(SysPosition::getStatus, (short) 1)
+                        .orderByAsc(SysPosition::getId)
+                        .last("LIMIT 1")
+        );
+    }
+
+    /**
      * =========================================================
      * 判断职位
      * =========================================================
@@ -1956,9 +2918,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             String position
     ) {
 
-        return "干事".equals(position)
-                || "副部长".equals(position)
-                || "部长".equals(position);
+        return OrgPositionLevel.isValidTitle(
+                position
+        );
     }
 
     /**

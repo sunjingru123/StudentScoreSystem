@@ -7,6 +7,7 @@ import com.student.studentscoresystem.entity.SysUserDepartment;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
@@ -151,12 +152,17 @@ public class ArchiveController {
         for (SysUserDepartment relation :
                 relations) {
 
-            String position =
-                    relation.getPosition();
+            /*
+             * 按权限层级判断：
+             * 部长 / 副部长 / 站长 / 副站长 / 理事长 … 均算正副职
+             */
+            String positionLevel =
+                    OrgPositionLevel.levelOf(relation);
 
 
-            if (!"部长".equals(position)
-                    && !"副部长".equals(position)) {
+            if (!OrgPositionLevel.isLeaderOrDeputy(
+                    positionLevel
+            )) {
 
                 continue;
             }

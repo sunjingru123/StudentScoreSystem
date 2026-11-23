@@ -14,6 +14,7 @@ import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.DepartmentMemberManageService;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.vo.DepartmentMemberDetailVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,8 +44,12 @@ import java.util.Set;
 public class DepartmentMemberManageServiceImpl
         implements DepartmentMemberManageService {
 
-    private static final List<String> LEADER_POSITIONS =
-            List.of("干事", "副部长", "部长");
+    private static final List<String> MEMBER_LEVELS =
+            List.of(
+                    OrgPositionLevel.LEVEL_LEADER,
+                    OrgPositionLevel.LEVEL_DEPUTY,
+                    OrgPositionLevel.LEVEL_MEMBER
+            );
 
     private final SysUserMapper userMapper;
 
@@ -185,6 +190,10 @@ public class DepartmentMemberManageServiceImpl
                     relation.getPosition()
             );
 
+            vo.setPositionLevel(
+                    OrgPositionLevel.levelOf(relation)
+            );
+
             vo.setStatus(
                     relation.getStatus()
             );
@@ -243,11 +252,6 @@ public class DepartmentMemberManageServiceImpl
             );
         }
 
-        String normalizedPosition =
-                normalizePosition(
-                        position
-                );
-
         Department department =
                 departmentMapper.selectById(
                         departmentId
@@ -259,6 +263,16 @@ public class DepartmentMemberManageServiceImpl
                     "部门不存在"
             );
         }
+
+        /*
+         * 职位校验依赖组织类型：
+         * 部门、大社团、小社团允许的职位名称不同。
+         */
+        String normalizedPosition =
+                normalizePosition(
+                        department,
+                        position
+                );
 
         SysUser user =
                 userMapper.selectById(
@@ -287,7 +301,7 @@ public class DepartmentMemberManageServiceImpl
         }
 
         SysPosition sysPosition =
-                findPositionByName(
+                findPositionByTitleOrLevel(
                         normalizedPosition
                 );
 
@@ -333,6 +347,10 @@ public class DepartmentMemberManageServiceImpl
                     normalizedPosition
             );
 
+            relation.setPositionLevel(
+                    OrgPositionLevel.resolveLevel(normalizedPosition)
+            );
+
             relation.setStatus(
                     (short) 1
             );
@@ -349,6 +367,10 @@ public class DepartmentMemberManageServiceImpl
 
             relation.setPosition(
                     normalizedPosition
+            );
+
+            relation.setPositionLevel(
+                    OrgPositionLevel.resolveLevel(normalizedPosition)
             );
 
             relation.setStatus(
@@ -619,7 +641,10 @@ public class DepartmentMemberManageServiceImpl
                 : sysDepartment.getId();
     }
 
-    private String normalizePosition(String position) {
+    private String normalizePosition(
+            Department department,
+            String position
+    ) {
 
         String value =
                 position == null
@@ -633,16 +658,43 @@ public class DepartmentMemberManageServiceImpl
             );
         }
 
-        if (!LEADER_POSITIONS.contains(
-                value
+        Integer orgType =
+                department == null
+                        || department.getDepartmentType() == null
+                        ? (int) OrgPositionLevel.TYPE_DEPARTMENT
+                        : department.getDepartmentType().intValue();
+
+        if (!OrgPositionLevel.isValidTitleForOrgType(
+                value,
+                orgType
         )) {
 
             throw new IllegalArgumentException(
-                    "职位只能是：干事、副部长、部长"
+                    "职位不合法，"
+                            + orgNameOf(orgType)
+                            + "只允许："
+                            + OrgPositionLevel.titlesOfOrgType(orgType)
             );
         }
 
         return value;
+    }
+
+    private String orgNameOf(Integer orgType) {
+
+        if (orgType != null
+                && orgType == OrgPositionLevel.TYPE_BIG_CLUB) {
+
+            return "大社团";
+        }
+
+        if (orgType != null
+                && orgType == OrgPositionLevel.TYPE_SMALL_CLUB) {
+
+            return "小社团";
+        }
+
+        return "部门";
     }
 
     private SysDepartment findSysDepartmentByName(
@@ -659,6 +711,52 @@ public class DepartmentMemberManageServiceImpl
                         .eq(
                                 SysDepartment::getName,
                                 name
+                        )
+                        .last("LIMIT 1")
+        );
+    }
+
+    /**
+     * 按职位名称查系统岗位；
+     * 若该职位名称尚未建立对应岗位，则退回到同层级的岗位，
+     * 保证权限不因岗位名称缺失而丢失。
+     */
+    private SysPosition findPositionByTitleOrLevel(
+            String title
+    ) {
+
+        SysPosition byName =
+                findPositionByName(
+                        title
+                );
+
+        if (byName != null) {
+
+            return byName;
+        }
+
+        String level =
+                OrgPositionLevel.resolveLevel(
+                        title
+                );
+
+        if (level == null) {
+
+            return null;
+        }
+
+        return sysPositionMapper.selectOne(
+                new LambdaQueryWrapper<SysPosition>()
+                        .eq(
+                                SysPosition::getLevel,
+                                level
+                        )
+                        .eq(
+                                SysPosition::getStatus,
+                                (short) 1
+                        )
+                        .orderByAsc(
+                                SysPosition::getId
                         )
                         .last("LIMIT 1")
         );
@@ -687,12 +785,17 @@ public class DepartmentMemberManageServiceImpl
 
     private List<Long> findLeaderPositionIds() {
 
+        /*
+         * 按权限层级清理：
+         * 部长 / 副部长 / 干事 分别覆盖部长、站长、理事长、
+         * 主席、主任 等所有组织职位。
+         */
         List<SysPosition> positions =
                 sysPositionMapper.selectList(
                         new LambdaQueryWrapper<SysPosition>()
                                 .in(
-                                        SysPosition::getName,
-                                        LEADER_POSITIONS
+                                        SysPosition::getLevel,
+                                        MEMBER_LEVELS
                                 )
                 );
 

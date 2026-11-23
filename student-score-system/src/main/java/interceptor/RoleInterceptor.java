@@ -236,20 +236,50 @@ public class RoleInterceptor implements HandlerInterceptor {
                     );
 
 
-            if (position == null
-                    || position.getName() == null) {
+            if (position == null) {
 
                 continue;
-
             }
+
+
+            /*
+             * 匹配规则：
+             *
+             * 1. 岗位名称直接命中要求（原有行为）；
+             * 2. 岗位的 level 命中要求，例如：
+             *    「站长」的 level = 部长，
+             *    因此 @RequireRole("部长") 同样放行站长。
+             *
+             * 这样不同组织可以使用不同的职位名称，
+             * 但同一层级的系统权限保持一致。
+             */
+            String positionName =
+                    position.getName();
+
+            String positionLevel =
+                    position.getLevel();
+
+
+            if (positionName == null
+                    && positionLevel == null) {
+
+                continue;
+            }
+
 
             for (
                     String requiredRole
                     : requireRole.value()
             ) {
 
-                if (position.getName()
-                        .equals(requiredRole)) {
+                if (requiredRole == null) {
+
+                    continue;
+                }
+
+
+                if (requiredRole.equals(positionName)
+                        || requiredRole.equals(positionLevel)) {
 
                     allowed = true;
 

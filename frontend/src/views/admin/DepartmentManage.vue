@@ -2,12 +2,12 @@
   <div class="department-page">
     <div class="page-header">
       <div>
-        <h2>部门管理</h2>
-        <p>新增、编辑及启停部门；点击“成员”可查看并管理该部门的学生</p>
+        <h2>组织管理</h2>
+        <p>管理部门、大社团与小社团；点击“成员”可查看并管理该组织的学生</p>
       </div>
       <el-button type="primary" @click="openAddDialog">
         <el-icon><Plus /></el-icon>
-        新增部门
+        新增组织
       </el-button>
     </div>
 
@@ -18,7 +18,23 @@
         :data="departments"
         stripe
       >
-        <el-table-column prop="name" label="部门名称" :min-width="isMobile ? 130 : 220" />
+        <el-table-column prop="name" label="组织名称" :min-width="isMobile ? 130 : 200" />
+        <el-table-column label="类型" :width="isMobile ? 88 : 110">
+          <template #default="scope">
+            <el-tag :type="typeTagOf(scope.row.departmentType)">
+              {{ typeNameOf(scope.row.departmentType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="!isMobile"
+          label="所属大社团"
+          min-width="150"
+        >
+          <template #default="scope">
+            {{ parentNameOf(scope.row) }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" :width="isMobile ? 78 : 110">
           <template #default="scope">
             <el-tag :type="Number(scope.row.status) === 1 ? 'success' : 'info'">
@@ -163,17 +179,45 @@
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="90px"
+        label-width="96px"
         @submit.prevent
       >
-        <el-form-item label="部门名称" prop="name">
+        <el-form-item label="组织名称" prop="name">
           <el-input
             v-model="form.name"
-            placeholder="请输入部门名称"
+            placeholder="请输入组织名称（全局唯一）"
             maxlength="100"
             show-word-limit
             @keyup.enter="submitForm"
           />
+        </el-form-item>
+
+        <el-form-item label="组织类型" prop="departmentType">
+          <el-select v-model="form.departmentType" style="width: 100%">
+            <el-option label="部门" :value="1" />
+            <el-option label="大社团" :value="2" />
+            <el-option label="小社团" :value="3" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          v-if="Number(form.departmentType) === 3"
+          label="所属大社团"
+          prop="parentId"
+        >
+          <el-select
+            v-model="form.parentId"
+            style="width: 100%"
+            filterable
+            placeholder="请选择所属大社团"
+          >
+            <el-option
+              v-for="item in bigClubOptions"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -185,7 +229,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Plus } from '@element-plus/icons-vue'
 import {
@@ -206,7 +250,64 @@ const saving = ref(false)
 const dialogVisible = ref(false)
 const editId = ref(null)
 const formRef = ref(null)
-const form = reactive({ name: '' })
+const form = reactive({
+  name: '',
+  departmentType: 1,
+  parentId: null
+})
+
+/* 组织类型：1 = 部门，2 = 大社团，3 = 小社团 */
+const TYPE_DEPARTMENT = 1
+const TYPE_BIG_CLUB = 2
+const TYPE_SMALL_CLUB = 3
+
+function typeNameOf(type) {
+  const value = Number(type || TYPE_DEPARTMENT)
+  if (value === TYPE_BIG_CLUB) return '大社团'
+  if (value === TYPE_SMALL_CLUB) return '小社团'
+  return '部门'
+}
+
+function typeTagOf(type) {
+  const value = Number(type || TYPE_DEPARTMENT)
+  if (value === TYPE_BIG_CLUB) return 'warning'
+  if (value === TYPE_SMALL_CLUB) return 'success'
+  return 'primary'
+}
+
+function parentNameOf(row) {
+  if (!row || Number(row.departmentType) !== TYPE_SMALL_CLUB) {
+    return '-'
+  }
+  const parent = departments.value.find(item => item.id === row.parentId)
+  return parent?.name || '-'
+}
+
+/* 可选的上级大社团（编辑时排除自身） */
+const bigClubOptions = computed(() =>
+  departments.value.filter(
+    item =>
+      Number(item.departmentType) === TYPE_BIG_CLUB &&
+      item.id !== editId.value
+  )
+)
+
+/* 职位选项随组织类型变化，但权限层级一致 */
+const positionOptions = computed(() => {
+  const type = Number(
+    currentDepartment.value?.departmentType || TYPE_DEPARTMENT
+  )
+
+  if (type === TYPE_BIG_CLUB) {
+    return ['干事', '副理事长', '理事长', '副主席', '主席']
+  }
+
+  if (type === TYPE_SMALL_CLUB) {
+    return ['干事', '副部长', '部长', '副主任', '主任']
+  }
+
+  return ['干事', '副部长', '部长', '副站长', '站长']
+})
 
 /* 手机端布局开关（<= 768px） */
 const isMobile = ref(false)
@@ -215,7 +316,20 @@ function syncViewport() {
   isMobile.value = window.innerWidth <= 768
 }
 const rules = {
-  name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入组织名称', trigger: 'blur' }],
+  departmentType: [{ required: true, message: '请选择组织类型', trigger: 'change' }],
+  parentId: [
+    {
+      validator: (rule, value, callback) => {
+        if (Number(form.departmentType) === TYPE_SMALL_CLUB && !value) {
+          callback(new Error('小社团必须选择所属大社团'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ]
 }
 
 /* 部门成员 */
@@ -226,7 +340,6 @@ const membersLoading = ref(false)
 const studentOptions = ref([])
 const studentLoading = ref(false)
 const studentsLoaded = ref(false)
-const positionOptions = ['干事', '副部长', '部长']
 const adding = ref(false)
 const addForm = reactive({ userId: null, position: '' })
 
@@ -250,12 +363,16 @@ async function loadDepartments() {
 function openAddDialog() {
   editId.value = null
   form.name = ''
+  form.departmentType = TYPE_DEPARTMENT
+  form.parentId = null
   dialogVisible.value = true
 }
 
 function openEditDialog(row) {
   editId.value = row.id
   form.name = row.name || ''
+  form.departmentType = Number(row.departmentType || TYPE_DEPARTMENT)
+  form.parentId = row.parentId || null
   dialogVisible.value = true
 }
 
@@ -288,7 +405,14 @@ async function submitForm() {
 
   saving.value = true
   try {
-    const data = { name: form.name.trim() }
+    const data = {
+      name: form.name.trim(),
+      departmentType: Number(form.departmentType),
+      parentId:
+        Number(form.departmentType) === TYPE_SMALL_CLUB
+          ? form.parentId
+          : null
+    }
     const res = editId.value
       ? await updateDepartment(editId.value, data)
       : await addDepartment(data)
@@ -298,7 +422,7 @@ async function submitForm() {
       return
     }
 
-    ElMessage.success(editId.value ? '部门修改成功' : '部门新增成功')
+    ElMessage.success(editId.value ? '组织修改成功' : '组织新增成功')
     dialogVisible.value = false
     await loadDepartments()
   } catch (error) {

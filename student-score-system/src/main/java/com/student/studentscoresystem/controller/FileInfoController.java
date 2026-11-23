@@ -1022,7 +1022,19 @@ public class FileInfoController {
         Long count = positionMapper.selectCount(
                 new LambdaQueryWrapper<SysPosition>()
                         .in(SysPosition::getId, positionIds)
-                        .in(SysPosition::getName, REVIEWER_POSITIONS)
+                        .and(
+                                condition ->
+                                        condition
+                                                .in(
+                                                        SysPosition::getName,
+                                                        REVIEWER_POSITIONS
+                                                )
+                                                .or()
+                                                .in(
+                                                        SysPosition::getLevel,
+                                                        REVIEWER_POSITIONS
+                                                )
+                        )
         );
 
         return count != null && count > 0;

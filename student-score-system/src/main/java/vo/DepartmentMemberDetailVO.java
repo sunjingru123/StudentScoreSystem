@@ -25,6 +25,11 @@ public class DepartmentMemberDetailVO {
 
     private String position;
 
+    /**
+     * 归一后的权限层级：干事 / 副部长 / 部长
+     */
+    private String positionLevel;
+
     private Short status;
 
     private LocalDateTime joinTime;

@@ -8,6 +8,7 @@ import com.student.studentscoresystem.entity.DepartmentScoreApply;
 import com.student.studentscoresystem.entity.DepartmentScoreTemplate;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
@@ -1332,11 +1333,10 @@ public class DepartmentScoreApplyImportService {
         }
 
         String position =
-                relation.getPosition();
+                OrgPositionLevel.levelOf(relation);
 
         boolean canApply =
-                "副部长".equals(position)
-                        || "部长".equals(position);
+                OrgPositionLevel.isLeaderOrDeputy(position);
 
         if (!canApply) {
 

@@ -19,9 +19,23 @@ public class SysUserDepartment {
     private Long departmentId;
 
     /**
-     * 干事 / 副部长 / 部长
+     * 组织内真实职位名称
+     *
+     * 例如：干事 / 副部长 / 部长 /
+     * 站长 / 副站长 / 理事长 / 副理事长 /
+     * 主席 / 副主席 / 主任 / 副主任
      */
     private String position;
+
+    /**
+     * 归一后的系统权限层级
+     *
+     * 干事 / 副部长 / 部长
+     *
+     * 所有权限判断一律看这个字段，
+     * 界面上展示仍使用 {@link #position}。
+     */
+    private String positionLevel;
 
     private Short status;
 

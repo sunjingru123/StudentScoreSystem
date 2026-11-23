@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 
 /**
  * =========================================================
@@ -121,7 +122,7 @@ public class PovertyImportPermissionService {
                                         (short) 1
                                 )
                                 .in(
-                                        SysUserDepartment::getPosition,
+                                        SysUserDepartment::getPositionLevel,
                                         IMPORT_POSITIONS
                                 )
                 );
@@ -142,7 +143,7 @@ public class PovertyImportPermissionService {
 
 
             String position =
-                    relation.getPosition();
+                    OrgPositionLevel.levelOf(relation);
 
 
             if (position == null) {
@@ -152,7 +153,7 @@ public class PovertyImportPermissionService {
 
 
             /*
-             * 岗位二次校验：
+             * 权限层级二次校验：
              * 避免调用方传入异常数据时误放行。
              */
             if (!IMPORT_POSITIONS.contains(position.trim())) {

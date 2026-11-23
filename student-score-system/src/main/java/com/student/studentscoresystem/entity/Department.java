@@ -18,6 +18,23 @@ public class Department {
 
     private Long teacherId;
 
+    /**
+     * 组织类型：
+     *
+     * 1 = 部门
+     * 2 = 大社团
+     * 3 = 小社团
+     */
+    private Short departmentType;
+
+    /**
+     * 上级组织 ID
+     *
+     * 仅小社团使用，指向所属大社团；
+     * 部门与大社团为 null。
+     */
+    private Long parentId;
+
     private Short status;
 
     private LocalDateTime createTime;

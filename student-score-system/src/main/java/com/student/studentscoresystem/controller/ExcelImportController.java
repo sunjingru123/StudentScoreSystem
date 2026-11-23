@@ -91,6 +91,36 @@ public class ExcelImportController {
     }
 
     /**
+     * 导入社团成员
+     *
+     * POST /excel/import/club-members
+     */
+    @PostMapping("/club-members")
+    @RequireRole("管理员")
+    public Result<Map<String, Object>> importClubMembers(
+            @RequestParam("file") MultipartFile file
+    ) {
+
+        if (file == null || file.isEmpty()) {
+            return Result.fail("请选择要导入的 Excel 文件");
+        }
+
+        try {
+
+            Map<String, Object> result =
+                    excelImportService.importClubMembers(file);
+
+            return Result.success(result);
+
+        } catch (Exception e) {
+
+            return Result.fail(
+                    "社团成员导入失败：" + e.getMessage()
+            );
+        }
+    }
+
+    /**
      * 下载学生名单导入模板
      *
      * GET /excel/import/students/template
@@ -125,6 +155,25 @@ public class ExcelImportController {
                 excelImportService
                         .buildDepartmentMemberTemplateWorkbook(),
                 "部门成员名单导入模板.xlsx"
+        );
+    }
+
+    /**
+     * 下载社团成员名单导入模板
+     *
+     * GET /excel/import/club-members/template
+     */
+    @GetMapping("/club-members/template")
+    @RequireRole("管理员")
+    public void downloadClubMemberTemplate(
+            HttpServletResponse response
+    ) throws IOException {
+
+        writeWorkbook(
+                response,
+                excelImportService
+                        .buildClubMemberTemplateWorkbook(),
+                "社团成员名单导入模板.xlsx"
         );
     }
 

@@ -5,6 +5,7 @@ import com.student.studentscoresystem.common.Result;
 import com.student.studentscoresystem.entity.Department;
 import com.student.studentscoresystem.entity.SysUser;
 import com.student.studentscoresystem.entity.SysUserDepartment;
+import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.mapper.DepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserDepartmentMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
@@ -82,6 +83,16 @@ public class StudentDepartmentController {
             relation.setPosition("干事");
         }
 
+        /*
+         * 职位层级与职位名称一起保存，
+         * 权限判断只依赖 positionLevel。
+         */
+        relation.setPositionLevel(
+                OrgPositionLevel.resolveLevelOrDefault(
+                        relation.getPosition()
+                )
+        );
+
         relation.setStatus((short) 1);
 
         userDepartmentMapper.insert(relation);
@@ -135,14 +146,19 @@ public class StudentDepartmentController {
             return Result.error("部门关系不存在");
         }
 
-        if (!position.equals("干事")
-                && !position.equals("副部长")
-                && !position.equals("部长")) {
+        if (!OrgPositionLevel.isValidTitle(position)) {
 
-            return Result.error("职位不合法");
+            return Result.error(
+                    "职位不合法，只允许："
+                            + OrgPositionLevel.titlesOfOrgType(null)
+            );
         }
 
         relation.setPosition(position);
+
+        relation.setPositionLevel(
+                OrgPositionLevel.resolveLevel(position)
+        );
 
         userDepartmentMapper.updateById(relation);
 
