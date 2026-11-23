@@ -55,6 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.student.studentscoresystem.utils.DepartmentScoreReviewRules;
 
 /**
  * =========================================================
@@ -217,6 +218,20 @@ public class DepartmentScoreApplyImportService {
 
         requireApplyPermission(departmentId, currentUserId);
 
+        /*
+         * 审核初始状态需要组织类型与申报人层级：
+         * 小社团副职的申报需要本小社团正职初审，
+         * 小社团申报都要再经过大社团审核。
+         */
+        Department importOrg =
+                departmentMapper.selectById(departmentId);
+
+        String applicantLevel =
+                resolveApplicantLevel(
+                        departmentId,
+                        currentUserId
+                );
+
         if (file == null || file.isEmpty()) {
 
             throw new IllegalArgumentException("请选择需要导入的 Excel 文件");
@@ -355,6 +370,8 @@ public class DepartmentScoreApplyImportService {
                                 row,
                                 departmentId,
                                 currentUserId,
+                                importOrg,
+                                applicantLevel,
                                 templatesByLabel,
                                 templatesByName,
                                 studentCache,
@@ -685,10 +702,44 @@ public class DepartmentScoreApplyImportService {
      * 业务校验失败抛出 IllegalArgumentException。
      * =========================================================
      */
+    /**
+     * 查询申报人在该组织中的权限层级
+     */
+    private String resolveApplicantLevel(
+            Long departmentId,
+            Long applicantId) {
+
+        SysUserDepartment relation =
+                userDepartmentMapper.selectOne(
+                        new LambdaQueryWrapper<SysUserDepartment>()
+                                .eq(
+                                        SysUserDepartment::getUserId,
+                                        applicantId
+                                )
+                                .eq(
+                                        SysUserDepartment::getDepartmentId,
+                                        departmentId
+                                )
+                                .eq(
+                                        SysUserDepartment::getStatus,
+                                        (short) 1
+                                )
+                                .last("LIMIT 1")
+                );
+
+
+        return relation == null
+                ? null
+                : OrgPositionLevel.levelOf(relation);
+    }
+
+
     private DepartmentScoreApply buildApply(
             DepartmentScoreApplyExcelRow row,
             Long departmentId,
             Long applicantId,
+            Department org,
+            String applicantLevel,
             Map<String, List<DepartmentScoreTemplate>> templatesByLabel,
             Map<String, List<DepartmentScoreTemplate>> templatesByName,
             Map<String, SysUser> studentCache,
@@ -954,7 +1005,18 @@ public class DepartmentScoreApplyImportService {
          */
         apply.setEvidenceUrl(null);
 
-        apply.setStatus((short) 0);
+        apply.setStatus(
+                DepartmentScoreReviewRules.initialStatus(
+                        org,
+                        applicantLevel
+                )
+        );
+
+        apply.setBigClubStatus(
+                DepartmentScoreReviewRules.initialBigClubStatus(
+                        org
+                )
+        );
 
         apply.setFinalStatus((short) 0);
 

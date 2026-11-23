@@ -161,4 +161,38 @@ public class DepartmentScoreApply {
      * 档案部审核时间
      */
     private LocalDateTime archiveReviewTime;
+
+    /**
+     * 大社团审核状态（仅小社团申报使用）
+     *
+     * null = 不经过大社团审核（部门 / 大社团负责人提交）
+     * 0    = 待大社团审核
+     * 1    = 大社团审核通过
+     * 2    = 大社团驳回
+     */
+    private Short bigClubStatus;
+
+    /**
+     * 大社团审核人
+     */
+    private Long bigClubReviewerId;
+
+    /**
+     * 大社团审核意见
+     */
+    private String bigClubReviewRemark;
+
+    /**
+     * 大社团审核时间
+     */
+    private LocalDateTime bigClubReviewTime;
+
+    /**
+     * 当前审核阶段（非数据库字段，仅用于前端展示）
+     *
+     * SMALL_CLUB = 待小社团 / 部门初审
+     * BIG_CLUB   = 待大社团审核
+     */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private String reviewStage;
 }

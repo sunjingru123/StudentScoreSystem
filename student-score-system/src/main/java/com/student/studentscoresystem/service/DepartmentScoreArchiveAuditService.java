@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import com.student.studentscoresystem.utils.DepartmentScoreReviewRules;
 
 
 /**
@@ -576,6 +577,17 @@ public class DepartmentScoreArchiveAuditService {
                 .equals(apply.getArchiveStatus())) {
 
             return "该申报已经完成档案部审核";
+        }
+
+
+        /*
+         * 小社团申报必须已通过大社团审核才进入档案部。
+         */
+        if (apply.getBigClubStatus() != null
+                && apply.getBigClubStatus()
+                != DepartmentScoreReviewRules.BIG_CLUB_APPROVED) {
+
+            return "该申报尚未通过大社团审核";
         }
 
 

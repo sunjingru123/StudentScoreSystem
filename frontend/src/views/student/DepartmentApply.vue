@@ -136,7 +136,8 @@
           </h3>
 
           <p>
-            你是副部长或部长，可以审核本部门其他干部提交的学生加减分申报。
+            你是组织负责人，可以审核本组织（含大社团旗下小社团）其他成员提交的
+            学生加减分申报。
           </p>
 
         </div>
@@ -244,6 +245,37 @@
           <template #default="{ $index }">
 
             {{ $index + 1 }}
+
+          </template>
+
+        </el-table-column>
+
+
+        <!-- ================================================== -->
+        <!-- 审核环节 -->
+        <!-- ================================================== -->
+
+        <el-table-column
+          label="审核环节"
+          width="120"
+          align="center"
+        >
+
+          <template #default="{ row }">
+
+            <el-tag
+              v-if="row.reviewStage === 'BIG_CLUB'"
+              type="warning"
+            >
+              大社团审核
+            </el-tag>
+
+            <el-tag
+              v-else
+              type="primary"
+            >
+              组织初审
+            </el-tag>
 
           </template>
 
@@ -1305,6 +1337,32 @@
               type="danger"
             >
               辅导员已驳回
+            </el-tag>
+
+
+            <!-- ============================================== -->
+            <!-- 大社团审核阶段（仅小社团申报） -->
+            <!-- ============================================== -->
+
+            <el-tag
+              v-else-if="
+                Number(row.status) === 1 &&
+                Number(row.bigClubStatus) === 2
+              "
+              type="danger"
+            >
+              大社团已驳回
+            </el-tag>
+
+
+            <el-tag
+              v-else-if="
+                Number(row.status) === 1 &&
+                Number(row.bigClubStatus) === 0
+              "
+              type="warning"
+            >
+              待大社团审核
             </el-tag>
 
 

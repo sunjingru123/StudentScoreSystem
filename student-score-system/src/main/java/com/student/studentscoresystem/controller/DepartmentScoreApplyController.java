@@ -24,6 +24,7 @@ import com.student.studentscoresystem.service.OrgScopeService;
 import com.student.studentscoresystem.service.PovertyImportPermissionService;
 import com.student.studentscoresystem.service.ScoreManagerPermissionService;
 import com.student.studentscoresystem.utils.JwtUtil;
+import com.student.studentscoresystem.utils.DepartmentScoreReviewRules;
 import com.student.studentscoresystem.utils.OrgPositionLevel;
 import com.student.studentscoresystem.vo.ArchiveScoreOptionsVO;
 import com.student.studentscoresystem.vo.BatchAuditResultVO;
@@ -214,16 +215,12 @@ public class DepartmentScoreApplyController {
      * =========================================================
      * 组织审核权限
      *
-     * 副职 / 正职
+     * 已统一由 DepartmentScoreReviewRules 按组织层级判断：
+     *   小社团：仅正职（部长 / 主任）
+     *   部门：正职 / 副职
+     *   大社团：正副职可审核旗下小社团
      * =========================================================
      */
-    private boolean canAudit(
-            String positionLevel) {
-
-        return OrgPositionLevel.isLeaderOrDeputy(
-                normalizeLevel(positionLevel)
-        );
-    }
 
 
     /**
@@ -576,12 +573,31 @@ public class DepartmentScoreApplyController {
 
 
         /*
-         * 部门审核：
+         * 审核初始状态按组织类型决定：
          *
-         * 0 = 待审核
+         * 1. 部门：待部门初审（原有流程）；
+         * 2. 大社团：负责人提交，直接进入档案部审核；
+         * 3. 小社团正职：初审视为通过，待大社团审核；
+         * 4. 小社团副职：待小社团正职初审，之后再由大社团审核。
          */
+        String applicantLevel =
+                OrgPositionLevel.levelOf(
+                        relation
+                );
+
+
         apply.setStatus(
-                (short) 0
+                DepartmentScoreReviewRules.initialStatus(
+                        department,
+                        applicantLevel
+                )
+        );
+
+
+        apply.setBigClubStatus(
+                DepartmentScoreReviewRules.initialBigClubStatus(
+                        department
+                )
         );
 
 
@@ -983,6 +999,8 @@ public class DepartmentScoreApplyController {
 
         boolean canDepartmentAudit = false;
 
+        boolean canBigClubReview = false;
+
 
     /* ========================================================
        4. 遍历部门关系
@@ -1028,14 +1046,38 @@ public class DepartmentScoreApplyController {
 
 
         /* ====================================================
-           6. 岗位判断
+           6. 组织初审权限
 
-           副部长 / 部长
-           可以进行部门审核
+           小社团：仅正职（部长 / 主任）
+           部门：正职或副职（兼容原有流程）
            ==================================================== */
 
+            Department relationOrg =
+                    departmentMapper.selectById(
+                            relation.getDepartmentId()
+                    );
+
+
             boolean auditPermission =
-                    canAudit(position);
+                    DepartmentScoreReviewRules.canAuditFirstStage(
+                            relationOrg,
+                            position
+                    );
+
+
+        /* ====================================================
+           6.1 大社团审核权限
+
+           大社团的正职 / 副职可以审核旗下小社团申报
+           ==================================================== */
+
+            boolean bigClubAuditPermission =
+                    DepartmentScoreReviewRules.isBigClub(
+                            relationOrg
+                    )
+                            && OrgPositionLevel.isLeaderOrDeputy(
+                            position
+                    );
 
 
             /*
@@ -1148,6 +1190,13 @@ public class DepartmentScoreApplyController {
 
             }
 
+
+            if (bigClubAuditPermission) {
+
+                canBigClubReview = true;
+
+            }
+
         }
 
 
@@ -1168,6 +1217,16 @@ public class DepartmentScoreApplyController {
         data.put(
                 "canDepartmentAudit",
                 canDepartmentAudit
+        );
+
+
+        /*
+         * 大社团审核权限：
+         * 主席 / 副主席 / 理事长 / 副理事长可审核旗下小社团申报。
+         */
+        data.put(
+                "canBigClubReview",
+                canBigClubReview
         );
 
 
@@ -1488,36 +1547,32 @@ public class DepartmentScoreApplyController {
                         );
 
 
-        System.out.println(
-                "当前用户负责部门 = "
-                        + departmentIds
-        );
-
         /*
-         * 大社团负责人负责本大社团及其下属小社团，
-         * 小社团负责人只能看到自己的小社团。
+         * =====================================================
+         * 按真实组织层级计算审核范围
+         *
+         * 1. 组织初审：
+         *      部门正职 / 副职 → 本部门（原有流程）
+         *      小社团正职      → 本小社团
+         * 2. 大社团审核：
+         *      大社团正职 / 副职 → 旗下所有小社团
+         * =====================================================
          */
-        departmentIds =
-                orgScopeService.expandManagedOrganizationIds(
-                        departmentIds
+        AuditScope auditScope =
+                resolveAuditScope(
+                        myPositions
                 );
 
 
-        /*
-         * =====================================================
-         * 没有部门
-         * =====================================================
-         */
-        if (departmentIds.isEmpty()) {
+        List<Long> firstStageOrgIds =
+                auditScope.getFirstStageOrgIds();
 
-            System.out.println(
-                    "当前用户没有有效部门"
-            );
+        List<Long> childOrgIds =
+                auditScope.getChildOrgIds();
 
-            System.out.println(
-                    "================================"
-            );
 
+        if (firstStageOrgIds.isEmpty()
+                && childOrgIds.isEmpty()) {
 
             return Result.success(
                     new ArrayList<>()
@@ -1527,77 +1582,97 @@ public class DepartmentScoreApplyController {
 
         /*
          * =====================================================
-         * ★★★ 查询待审核申报
+         * 查询待审核申报
          *
-         * department_id IN 当前用户负责部门
-         *
-         * status = 0
-         *
-         * 这里不再写 applicantId != currentUserId。
-         *
-         * 因为“不能审核自己的申报”应该在真正执行审核时
-         * 再进行判断，而不是影响待审核列表展示。
-         *
+         * A. 组织初审待审核：status = 0，范围为可初审的组织
+         * B. 大社团待审核：status = 1 且 bigClubStatus = 0，
+         *    范围为大社团旗下小社团
          * =====================================================
          */
+        LambdaQueryWrapper<DepartmentScoreApply> auditWrapper =
+                new LambdaQueryWrapper<>();
+
+
+        auditWrapper.ne(
+                DepartmentScoreApply::getApplicantId,
+                currentUserId
+        );
+
+
+        auditWrapper.and(
+                condition -> {
+
+                    boolean hasFirstStage =
+                            !firstStageOrgIds.isEmpty();
+
+                    if (hasFirstStage) {
+
+                        condition.and(
+                                first -> first
+                                        .eq(
+                                                DepartmentScoreApply::getStatus,
+                                                (short) 0
+                                        )
+                                        .in(
+                                                DepartmentScoreApply::getDepartmentId,
+                                                firstStageOrgIds
+                                        )
+                        );
+                    }
+
+
+                    if (!childOrgIds.isEmpty()) {
+
+                        if (hasFirstStage) {
+
+                            condition.or();
+                        }
+
+                        condition.and(
+                                big -> big
+                                        .eq(
+                                                DepartmentScoreApply::getStatus,
+                                                (short) 1
+                                        )
+                                        .eq(
+                                                DepartmentScoreApply::getBigClubStatus,
+                                                DepartmentScoreReviewRules.BIG_CLUB_PENDING
+                                        )
+                                        .in(
+                                                DepartmentScoreApply::getDepartmentId,
+                                                childOrgIds
+                                        )
+                        );
+                    }
+                }
+        );
+
+
+        auditWrapper.orderByDesc(
+                DepartmentScoreApply::getCreateTime
+        );
+
+
         List<DepartmentScoreApply> list =
-
                 applyService.list(
-
-                        new LambdaQueryWrapper<DepartmentScoreApply>()
-
-                                /*
-                                 * =====================================================
-                                 * 只查询当前用户负责部门的待审核申报
-                                 * =====================================================
-                                 */
-
-                                .in(
-                                        DepartmentScoreApply::getDepartmentId,
-                                        departmentIds
-                                )
-
-                                /*
-                                 * 只查询待审核
-                                 *
-                                 * 0 = 待审核
-                                 */
-
-                                .eq(
-                                        DepartmentScoreApply::getStatus,
-                                        (short) 0
-                                )
-
-                                /*
-                                 * =====================================================
-                                 * ★★★ 最关键
-                                 *
-                                 * 不能审核自己提交的申报。
-                                 *
-                                 * 这里直接从“待审核列表”里排除自己提交的，
-                                 * 而不是等点击审核以后才报错。
-                                 *
-                                 * 所以：
-                                 *
-                                 * 部长自己提交的 → 不显示
-                                 * 副部长自己提交的 → 不显示
-                                 * 其他人提交的     → 正常显示
-                                 * =====================================================
-                                 */
-
-                                .ne(
-                                        DepartmentScoreApply::getApplicantId,
-                                        currentUserId
-                                )
-
-                                /*
-                                 * 最新申报排在前面
-                                 */
-
-                                .orderByDesc(
-                                        DepartmentScoreApply::getCreateTime
-                                )
+                        auditWrapper
                 );
+
+
+        /*
+         * 标记当前审核阶段，便于前端展示
+         */
+        if (list != null) {
+
+            for (DepartmentScoreApply apply : list) {
+
+                apply.setReviewStage(
+                        DepartmentScoreReviewRules.waitingBigClubReview(apply)
+                                ? "BIG_CLUB"
+                                : "ORGANIZATION"
+                );
+            }
+        }
 
 
         System.out.println(
@@ -1710,68 +1785,22 @@ public class DepartmentScoreApplyController {
         }
 
 
-        if (!Short.valueOf((short) 0)
-                .equals(
-                        apply.getStatus()
-                )) {
+        boolean firstStage =
+                Short.valueOf((short) 0)
+                        .equals(
+                                apply.getStatus()
+                        );
 
-            return Result.fail(
-                    "该申报已经完成部门审核"
-            );
-        }
-
-
-        /*
-         * 审核人必须能够管理该申报所属组织：
-         *
-         * - 同部门正副职；
-         * - 大社团正副职可以审核其下属小社团；
-         * - 小社团负责人不能越权到其它组织。
-         */
-        List<SysUserDepartment> reviewerRelations =
-                userDepartmentMapper.selectList(
-                        new LambdaQueryWrapper<SysUserDepartment>()
-                                .eq(
-                                        SysUserDepartment::getUserId,
-                                        currentUserId
-                                )
-                                .eq(
-                                        SysUserDepartment::getStatus,
-                                        (short) 1
-                                )
-                                .in(
-                                        SysUserDepartment::getPositionLevel,
-                                        List.of(
-                                                "副部长",
-                                                "部长"
-                                        )
-                                )
+        boolean bigClubStage =
+                DepartmentScoreReviewRules.waitingBigClubReview(
+                        apply
                 );
 
-        List<Long> reviewerOrganizationIds =
-                new ArrayList<>();
 
-        if (reviewerRelations != null) {
-
-            for (SysUserDepartment relation : reviewerRelations) {
-
-                if (relation != null
-                        && relation.getDepartmentId() != null) {
-
-                    reviewerOrganizationIds.add(
-                            relation.getDepartmentId()
-                    );
-                }
-            }
-        }
-
-        if (!orgScopeService.covers(
-                reviewerOrganizationIds,
-                apply.getDepartmentId()
-        )) {
+        if (!firstStage && !bigClubStage) {
 
             return Result.fail(
-                    "你不是该组织的副部长或部长，没有审核权限"
+                    "该申报当前不在可审核阶段"
             );
         }
 
@@ -1789,28 +1818,177 @@ public class DepartmentScoreApplyController {
         }
 
 
-        apply.setStatus(
-                status
-        );
+        Department applyOrg =
+                departmentMapper.selectById(
+                        apply.getDepartmentId()
+                );
 
 
-        apply.setReviewerId(
-                currentUserId
-        );
+        if (applyOrg == null) {
+
+            return Result.fail(
+                    "申报所属组织不存在"
+            );
+        }
 
 
-        apply.setReviewRemark(
-                dto.getReviewRemark()
-        );
+        SysUserDepartment myRelation =
+                userDepartmentMapper.selectOne(
+                        new LambdaQueryWrapper<SysUserDepartment>()
+                                .eq(
+                                        SysUserDepartment::getUserId,
+                                        currentUserId
+                                )
+                                .eq(
+                                        SysUserDepartment::getDepartmentId,
+                                        apply.getDepartmentId()
+                                )
+                                .eq(
+                                        SysUserDepartment::getStatus,
+                                        (short) 1
+                                )
+                                .last("LIMIT 1")
+                );
+
+
+        String myLevel =
+                myRelation == null
+                        ? null
+                        : OrgPositionLevel.levelOf(myRelation);
 
 
         LocalDateTime now =
                 LocalDateTime.now();
 
 
-        apply.setReviewTime(
-                now
-        );
+        if (bigClubStage) {
+
+            /*
+             * 大社团审核：
+             * 必须是该小社团所属大社团的正职 / 副职。
+             */
+            Department parentOrg =
+                    applyOrg.getParentId() == null
+                            ? null
+                            : departmentMapper.selectById(
+                            applyOrg.getParentId()
+                    );
+
+
+            SysUserDepartment parentRelation =
+                    parentOrg == null
+                            ? null
+                            : userDepartmentMapper.selectOne(
+                            new LambdaQueryWrapper<SysUserDepartment>()
+                                    .eq(
+                                            SysUserDepartment::getUserId,
+                                            currentUserId
+                                    )
+                                    .eq(
+                                            SysUserDepartment::getDepartmentId,
+                                            parentOrg.getId()
+                                    )
+                                    .eq(
+                                            SysUserDepartment::getStatus,
+                                            (short) 1
+                                    )
+                                    .last("LIMIT 1")
+                    );
+
+
+            String parentLevel =
+                    parentRelation == null
+                            ? null
+                            : OrgPositionLevel.levelOf(parentRelation);
+
+
+            if (!DepartmentScoreReviewRules.canAuditBigClubStage(
+                    applyOrg,
+                    parentOrg,
+                    parentLevel
+            )) {
+
+                return Result.fail(
+                        "你不是该小社团所属大社团的负责人，没有审核权限"
+                );
+            }
+
+
+            apply.setBigClubStatus(
+                    status
+            );
+
+            apply.setBigClubReviewerId(
+                    currentUserId
+            );
+
+            apply.setBigClubReviewRemark(
+                    dto.getReviewRemark()
+            );
+
+            apply.setBigClubReviewTime(
+                    now
+            );
+
+        } else {
+
+            /*
+             * 组织初审：
+             * 小社团仅正职；部门正职 / 副职。
+             */
+            if (!DepartmentScoreReviewRules.canAuditFirstStage(
+                    applyOrg,
+                    myLevel
+            )) {
+
+                return Result.fail(
+                        "你没有该组织的审核权限"
+                );
+            }
+
+
+            apply.setStatus(
+                    status
+            );
+
+            apply.setReviewerId(
+                    currentUserId
+            );
+
+            apply.setReviewRemark(
+                    dto.getReviewRemark()
+            );
+
+            apply.setReviewTime(
+                    now
+            );
+
+
+            /*
+             * 小社团初审后的去向：
+             *
+             * 驳回 → 大社团审核直接标记驳回，不再流转；
+             * 通过 → 保持待大社团审核；
+             * 数据异常（无上级大社团）→ 放行至档案部审核。
+             */
+            if (DepartmentScoreReviewRules.isSmallClub(
+                    applyOrg
+            )) {
+
+                if (status == 2) {
+
+                    apply.setBigClubStatus(
+                            DepartmentScoreReviewRules.BIG_CLUB_REJECTED
+                    );
+
+                } else if (applyOrg.getParentId() == null) {
+
+                    apply.setBigClubStatus(
+                            DepartmentScoreReviewRules.BIG_CLUB_APPROVED
+                    );
+                }
+            }
+        }
 
 
         apply.setUpdateTime(
@@ -1929,43 +2107,102 @@ public class DepartmentScoreApplyController {
 
 
         /*
-         * 自己直接负责的组织（用于逐个校验越权）
+         * 审核范围按真实组织层级计算：
+         * 部门正副职 → 本部门；小社团正职 → 本小社团；
+         * 大社团正副职 → 旗下小社团
          */
-        List<Long> reviewerOrganizationIds =
-                new ArrayList<>(departmentIds);
-
-
-        /*
-         * 待审核查询范围：大社团包含其下属小社团
-         */
-        departmentIds =
-                orgScopeService.expandManagedOrganizationIds(
-                        departmentIds
+        AuditScope auditScope =
+                resolveAuditScope(
+                        myPositions
                 );
 
 
+        List<Long> firstStageOrgIds =
+                auditScope.getFirstStageOrgIds();
+
+        List<Long> childOrgIds =
+                auditScope.getChildOrgIds();
+
+
+        if (firstStageOrgIds.isEmpty()
+                && childOrgIds.isEmpty()) {
+
+            return Result.fail(
+                    "你当前没有需要审核的组织"
+            );
+        }
+
+
         /*
-         * 查询待审核数据
+         * 查询待审核数据（组织初审 + 大社团审核）
          */
+        LambdaQueryWrapper<DepartmentScoreApply> batchWrapper =
+                new LambdaQueryWrapper<>();
+
+
+        batchWrapper.ne(
+                DepartmentScoreApply::getApplicantId,
+                currentUserId
+        );
+
+
+        batchWrapper.and(
+                condition -> {
+
+                    boolean hasFirstStage =
+                            !firstStageOrgIds.isEmpty();
+
+                    if (hasFirstStage) {
+
+                        condition.and(
+                                first -> first
+                                        .eq(
+                                                DepartmentScoreApply::getStatus,
+                                                (short) 0
+                                        )
+                                        .in(
+                                                DepartmentScoreApply::getDepartmentId,
+                                                firstStageOrgIds
+                                        )
+                        );
+                    }
+
+
+                    if (!childOrgIds.isEmpty()) {
+
+                        if (hasFirstStage) {
+
+                            condition.or();
+                        }
+
+                        condition.and(
+                                big -> big
+                                        .eq(
+                                                DepartmentScoreApply::getStatus,
+                                                (short) 1
+                                        )
+                                        .eq(
+                                                DepartmentScoreApply::getBigClubStatus,
+                                                DepartmentScoreReviewRules.BIG_CLUB_PENDING
+                                        )
+                                        .in(
+                                                DepartmentScoreApply::getDepartmentId,
+                                                childOrgIds
+                                        )
+                        );
+                    }
+                }
+        );
+
+
+        batchWrapper.orderByAsc(
+                DepartmentScoreApply::getCreateTime
+        );
+
+
         List<DepartmentScoreApply> list =
-
                 applyService.list(
-
-                        new LambdaQueryWrapper<DepartmentScoreApply>()
-
-                                .in(
-                                        DepartmentScoreApply::getDepartmentId,
-                                        departmentIds
-                                )
-
-                                .eq(
-                                        DepartmentScoreApply::getStatus,
-                                        (short) 0
-                                )
-
-                                .orderByAsc(
-                                        DepartmentScoreApply::getCreateTime
-                                )
+                        batchWrapper
                 );
 
 
@@ -2005,15 +2242,6 @@ public class DepartmentScoreApplyController {
                 list) {
 
 
-            if (!Short.valueOf((short) 0)
-                    .equals(
-                            apply.getStatus()
-                    )) {
-
-                continue;
-            }
-
-
             /*
              * 自己的申报仍然不能审批
              */
@@ -2025,37 +2253,107 @@ public class DepartmentScoreApplyController {
             }
 
 
-            /*
-             * 再次确认审核人能够管理这个组织
-             *（大社团正副职可审核下属小社团）
-             */
-            if (!orgScopeService.covers(
-                    reviewerOrganizationIds,
-                    apply.getDepartmentId()
-            )) {
+            boolean firstStage =
+                    Short.valueOf((short) 0)
+                            .equals(
+                                    apply.getStatus()
+                            );
+
+            boolean bigClubStage =
+                    DepartmentScoreReviewRules.waitingBigClubReview(
+                            apply
+                    );
+
+
+            if (!firstStage && !bigClubStage) {
 
                 continue;
             }
 
 
-            apply.setStatus(
-                    (short) 1
-            );
+            Department applyOrg =
+                    departmentMapper.selectById(
+                            apply.getDepartmentId()
+                    );
 
 
-            apply.setReviewerId(
-                    currentUserId
-            );
+            if (applyOrg == null) {
+
+                continue;
+            }
 
 
-            apply.setReviewRemark(
-                    "一键审批通过"
-            );
+            if (bigClubStage) {
+
+                /*
+                 * 大社团审核：必须是其下属小社团
+                 */
+                if (!childOrgIds.contains(
+                        apply.getDepartmentId()
+                )) {
+
+                    continue;
+                }
 
 
-            apply.setReviewTime(
-                    now
-            );
+                apply.setBigClubStatus(
+                        DepartmentScoreReviewRules.BIG_CLUB_APPROVED
+                );
+
+                apply.setBigClubReviewerId(
+                        currentUserId
+                );
+
+                apply.setBigClubReviewRemark(
+                        "一键审批通过"
+                );
+
+                apply.setBigClubReviewTime(
+                        now
+                );
+
+            } else {
+
+                /*
+                 * 组织初审范围（部门正副职 / 小社团正职）
+                 */
+                if (!firstStageOrgIds.contains(
+                        apply.getDepartmentId()
+                )) {
+
+                    continue;
+                }
+
+
+                apply.setStatus(
+                        (short) 1
+                );
+
+                apply.setReviewerId(
+                        currentUserId
+                );
+
+                apply.setReviewRemark(
+                        "一键审批通过"
+                );
+
+                apply.setReviewTime(
+                        now
+                );
+
+
+                /*
+                 * 小社团无上级大社团（数据异常）→ 直接放行至档案部
+                 */
+                if (DepartmentScoreReviewRules.isSmallClub(
+                        applyOrg
+                ) && applyOrg.getParentId() == null) {
+
+                    apply.setBigClubStatus(
+                            DepartmentScoreReviewRules.BIG_CLUB_APPROVED
+                    );
+                }
+            }
 
 
             apply.setUpdateTime(
@@ -2151,6 +2449,23 @@ public class DepartmentScoreApplyController {
                                 .eq(
                                         DepartmentScoreApply::getArchiveStatus,
                                         (short) 0
+                                )
+
+                                /*
+                                 * 小社团申报必须先通过大社团审核，
+                                 * 才能进入档案部审核。
+                                 * 部门申报的 bigClubStatus 为 NULL，不受影响。
+                                 */
+                                .and(
+                                        condition -> condition
+                                                .isNull(
+                                                        DepartmentScoreApply::getBigClubStatus
+                                                )
+                                                .or()
+                                                .eq(
+                                                        DepartmentScoreApply::getBigClubStatus,
+                                                        DepartmentScoreReviewRules.BIG_CLUB_APPROVED
+                                                )
                                 )
 
                                 /*
@@ -3045,6 +3360,132 @@ public class DepartmentScoreApplyController {
                     );
                 }
             }
+        }
+    }
+
+
+    /**
+     * =========================================================
+     * 按真实组织层级计算当前用户的审核范围
+     * =========================================================
+     */
+    private AuditScope resolveAuditScope(
+            List<SysUserDepartment> myPositions) {
+
+        AuditScope scope =
+                new AuditScope();
+
+
+        if (myPositions == null
+                || myPositions.isEmpty()) {
+
+            return scope;
+        }
+
+
+        List<Long> bigClubIds =
+                new ArrayList<>();
+
+
+        for (SysUserDepartment myPosition : myPositions) {
+
+            if (myPosition == null
+                    || myPosition.getDepartmentId() == null) {
+
+                continue;
+            }
+
+
+            Department relationOrg =
+                    departmentMapper.selectById(
+                            myPosition.getDepartmentId()
+                    );
+
+
+            String level =
+                    OrgPositionLevel.levelOf(
+                            myPosition
+                    );
+
+
+            if (DepartmentScoreReviewRules.canAuditFirstStage(
+                    relationOrg,
+                    level
+            )) {
+
+                scope.getFirstStageOrgIds().add(
+                        myPosition.getDepartmentId()
+                );
+            }
+
+
+            if (DepartmentScoreReviewRules.isBigClub(
+                    relationOrg
+            ) && OrgPositionLevel.isLeaderOrDeputy(level)) {
+
+                bigClubIds.add(
+                        myPosition.getDepartmentId()
+                );
+            }
+        }
+
+
+        if (bigClubIds.isEmpty()) {
+
+            return scope;
+        }
+
+
+        List<Department> children =
+                departmentMapper.selectList(
+                        new LambdaQueryWrapper<Department>()
+                                .in(
+                                        Department::getParentId,
+                                        bigClubIds
+                                )
+                );
+
+
+        if (children != null) {
+
+            for (Department child : children) {
+
+                if (child != null
+                        && child.getId() != null) {
+
+                    scope.getChildOrgIds().add(
+                            child.getId()
+                    );
+                }
+            }
+        }
+
+
+        return scope;
+    }
+
+
+    /**
+     * 当前用户的审核范围
+     */
+    private static final class AuditScope {
+
+        /** 可做组织初审的组织 ID */
+        private final List<Long> firstStageOrgIds =
+                new ArrayList<>();
+
+        /** 可做大社团审核的下级小社团 ID */
+        private final List<Long> childOrgIds =
+                new ArrayList<>();
+
+        private List<Long> getFirstStageOrgIds() {
+
+            return firstStageOrgIds;
+        }
+
+        private List<Long> getChildOrgIds() {
+
+            return childOrgIds;
         }
     }
 }

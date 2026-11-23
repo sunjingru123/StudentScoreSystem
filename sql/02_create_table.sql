@@ -1078,6 +1078,31 @@ ALTER TABLE public.department_score_apply
 ALTER TABLE public.department_score_apply
     ADD COLUMN IF NOT EXISTS archive_review_time TIMESTAMP WITHOUT TIME ZONE;
 
+-- =========================================================
+-- 社团审核链路（仅小社团申报使用）
+--
+-- big_club_status：
+--   NULL = 不经过大社团审核（部门 / 大社团负责人提交）
+--   0    = 待大社团审核
+--   1    = 大社团审核通过
+--   2    = 大社团驳回
+--
+-- 小社团申报必须大社团审核通过后，才能进入档案部审核。
+-- 只新增列，不回填、不修改任何历史数据；历史部门申报的该字段保持 NULL，
+-- 因此原有部门流程完全不受影响。
+-- =========================================================
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS big_club_status SMALLINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS big_club_reviewer_id BIGINT;
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS big_club_review_remark VARCHAR(1000);
+
+ALTER TABLE public.department_score_apply
+    ADD COLUMN IF NOT EXISTS big_club_review_time TIMESTAMP WITHOUT TIME ZONE;
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dsa_archive_status') THEN
