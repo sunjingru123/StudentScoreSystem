@@ -1014,10 +1014,33 @@
             导入 Excel
           </el-button>
 
+
+          <!-- 活动批量加分：独立模板，与上面互不影响 -->
+
+          <el-button
+            type="success"
+            plain
+            @click="downloadActivityTemplate"
+          >
+            下载活动模板
+          </el-button>
+
+          <el-button
+            type="success"
+            @click="openActivityDialog"
+          >
+            导入活动加分
+          </el-button>
+
           <div class="form-tip">
             模板固定六列：学号、姓名、日期、项目、分值、备注，
             其中「项目」只能从下拉列表中选择本部门已启用的项目；
             同一个学生填多行时，可把「学号」「姓名」单元格纵向合并，系统会自动识别。
+          </div>
+
+          <div class="form-tip">
+            活动批量加分：一场活动可添加多名学生，每名学生的分值与凭证可不同；
+            活动名称、举办部门、举办时间为必填项，审批仍在系统内线上完成。
           </div>
 
         </el-form-item>
@@ -1961,6 +1984,209 @@
 
         <el-button @click="evidencePreviewVisible = false">
           关闭
+        </el-button>
+
+      </template>
+
+    </el-dialog>
+
+
+    <!-- =====================================================
+         活动批量加分申报
+         ===================================================== -->
+
+    <el-dialog
+      v-model="activityDialogVisible"
+      title="活动批量加分申报"
+      width="900px"
+      destroy-on-close
+    >
+
+      <div class="excel-info">
+
+        <p>
+          ① 先下载「活动模板」，按原表格式填写活动基本信息与左右两栏学生明细（行数不限）。
+        </p>
+
+        <p>
+          ② 上传后先预览核对，确认无误再导入；错误行不会影响其他学生。
+        </p>
+
+        <p>
+          ③ 审批（组织者 / 档案部 / 指导老师 / 团委）在系统内线上完成，
+          不需要在 Excel 里填写审批意见，也不生成实体公章。
+        </p>
+
+      </div>
+
+
+      <div class="upload-row">
+
+        <el-upload
+          action=""
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="handleActivityFileChange"
+          :on-remove="handleActivityFileRemove"
+          :file-list="activityFileList"
+        >
+
+          <el-button>选择活动 Excel</el-button>
+
+        </el-upload>
+
+        <el-button
+          type="primary"
+          :loading="activityParsing"
+          :disabled="!activityFile"
+          @click="previewActivityFile"
+        >
+          预览核对
+        </el-button>
+
+      </div>
+
+
+      <template v-if="activityPreview">
+
+        <el-alert
+          v-if="activityPreview.message"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="activityPreview.message"
+          style="margin-bottom: 12px"
+        />
+
+
+        <el-descriptions
+          :column="2"
+          border
+          size="small"
+          style="margin-bottom: 12px"
+        >
+
+          <el-descriptions-item label="活动名称">
+            {{ activityPreview.activityName || '-' }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="举办部门">
+            {{ activityPreview.departmentName || '-' }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="举办时间">
+            {{ activityPreview.activityDate || '-' }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="活动地点">
+            {{ activityPreview.location || '-' }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="组织人员">
+            {{ activityPreview.organizers || '-' }}
+          </el-descriptions-item>
+
+          <el-descriptions-item label="可导入 / 问题行">
+            {{ activityPreview.validCount }} / {{ activityPreview.invalidCount }}
+          </el-descriptions-item>
+
+        </el-descriptions>
+
+
+        <el-table
+          :data="activityPreview.rows"
+          border
+          size="small"
+          max-height="320"
+        >
+
+          <el-table-column
+            prop="rowNumber"
+            label="行号"
+            width="70"
+            align="center"
+          />
+
+          <el-table-column
+            prop="realName"
+            label="姓名"
+            width="100"
+          />
+
+          <el-table-column
+            prop="className"
+            label="班级"
+            min-width="120"
+          />
+
+          <el-table-column
+            prop="studentNo"
+            label="学号"
+            width="130"
+          />
+
+          <el-table-column
+            prop="score"
+            label="加分分值"
+            width="100"
+            align="center"
+          />
+
+          <el-table-column
+            prop="evidence"
+            label="加分凭证"
+            min-width="140"
+            show-overflow-tooltip
+          />
+
+          <el-table-column
+            label="校验结果"
+            min-width="200"
+          >
+
+            <template #default="{ row }">
+
+              <el-tag
+                v-if="!row.error"
+                type="success"
+              >
+                可导入
+              </el-tag>
+
+              <span
+                v-else
+                class="activity-error"
+              >
+                {{ row.error }}
+              </span>
+
+            </template>
+
+          </el-table-column>
+
+        </el-table>
+
+      </template>
+
+
+      <template #footer>
+
+        <el-button @click="activityDialogVisible = false">
+          取消
+        </el-button>
+
+        <el-button
+          type="success"
+          :loading="activityImporting"
+          :disabled="
+            !activityPreview ||
+            activityPreview.message ||
+            activityPreview.validCount === 0
+          "
+          @click="submitActivityImport"
+        >
+          确认导入
         </el-button>
 
       </template>
@@ -3944,6 +4170,299 @@ async function batchApproveAudit() {
 /* 部门加减分申报 Excel 导入 */
 /* ====================================================== */
 
+/* =========================================================
+ * 活动批量加分申报
+ *
+ * 独立模板、独立上传与导入，
+ * 与原有部门加减分申报互不影响。
+ * ========================================================= */
+
+const activityDialogVisible = ref(false)
+
+const activityFile = ref(null)
+
+const activityFileList = ref([])
+
+const activityPreview = ref(null)
+
+const activityParsing = ref(false)
+
+const activityImporting = ref(false)
+
+
+function openActivityDialog() {
+
+  activityDialogVisible.value = true
+
+  activityFile.value = null
+
+  activityFileList.value = []
+
+  activityPreview.value = null
+
+}
+
+
+function handleActivityFileChange(file) {
+
+  activityFile.value =
+    file.raw
+
+  activityFileList.value =
+    [file]
+
+  activityPreview.value = null
+
+}
+
+
+function handleActivityFileRemove() {
+
+  activityFile.value = null
+
+  activityPreview.value = null
+
+}
+
+
+function saveBlobAsFile(
+  response,
+  fileName
+) {
+
+  const blob = new Blob(
+    [response?.data || response],
+    {
+      type:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }
+  )
+
+  const url =
+    window.URL.createObjectURL(blob)
+
+  const link =
+    document.createElement('a')
+
+  link.href = url
+
+  link.download = fileName
+
+  document.body.appendChild(link)
+
+  link.click()
+
+  document.body.removeChild(link)
+
+  window.URL.revokeObjectURL(url)
+
+}
+
+
+async function downloadActivityTemplate() {
+
+  try {
+
+    const response =
+      await request.get(
+        '/departmentScoreActivity/template',
+        {
+          responseType: 'blob',
+        }
+      )
+
+    if (
+      response instanceof Blob
+      && (response.type || '').includes('json')
+    ) {
+
+      let message = '下载活动模板失败'
+
+      try {
+
+        const data = JSON.parse(await response.text())
+
+        message = data?.message || message
+
+      } catch (e) {
+
+        // 保持默认提示
+
+      }
+
+      ElMessage.error(message)
+
+      return
+
+    }
+
+    saveBlobAsFile(
+      response,
+      '活动批量加分申报模板.xlsx'
+    )
+
+  } catch (error) {
+
+    console.error('下载活动模板失败：', error)
+
+    ElMessage.error('下载活动模板失败')
+
+  }
+
+}
+
+
+async function previewActivityFile() {
+
+  if (!activityFile.value) {
+
+    ElMessage.warning('请先选择活动 Excel')
+
+    return
+
+  }
+
+  activityParsing.value = true
+
+  try {
+
+    const formData = new FormData()
+
+    formData.append('file', activityFile.value)
+
+    const res =
+      await request.post(
+        '/departmentScoreActivity/preview',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message || '预览失败'
+      )
+
+      return
+
+    }
+
+    activityPreview.value = res.data || {}; 
+
+  } catch (error) {
+
+    console.error('活动加分预览失败：', error)
+
+    ElMessage.error(
+      error?.response?.data?.message
+        || error?.message
+        || '预览失败'
+    )
+
+  } finally {
+
+    activityParsing.value = false
+
+  }
+
+}
+
+
+async function submitActivityImport() {
+
+  if (!activityFile.value) {
+
+    ElMessage.warning('请先选择活动 Excel')
+
+    return
+
+  }
+
+  activityImporting.value = true
+
+  try {
+
+    const formData = new FormData()
+
+    formData.append('file', activityFile.value)
+
+    const res =
+      await request.post(
+        '/departmentScoreActivity/import',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+    if (Number(res?.code) !== 200) {
+
+      ElMessage.error(
+        res?.message || '导入失败'
+      )
+
+      return
+
+    }
+
+    const result =
+      res.data || {}
+
+    const successCount =
+      result.successCount || 0
+
+    const failCount =
+      result.failCount || 0
+
+    if (failCount > 0) {
+
+      ElMessage.warning(
+        `活动加分导入完成：成功 ${successCount} 条，失败 ${failCount} 条`
+      )
+
+    } else {
+
+      ElMessage.success(
+        `活动加分导入成功：共 ${successCount} 条`
+      )
+
+    }
+
+    activityDialogVisible.value = false
+
+    activityFile.value = null
+
+    activityFileList.value = []
+
+    activityPreview.value = null
+
+    loadMyApply()
+
+  } catch (error) {
+
+    console.error('活动加分导入失败：', error)
+
+    ElMessage.error(
+      error?.response?.data?.message
+        || error?.message
+        || '导入失败'
+    )
+
+  } finally {
+
+    activityImporting.value = false
+
+  }
+
+}
+
+
 function openImportDialog() {
 
   if (!departmentForm.departmentId) {
@@ -5564,6 +6083,18 @@ onMounted(async () => {
 /* ====================================================== */
 /* 表单提示 */
 /* ====================================================== */
+
+/* 活动批量加分：错误行提示 */
+.activity-error {
+
+  color:
+    #f56c6c;
+
+  font-size:
+    12px;
+
+}
+
 
 .form-tip {
 

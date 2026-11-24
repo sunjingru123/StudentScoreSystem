@@ -57,6 +57,14 @@ public class DepartmentScoreApply {
     private Long departmentId;
 
     /**
+     * 所属活动 ID（活动批量加分申报）
+     *
+     * 普通部门申报为 null；
+     * 同一场活动的多名学生共用同一个 activityId。
+     */
+    private Long activityId;
+
+    /**
      * 1 加分
      * -1 减分
      */
