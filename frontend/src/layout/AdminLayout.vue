@@ -489,6 +489,8 @@ import {
   useRoute
 } from 'vue-router'
 
+import request from '@/utils/request'
+
 
 import {
   House,
@@ -717,6 +719,22 @@ function goChangePassword() {
 // =========================================================
 
 function logout() {
+
+  /*
+   * 通知后端清空会话，使当前 Token 立即失效。
+   * 失败也不阻断本地退出。
+   */
+  try {
+
+    request.post(
+      '/login/logout'
+    ).catch(() => {})
+
+  } catch (error) {
+
+    // 忽略
+  }
+
 
   localStorage.removeItem(
     'token'

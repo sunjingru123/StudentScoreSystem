@@ -141,6 +141,16 @@ public class UserSessionService {
             return false;
         }
 
+        /*
+         * 已停用账号同样立即失效，
+         * 不用等 Token 自然过期。
+         */
+        if (user.getStatus() != null
+                && user.getStatus() != 1) {
+
+            return false;
+        }
+
         String activeSessionId =
                 user.getActiveSessionId();
 
@@ -152,5 +162,44 @@ public class UserSessionService {
          */
         return activeSessionId != null
                 && activeSessionId.equals(sessionId);
+    }
+
+    /**
+     * 结束会话（退出登录）
+     *
+     * 清空 sys_user.active_session_id，
+     * 使该账号当前所有已签发的 Token 立即失效。
+     *
+     * @param userId 用户 ID
+     */
+    public void endSession(
+            Long userId
+    ) {
+
+        if (userId == null) {
+
+            return;
+        }
+
+        /*
+         * 只更新 active_session_id 一个字段，
+         * 避免把整行用户数据（密码、首登标记等）一起写回。
+         */
+        LambdaUpdateWrapper<SysUser> wrapper =
+                new LambdaUpdateWrapper<>();
+
+        wrapper.eq(
+                        SysUser::getId,
+                        userId
+                )
+                .set(
+                        SysUser::getActiveSessionId,
+                        null
+                );
+
+        sysUserMapper.update(
+                null,
+                wrapper
+        );
     }
 }

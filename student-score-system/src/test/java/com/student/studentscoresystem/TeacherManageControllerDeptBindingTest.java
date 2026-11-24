@@ -92,7 +92,10 @@ class TeacherManageControllerDeptBindingTest {
                 userPositionMapper,
                 positionMapper,
                 departmentMapper,
-                sysDepartmentMapper
+                sysDepartmentMapper,
+                org.mockito.Mockito.mock(
+                        com.student.studentscoresystem.service.UserSessionService.class
+                )
         );
     }
 

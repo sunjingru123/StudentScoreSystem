@@ -247,4 +247,63 @@ class UserSessionServiceTest {
                 "缺少用户 ID 时必须拒绝"
         );
     }
+
+    /* =====================================================
+     * 单设备登录：退出登录 / 账号停用
+     * ===================================================== */
+
+    @Test
+    void endSessionClearsActiveSessionId() {
+
+        SysUserMapper mapper =
+                mock(SysUserMapper.class);
+
+        UserSessionService service =
+                new UserSessionService(mapper);
+
+        service.endSession(USER_ID);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaUpdateWrapper<SysUser>> captor =
+                ArgumentCaptor.forClass(
+                        LambdaUpdateWrapper.class
+                );
+
+        verify(mapper).update(
+                isNull(),
+                captor.capture()
+        );
+
+        assertTrue(
+                captor.getValue()
+                        .getSqlSet()
+                        .contains("active_session_id"),
+                "退出登录必须清空 active_session_id"
+        );
+    }
+
+    @Test
+    void disabledUserSessionIsRejected() {
+
+        SysUserMapper mapper =
+                mock(SysUserMapper.class);
+
+        SysUser user =
+                new SysUser();
+
+        user.setId(USER_ID);
+        user.setStatus((short) 0);
+        user.setActiveSessionId("abc123");
+
+        when(mapper.selectById(USER_ID))
+                .thenReturn(user);
+
+        UserSessionService service =
+                new UserSessionService(mapper);
+
+        assertFalse(
+                service.isActiveSession(USER_ID, "abc123"),
+                "停用账号的会话必须立即失效"
+        );
+    }
 }

@@ -36,7 +36,8 @@ class SysUserControllerStudentClassesTest {
                 sysUserMapper,
                 mock(SysUserPositionMapper.class),
                 mock(SysPositionMapper.class),
-                mock(StudentAccountManageService.class)
+                mock(StudentAccountManageService.class),
+                mock(com.student.studentscoresystem.service.UserSessionService.class)
         );
     }
 

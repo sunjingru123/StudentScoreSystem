@@ -412,4 +412,53 @@ public class LoginController {
 
         return Result.success(vo);
     }
+
+
+    /**
+     * =========================================================
+     * 退出登录
+     * =========================================================
+     *
+     * POST /login/logout
+     *
+     * 清空该账号的 active_session_id：
+     * 当前设备与其它设备上的旧 Token 立即失效。
+     * =========================================================
+     */
+    @PostMapping("/logout")
+    public Result<Void> logout(
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+
+        Object userIdAttr =
+                request.getAttribute("userId");
+
+        if (userIdAttr == null) {
+
+            /*
+             * Token 已失效时退出登录也视为成功，
+             * 前端只需要清理本地缓存。
+             */
+            return Result.success(null);
+        }
+
+
+        try {
+
+            userSessionService.endSession(
+                    Long.valueOf(
+                            userIdAttr.toString()
+                    )
+            );
+
+        } catch (Exception ignored) {
+
+            /*
+             * 退出登录失败不阻断前端流程。
+             */
+        }
+
+
+        return Result.success(null);
+    }
 }

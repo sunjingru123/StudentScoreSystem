@@ -14,6 +14,7 @@ import com.student.studentscoresystem.mapper.SysPositionMapper;
 import com.student.studentscoresystem.mapper.SysUserMapper;
 import com.student.studentscoresystem.mapper.SysUserPositionMapper;
 import com.student.studentscoresystem.service.StudentAccountManageService;
+import com.student.studentscoresystem.service.UserSessionService;
 import com.student.studentscoresystem.utils.ClassNameUtils;
 import com.student.studentscoresystem.utils.PasswordUtil;
 import com.student.studentscoresystem.vo.RecycledStudentVO;
@@ -39,17 +40,21 @@ public class SysUserController {
 
     private final StudentAccountManageService studentAccountManageService;
 
+    private final UserSessionService userSessionService;
+
 
     public SysUserController(
             SysUserMapper sysUserMapper,
             SysUserPositionMapper userPositionMapper,
             SysPositionMapper positionMapper,
-            StudentAccountManageService studentAccountManageService
+            StudentAccountManageService studentAccountManageService,
+            UserSessionService userSessionService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.userPositionMapper = userPositionMapper;
         this.positionMapper = positionMapper;
         this.studentAccountManageService = studentAccountManageService;
+        this.userSessionService = userSessionService;
     }
 
 
@@ -1710,6 +1715,12 @@ public class SysUserController {
         if (updated <= 0) {
             return Result.fail("密码重置失败");
         }
+
+        /*
+         * 重置密码后强制下线：
+         * 清空会话，使学生旧设备上的 Token 立即失效。
+         */
+        userSessionService.endSession(id);
 
         return Result.success(null);
     }

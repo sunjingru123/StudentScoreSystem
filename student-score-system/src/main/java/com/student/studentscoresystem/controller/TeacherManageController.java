@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.student.studentscoresystem.service.UserSessionService;
 
 @RestController
 @RequestMapping("/admin/teacher")
@@ -46,18 +47,22 @@ public class TeacherManageController {
     private final DepartmentMapper departmentMapper;
     private final SysDepartmentMapper sysDepartmentMapper;
 
+    private final UserSessionService userSessionService;
+
     public TeacherManageController(
             SysUserMapper sysUserMapper,
             SysUserPositionMapper userPositionMapper,
             SysPositionMapper positionMapper,
             DepartmentMapper departmentMapper,
-            SysDepartmentMapper sysDepartmentMapper
+            SysDepartmentMapper sysDepartmentMapper,
+            UserSessionService userSessionService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.userPositionMapper = userPositionMapper;
         this.positionMapper = positionMapper;
         this.departmentMapper = departmentMapper;
         this.sysDepartmentMapper = sysDepartmentMapper;
+        this.userSessionService = userSessionService;
     }
 
     /**
@@ -887,6 +892,12 @@ public class TeacherManageController {
         user.setFirstLogin((short) 1);
 
         sysUserMapper.updateById(user);
+
+        /*
+         * 重置密码后强制下线，
+         * 使教师旧设备上的 Token 立即失效。
+         */
+        userSessionService.endSession(id);
 
         return Result.success(null);
     }
