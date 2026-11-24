@@ -25,6 +25,11 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +44,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -47,12 +53,12 @@ import java.util.Set;
  *
  * 与原有「部门加减分申报」完全并存、互不影响：
  *
- * 1. 独立模板：活动基本信息 + 学生加分明细；
- * 2. 独立解析、校验、导入；
+ * 1. 独立模板：直接下发学院在用的活动加分统计表（Word 原表）；
+ * 2. 独立解析、校验、导入：自动识别 Word / Excel 表结构；
  * 3. 一场活动一条活动记录，每名学生各生成一条申报明细，
  *    沿用原有审核链路（组织负责人 → 大社团 → 档案部 → 辅导员）。
  *
- * 审批结果不写在 Excel 里，全部由系统线上审批记录体现。
+ * 审批结果不写在表里，全部由系统线上审批记录体现。
  */
 @Service
 public class DepartmentScoreActivityImportService {
@@ -66,6 +72,15 @@ public class DepartmentScoreActivityImportService {
     private static final String HEADER_EVIDENCE = "加分凭证";
 
     private static final String HEADER_CLASS_NAME = "班级";
+
+    /**
+     * 原始活动加分统计表（Word）。
+     *
+     * 系统直接下发学院在用原表，不做任何改写，
+     * 导入时也按该表结构自动识别，保证「表原封不动当模板」。
+     */
+    private static final String TEMPLATE_RESOURCE =
+            "templates/activity-score-template.docx";
 
     private final DepartmentMapper departmentMapper;
 
@@ -96,6 +111,37 @@ public class DepartmentScoreActivityImportService {
      * 模板
      * ========================================================= */
 
+    /**
+     * 下载模板：直接返回学院在用的原表（Word），原封不动。
+     */
+    public byte[] buildTemplateDocument() {
+
+        ClassPathResource resource =
+                new ClassPathResource(TEMPLATE_RESOURCE);
+
+        if (!resource.exists()) {
+
+            throw new IllegalStateException(
+                    "活动加分统计表模板未随应用打包：" + TEMPLATE_RESOURCE
+            );
+        }
+
+        try (InputStream in = resource.getInputStream()) {
+
+            return in.readAllBytes();
+
+        } catch (Exception e) {
+
+            throw new IllegalStateException(
+                    "读取活动加分统计表模板失败：" + e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * 备用模板：按原表结构生成的 Excel 版本（仍可导入）。
+     */
     public byte[] buildTemplateWorkbook() {
 
         try (XSSFWorkbook workbook = new XSSFWorkbook();
@@ -323,7 +369,7 @@ public class DepartmentScoreActivityImportService {
         if (validCount == 0) {
 
             throw new IllegalArgumentException(
-                    "没有可导入的有效学生记录，请先修正 Excel 中的错误"
+                    "没有可导入的有效学生记录，请先修正文件中的错误"
             );
         }
 
@@ -438,17 +484,40 @@ public class DepartmentScoreActivityImportService {
 
         if (file == null || file.isEmpty()) {
 
-            throw new IllegalArgumentException("请选择活动批量加分 Excel 文件");
+            throw new IllegalArgumentException(
+                    "请选择活动加分统计表文件（.docx 或 .xlsx）"
+            );
         }
 
         String filename = file.getOriginalFilename();
 
-        if (filename == null
-                || (!filename.toLowerCase().endsWith(".xlsx")
-                && !filename.toLowerCase().endsWith(".xls"))) {
+        String lower = filename == null
+                ? ""
+                : filename.toLowerCase(Locale.ROOT);
+
+        /* 学院原表是 Word，直接按 Word 表格识别 */
+        if (lower.endsWith(".docx")) {
+
+            try (InputStream in = file.getInputStream()) {
+
+                return parseDocx(in);
+
+            } catch (IllegalArgumentException e) {
+
+                throw e;
+
+            } catch (Exception e) {
+
+                throw new IllegalArgumentException(
+                        "Word 文件读取失败：" + e.getMessage()
+                );
+            }
+        }
+
+        if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls")) {
 
             throw new IllegalArgumentException(
-                    "只支持 .xlsx 或 .xls 格式的 Excel 文件"
+                    "只支持 .docx、.xlsx 或 .xls 格式的模板文件"
             );
         }
 
@@ -860,6 +929,265 @@ public class DepartmentScoreActivityImportService {
     }
 
     /* =========================================================
+     * Word 原表解析
+     * ========================================================= */
+
+    /**
+     * 解析学院原表（Word）。
+     *
+     * 表结构（与原表一致，明细行数不限）：
+     *   活动名称 / 举办部门 · 举办时间 · 活动地点 / 组织人员
+     *   姓名 班级 学号 加分凭证 加分（左右双栏）
+     *   底部审批栏
+     *
+     * 单元格按 w:tc 顺序读取，不依赖固定列号，
+     * 因此原表中的合并单元格（活动名称、加分凭证等）不影响解析。
+     */
+    private Parsed parseDocx(InputStream in) {
+
+        try (XWPFDocument document = new XWPFDocument(in)) {
+
+            XWPFTable table = findActivityTable(document);
+
+            if (table == null) {
+
+                throw new IllegalArgumentException(
+                        "未在 Word 中找到包含「姓名 / 学号」的学生明细表格，"
+                                + "请使用系统提供的活动加分统计表模板"
+                );
+            }
+
+            List<XWPFTableRow> rows = table.getRows();
+
+            int headerIndex = -1;
+
+            for (int i = 0; i < rows.size(); i++) {
+
+                List<String> texts = docxTexts(rows.get(i));
+
+                if (texts.contains(HEADER_NAME)
+                        && texts.contains(HEADER_STUDENT_NO)) {
+
+                    headerIndex = i;
+                    break;
+                }
+            }
+
+            if (headerIndex < 0) {
+
+                throw new IllegalArgumentException(
+                        "未找到学生明细表头（姓名 / 学号），"
+                                + "请使用系统提供的活动加分统计表模板"
+                );
+            }
+
+            Parsed parsed = new Parsed();
+
+            readDocxActivityInfo(rows, headerIndex, parsed);
+            readDocxStudentRows(rows, headerIndex, parsed);
+
+            return parsed;
+
+        } catch (IllegalArgumentException e) {
+
+            throw e;
+
+        } catch (Exception e) {
+
+            throw new IllegalArgumentException(
+                    "Word 文件读取失败：" + e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    private XWPFTable findActivityTable(XWPFDocument document) {
+
+        for (XWPFTable table : document.getTables()) {
+
+            for (XWPFTableRow row : table.getRows()) {
+
+                List<String> texts = docxTexts(row);
+
+                if (texts.contains(HEADER_NAME)
+                        && texts.contains(HEADER_STUDENT_NO)) {
+
+                    return table;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private List<String> docxTexts(XWPFTableRow row) {
+
+        List<String> texts = new ArrayList<>();
+
+        for (XWPFTableCell cell : row.getTableCells()) {
+
+            texts.add(normalizeCellText(cell));
+        }
+
+        return texts;
+    }
+
+    private String normalizeCellText(XWPFTableCell cell) {
+
+        if (cell == null) {
+
+            return "";
+        }
+
+        String text = cell.getText();
+
+        if (text == null) {
+
+            return "";
+        }
+
+        return text
+                .replace('\u00A0', ' ')
+                .replace('\u3000', ' ')
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private void readDocxActivityInfo(
+            List<XWPFTableRow> rows,
+            int headerIndex,
+            Parsed parsed
+    ) {
+
+        for (int i = 0; i < headerIndex; i++) {
+
+            List<String> texts = docxTexts(rows.get(i));
+
+            for (int c = 0; c < texts.size(); c++) {
+
+                String key = infoKey(texts.get(c));
+
+                if (key == null) {
+                    continue;
+                }
+
+                String value = docxValue(texts, c + 1);
+
+                applyInfo(parsed, key, value, null);
+
+                c++;
+            }
+        }
+    }
+
+    private void readDocxStudentRows(
+            List<XWPFTableRow> rows,
+            int headerIndex,
+            Parsed parsed
+    ) {
+
+        List<String> header = docxTexts(rows.get(headerIndex));
+
+        List<Integer> blockStarts = new ArrayList<>();
+
+        for (int c = 0; c < header.size(); c++) {
+
+            if (HEADER_NAME.equals(header.get(c))) {
+                blockStarts.add(c);
+            }
+        }
+
+        for (int i = headerIndex + 1; i < rows.size(); i++) {
+
+            List<String> texts = docxTexts(rows.get(i));
+
+            /* 底部审批栏不计入明细 */
+            if (isApprovalTexts(texts)) {
+                break;
+            }
+
+            for (int b = 0; b < blockStarts.size(); b++) {
+
+                int start = blockStarts.get(b);
+
+                int end = b + 1 < blockStarts.size()
+                        ? blockStarts.get(b + 1)
+                        : header.size();
+
+                Map<String, Integer> columns = new HashMap<>();
+
+                for (int c = start; c < end; c++) {
+
+                    String key = headerKey(header.get(c));
+
+                    if (key != null && !columns.containsKey(key)) {
+                        columns.put(key, c);
+                    }
+                }
+
+                RawRow raw = readDocxRow(texts, columns, i);
+
+                if (raw != null) {
+                    parsed.rows.add(raw);
+                }
+            }
+        }
+    }
+
+    private boolean isApprovalTexts(List<String> texts) {
+
+        for (String text : texts) {
+
+            if (text.contains("意见") || text.contains("公章")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private RawRow readDocxRow(
+            List<String> texts,
+            Map<String, Integer> columns,
+            int rowIndex
+    ) {
+
+        String realName = docxValue(texts, columns.get("name"));
+        String className = docxValue(texts, columns.get("class"));
+        String studentNo = docxValue(texts, columns.get("no"));
+        String evidence = docxValue(texts, columns.get("evidence"));
+        String scoreText = docxValue(texts, columns.get("score"));
+
+        if (studentNo.isEmpty()
+                && realName.isEmpty()
+                && scoreText.isEmpty()
+                && evidence.isEmpty()) {
+
+            return null;
+        }
+
+        RawRow raw = new RawRow();
+
+        raw.rowNumber = rowIndex + 1;
+        raw.realName = realName;
+        raw.className = className;
+        raw.studentNo = studentNo;
+        raw.scoreText = scoreText;
+        raw.evidence = evidence;
+
+        return raw;
+    }
+
+    private String docxValue(List<String> texts, Integer index) {
+
+        if (index == null || index < 0 || index >= texts.size()) {
+            return "";
+        }
+
+        return texts.get(index);
+    }
+
+    /* =========================================================
      * 校验
      * ========================================================= */
 
@@ -1002,7 +1330,7 @@ public class DepartmentScoreActivityImportService {
 
             if (!seen.add(key + "@file")) {
 
-                vo.setError("Excel 中重复出现该学生的相同加分");
+                vo.setError("文件中重复出现该学生的相同加分");
                 result.add(vo);
                 continue;
             }
@@ -1262,6 +1590,9 @@ public class DepartmentScoreActivityImportService {
         }
 
         String value = text.trim()
+                .replace("年", "-")
+                .replace("月", "-")
+                .replace("日", "")
                 .replace("/", "-")
                 .replace(".", "-");
 

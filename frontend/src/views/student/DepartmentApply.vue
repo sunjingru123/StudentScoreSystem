@@ -2005,7 +2005,8 @@
       <div class="excel-info">
 
         <p>
-          ① 先下载「活动模板」，按原表格式填写活动基本信息与左右两栏学生明细（行数不限）。
+          ① 先下载「活动加分统计表」（学院在用原表，无需改造），
+          按原表格式填写活动基本信息与左右两栏学生明细（行数不限）。
         </p>
 
         <p>
@@ -2014,7 +2015,7 @@
 
         <p>
           ③ 审批（组织者 / 档案部 / 指导老师 / 团委）在系统内线上完成，
-          不需要在 Excel 里填写审批意见，也不生成实体公章。
+          不需要在表格里填写审批意见，也不生成实体公章。
         </p>
 
       </div>
@@ -2026,13 +2027,13 @@
           action=""
           :auto-upload="false"
           :limit="1"
-          accept=".xlsx,.xls"
+          accept=".docx,.xlsx,.xls"
           :on-change="handleActivityFileChange"
           :on-remove="handleActivityFileRemove"
           :file-list="activityFileList"
         >
 
-          <el-button>选择活动 Excel</el-button>
+          <el-button>选择活动加分统计表</el-button>
 
         </el-upload>
 
@@ -4227,14 +4228,14 @@ function handleActivityFileRemove() {
 
 function saveBlobAsFile(
   response,
-  fileName
+  fileName,
+  mimeType = 'application/octet-stream'
 ) {
 
   const blob = new Blob(
     [response?.data || response],
     {
-      type:
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      type: mimeType,
     }
   )
 
@@ -4298,7 +4299,8 @@ async function downloadActivityTemplate() {
 
     saveBlobAsFile(
       response,
-      '活动批量加分申报模板.xlsx'
+      '人工智能与计算机学院加分统计表.docx',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     )
 
   } catch (error) {
@@ -4316,7 +4318,7 @@ async function previewActivityFile() {
 
   if (!activityFile.value) {
 
-    ElMessage.warning('请先选择活动 Excel')
+    ElMessage.warning('请先选择活动加分统计表')
 
     return
 
@@ -4376,7 +4378,7 @@ async function submitActivityImport() {
 
   if (!activityFile.value) {
 
-    ElMessage.warning('请先选择活动 Excel')
+    ElMessage.warning('请先选择活动加分统计表')
 
     return
 

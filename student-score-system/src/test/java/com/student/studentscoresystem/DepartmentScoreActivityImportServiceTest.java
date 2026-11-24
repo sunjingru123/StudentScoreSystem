@@ -19,6 +19,9 @@ import com.student.studentscoresystem.vo.ActivityBatchPreviewVO;
 import com.student.studentscoresystem.vo.ActivityBatchRowVO;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -339,6 +342,161 @@ class DepartmentScoreActivityImportServiceTest {
         assertTrue(template.length > 1000);
     }
 
+    @Test
+    void shippedWordTemplateIsServedAsIs() {
+
+        byte[] template = service.buildTemplateDocument();
+
+        assertNotNull(template);
+        assertTrue(template.length > 1000);
+
+        /* docx 实为 zip 包，文件头为 PK */
+        assertEquals('P', (char) template[0]);
+        assertEquals('K', (char) template[1]);
+
+        ActivityBatchPreviewVO vo = service.preview(
+                new MockMultipartFile(
+                        "file",
+                        "人工智能与计算机学院加分统计表.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        template
+                ),
+                APPLICANT_ID
+        );
+
+        /* 下发的就是原表，未填写内容：能解析出表格，但提示补全活动信息 */
+        assertNotNull(vo);
+        assertEquals("活动名称不能为空", vo.getMessage());
+        assertTrue(vo.getRows().isEmpty());
+    }
+
+    @Test
+    void realTemplateAcceptsFilledValues() throws Exception {
+
+        byte[] filled;
+
+        try (XWPFDocument doc = new XWPFDocument(
+                new java.io.ByteArrayInputStream(
+                        service.buildTemplateDocument()
+                )
+        );
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            XWPFTable table = doc.getTables().get(0);
+
+            table.getRow(0).getCell(1).setText("校园歌手大赛");
+            table.getRow(1).getCell(1).setText("学习部");
+            table.getRow(1).getCell(3).setText("2024-05-01");
+            table.getRow(1).getCell(5).setText("大学生活动中心");
+            table.getRow(2).getCell(1).setText("张一、张二");
+
+            XWPFTableRow detail = table.getRow(4);
+
+            String[] values = {
+                    "张一", "25级1班", "20240001", "证书A", "2",
+                    "张二", "25级1班", "20240002", "证书B", "1.5"
+            };
+
+            for (int c = 0; c < values.length; c++) {
+                detail.getCell(c).setText(values[c]);
+            }
+
+            doc.write(out);
+
+            filled = out.toByteArray();
+        }
+
+        ActivityBatchPreviewVO vo = service.preview(
+                new MockMultipartFile(
+                        "file",
+                        "人工智能与计算机学院加分统计表.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        filled
+                ),
+                APPLICANT_ID
+        );
+
+        assertNull(vo.getMessage());
+
+        assertEquals("校园歌手大赛", vo.getActivityName());
+        assertEquals("学习部", vo.getDepartmentName());
+        assertEquals("大学生活动中心", vo.getLocation());
+        assertEquals("张一、张二", vo.getOrganizers());
+
+        assertEquals(2, vo.getRows().size());
+        assertEquals(2, vo.getValidCount());
+
+        assertEquals("20240001", vo.getRows().get(0).getStudentNo());
+        assertEquals("证书A", vo.getRows().get(0).getEvidence());
+        assertEquals("20240002", vo.getRows().get(1).getStudentNo());
+        assertEquals(
+                "1.5",
+                vo.getRows().get(1).getScore()
+                        .stripTrailingZeros()
+                        .toPlainString()
+        );
+    }
+
+    @Test
+    void previewParsesOriginalWordTemplate() {
+
+        ActivityBatchPreviewVO vo =
+                service.preview(
+                        wordDocument(),
+                        APPLICANT_ID
+                );
+
+        assertNull(vo.getMessage());
+
+        assertEquals("校园歌手大赛", vo.getActivityName());
+        assertEquals("学习部", vo.getDepartmentName());
+        assertEquals("大学生活动中心", vo.getLocation());
+        assertEquals("张一、张二", vo.getOrganizers());
+
+        /* 中文日期（2024年5月1日）也应能识别 */
+        assertEquals("2024年5月1日", vo.getActivityDate());
+
+        assertEquals(2, vo.getRows().size());
+        assertEquals(2, vo.getValidCount());
+        assertEquals(0, vo.getInvalidCount());
+
+        ActivityBatchRowVO left = vo.getRows().get(0);
+        ActivityBatchRowVO right = vo.getRows().get(1);
+
+        assertEquals("20240001", left.getStudentNo());
+        assertEquals("证书A", left.getEvidence());
+        assertEquals("2", left.getScore().stripTrailingZeros().toPlainString());
+
+        assertEquals("20240002", right.getStudentNo());
+        assertEquals("证书B", right.getEvidence());
+        assertEquals("1.5", right.getScore().stripTrailingZeros().toPlainString());
+    }
+
+    @Test
+    void wordTemplateReportsRowErrorsWithoutBlockingValidRows() {
+
+        ActivityBatchPreviewVO vo =
+                service.preview(
+                        wordDocument(
+                                "",
+                                "25级1班",
+                                "20249999",
+                                "证书X",
+                                "2"
+                        ),
+                        APPLICANT_ID
+                );
+
+        assertEquals(2, vo.getRows().size());
+        assertEquals(1, vo.getValidCount());
+        assertEquals(1, vo.getInvalidCount());
+        assertEquals(
+                "系统中不存在该学号：20249999",
+                vo.getRows().get(0).getError()
+        );
+        assertNull(vo.getRows().get(1).getError());
+    }
+
     /* =====================================================
      * 构造测试 Excel
      * ===================================================== */
@@ -489,6 +647,71 @@ class DepartmentScoreActivityImportServiceTest {
         } catch (Exception e) {
 
             throw new IllegalStateException(e);
+        }
+    }
+
+    private MockMultipartFile wordDocument(String... leftCells) {
+
+        String[] left = leftCells.length == 5
+                ? leftCells
+                : new String[]{"张一", "25级1班", "20240001", "证书A", "2"};
+
+        String[] right = {"张二", "25级1班", "20240002", "证书B", "1.5"};
+
+        String[] data = new String[10];
+
+        System.arraycopy(left, 0, data, 0, 5);
+        System.arraycopy(right, 0, data, 5, 5);
+
+        try (XWPFDocument doc = new XWPFDocument();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            /* 原表：4 行基本信息/表头 + 1 行明细 + 1 行空行 + 1 行审批栏 */
+            XWPFTable table = doc.createTable(7, 10);
+
+            setCells(table.getRow(0), new String[]{"活动名称", "校园歌手大赛"});
+
+            setCells(table.getRow(1), new String[]{
+                    "举办部门", "学习部",
+                    "举办时间", "2024年5月1日",
+                    "活动地点", "大学生活动中心"
+            });
+
+            setCells(table.getRow(2), new String[]{"组织人员", "张一、张二"});
+
+            setCells(table.getRow(3), new String[]{
+                    "姓名", "班级", "学号", "加分凭证", "加分",
+                    "姓名", "班级", "学号", "加分凭证", "加分"
+            });
+
+            setCells(table.getRow(4), data);
+
+            setCells(table.getRow(6), new String[]{
+                    "活动组织者意见", "",
+                    "档案部主要负责人意见", "",
+                    "指导老师意见", "",
+                    "团委意见", "团委公章"
+            });
+
+            doc.write(out);
+
+            return new MockMultipartFile(
+                    "file",
+                    "人工智能与计算机学院加分统计表.docx",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    out.toByteArray()
+            );
+
+        } catch (Exception e) {
+
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private void setCells(XWPFTableRow row, String[] values) {
+
+        for (int c = 0; c < values.length; c++) {
+            row.getCell(c).setText(values[c]);
         }
     }
 

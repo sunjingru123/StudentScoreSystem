@@ -40,10 +40,50 @@ public class DepartmentScoreActivityController {
     }
 
     /**
-     * 下载活动批量加分申报模板
+     * 下载活动加分统计表模板。
+     *
+     * 直接下发学院在用的 Word 原表，不做任何改写；
+     * 上传时系统自动识别该表结构。
      */
     @GetMapping("/template")
     public void template(
+            HttpServletResponse response
+    ) throws IOException {
+
+        byte[] content =
+                importService.buildTemplateDocument();
+
+        String fileName =
+                URLEncoder.encode(
+                        "人工智能与计算机学院加分统计表.docx",
+                        StandardCharsets.UTF_8
+                ).replace("+", "%20");
+
+        response.setContentType(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+
+        response.setCharacterEncoding(
+                StandardCharsets.UTF_8.name()
+        );
+
+        response.setHeader(
+                "Content-Disposition",
+                "attachment;filename*=UTF-8''" + fileName
+        );
+
+        response.setContentLength(content.length);
+
+        response.getOutputStream().write(content);
+
+        response.flushBuffer();
+    }
+
+    /**
+     * 备用模板（Excel 版，与原表结构一致，同样可以导入）
+     */
+    @GetMapping("/template/xlsx")
+    public void templateWorkbook(
             HttpServletResponse response
     ) throws IOException {
 
