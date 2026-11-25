@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 活动批量加分申报。
@@ -72,6 +74,15 @@ public class DepartmentScoreActivityImportService {
     private static final String HEADER_EVIDENCE = "加分凭证";
 
     private static final String HEADER_CLASS_NAME = "班级";
+
+    /**
+     * 举办时间识别用：从各种写法中取出第一个「年月日」。
+     *
+     * 2026-10-22 / 2026.10.22 / 2026/10/22 / 20261022 / 2026年10月22日
+     * 2026.9.20-2026.9.24（区间）→ 取起始日 2026-09-20
+     */
+    private static final Pattern DATE_PATTERN =
+            Pattern.compile("(\\d{4})\\D{0,2}(\\d{1,2})\\D{0,2}(\\d{1,2})");
 
     /**
      * 原始活动加分统计表（Word）。
@@ -241,7 +252,7 @@ public class DepartmentScoreActivityImportService {
             XSSFSheet note = workbook.createSheet("填写说明");
 
             String[] notes = {
-                    "1. 活动名称、举办部门、举办时间为必填项。",
+                    "1. 活动名称、举办部门、举办时间为必填项（时间可写 2026.10.22 或 2026.9.20-2026.9.24）。",
                     "2. 举办部门必须与本人在系统中的所属组织名称完全一致。",
                     "3. 学生明细左右两栏均可填写（与原表一致），行数不限；",
                     "   每名学生的加分与凭证可以不同。",
@@ -1227,7 +1238,7 @@ public class DepartmentScoreActivityImportService {
             parsed.activityDateValue = parseDate(parsed.activityDate);
 
             if (parsed.activityDateValue == null) {
-                return "举办时间不能为空，格式示例：2024-05-01";
+                return "举办时间不能为空，格式示例：2026.10.22 或 2026.9.20-2026.9.24";
             }
         }
 
@@ -1482,22 +1493,41 @@ public class DepartmentScoreActivityImportService {
 
         StringBuilder builder = new StringBuilder();
 
-        if (!isBlank(parsed.location)) {
-            builder.append("活动地点：").append(parsed.location.trim());
+        String rawDate = parsed.activityDate == null
+                ? ""
+                : parsed.activityDate.trim();
+
+        /* 区间等非标准写法保留原文，便于审核时看到活动起止时间 */
+        if (!rawDate.isEmpty()
+                && (parsed.activityDateValue == null
+                || !rawDate.equals(parsed.activityDateValue.toString()))) {
+
+            appendPart(builder, "举办时间：", rawDate);
         }
 
-        if (!isBlank(parsed.organizers)) {
-
-            if (builder.length() > 0) {
-                builder.append("；");
-            }
-
-            builder.append("组织人员：").append(parsed.organizers.trim());
-        }
+        appendPart(builder, "活动地点：", parsed.location);
+        appendPart(builder, "组织人员：", parsed.organizers);
 
         return builder.length() == 0
                 ? null
                 : builder.toString();
+    }
+
+    private void appendPart(
+            StringBuilder builder,
+            String label,
+            String value
+    ) {
+
+        if (isBlank(value)) {
+            return;
+        }
+
+        if (builder.length() > 0) {
+            builder.append("；");
+        }
+
+        builder.append(label).append(value.trim());
     }
 
     /* =========================================================
@@ -1583,46 +1613,36 @@ public class DepartmentScoreActivityImportService {
         }
     }
 
+    /**
+     * 举办时间解析。
+     *
+     * 支持：
+     *   2026-10-22、2026.10.22、2026/10/22、20261022、2026年10月22日；
+     *   2026.9.20-2026.9.24、2026.9.20 至 2026.9.24 等区间写法，
+     *   区间取「起始日」入账，原文保留到活动说明中。
+     */
     private LocalDate parseDate(String text) {
 
         if (isBlank(text)) {
             return null;
         }
 
-        String value = text.trim()
-                .replace("年", "-")
-                .replace("月", "-")
-                .replace("日", "")
-                .replace("/", "-")
-                .replace(".", "-");
+        Matcher matcher = DATE_PATTERN.matcher(text.trim());
 
-        /* 20240501 */
-        if (value.matches("\\d{8}")) {
-
-            try {
-                return LocalDate.of(
-                        Integer.parseInt(value.substring(0, 4)),
-                        Integer.parseInt(value.substring(4, 6)),
-                        Integer.parseInt(value.substring(6, 8))
-                );
-            } catch (Exception e) {
-                return null;
-            }
-        }
-
-        String[] parts = value.split("-");
-
-        if (parts.length != 3) {
+        if (!matcher.find()) {
             return null;
         }
 
         try {
+
             return LocalDate.of(
-                    Integer.parseInt(parts[0]),
-                    Integer.parseInt(parts[1]),
-                    Integer.parseInt(parts[2])
+                    Integer.parseInt(matcher.group(1)),
+                    Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3))
             );
+
         } catch (Exception e) {
+
             return null;
         }
     }

@@ -29,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -171,7 +172,7 @@ class DepartmentScoreActivityImportServiceTest {
 
         ActivityBatchPreviewVO vo =
                 service.preview(
-                        twoBlockWorkbook(),
+                        twoBlockWorkbook("2024-05-01"),
                         APPLICANT_ID
                 );
 
@@ -331,6 +332,80 @@ class DepartmentScoreActivityImportServiceTest {
 
         assertEquals(STUDENT_A_ID, saved.get(0).getStudentId());
         assertEquals(STUDENT_B_ID, saved.get(1).getStudentId());
+    }
+
+    @Test
+    void previewAcceptsDotDate() {
+
+        ActivityBatchPreviewVO vo =
+                service.preview(
+                        twoBlockWorkbook("2026.10.22"),
+                        APPLICANT_ID
+                );
+
+        assertNull(vo.getMessage());
+        assertEquals("2026.10.22", vo.getActivityDate());
+        assertEquals(2, vo.getValidCount());
+    }
+
+    @Test
+    void previewAcceptsDateRange() {
+
+        ActivityBatchPreviewVO vo =
+                service.preview(
+                        twoBlockWorkbook("2026.9.20-2026.9.24"),
+                        APPLICANT_ID
+                );
+
+        assertNull(vo.getMessage());
+        assertEquals("2026.9.20-2026.9.24", vo.getActivityDate());
+        assertEquals(2, vo.getValidCount());
+    }
+
+    @Test
+    void previewAcceptsChineseDateRange() {
+
+        ActivityBatchPreviewVO vo =
+                service.preview(
+                        twoBlockWorkbook("2026年9月20日至2026年9月24日"),
+                        APPLICANT_ID
+                );
+
+        assertNull(vo.getMessage());
+        assertEquals(2, vo.getValidCount());
+    }
+
+    @Test
+    void importStoresRangeStartDateAndKeepsRangeText() {
+
+        Map<String, Object> result =
+                service.importBatch(
+                        twoBlockWorkbook("2026.9.20-2026.9.24"),
+                        APPLICANT_ID
+                );
+
+        assertEquals(2, result.get("successCount"));
+
+        ArgumentCaptor<DepartmentScoreActivity> activityCaptor =
+                ArgumentCaptor.forClass(DepartmentScoreActivity.class);
+
+        org.mockito.Mockito.verify(activityMapper)
+                .insert(activityCaptor.capture());
+
+        DepartmentScoreActivity activity = activityCaptor.getValue();
+
+        assertEquals(LocalDate.of(2026, 9, 20), activity.getActivityDate());
+        assertTrue(activity.getDescription().contains("2026.9.20-2026.9.24"));
+
+        ArgumentCaptor<DepartmentScoreApply> applyCaptor =
+                ArgumentCaptor.forClass(DepartmentScoreApply.class);
+
+        org.mockito.Mockito.verify(applyService, org.mockito.Mockito.times(2))
+                .save(applyCaptor.capture());
+
+        for (DepartmentScoreApply apply : applyCaptor.getAllValues()) {
+            assertEquals(LocalDate.of(2026, 9, 20), apply.getActivityDate());
+        }
     }
 
     @Test
@@ -570,7 +645,7 @@ class DepartmentScoreActivityImportServiceTest {
         }
     }
 
-    private MockMultipartFile twoBlockWorkbook() {
+    private MockMultipartFile twoBlockWorkbook(String dateText) {
 
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -591,7 +666,7 @@ class DepartmentScoreActivityImportServiceTest {
             info.createCell(0).setCellValue("举办部门");
             info.createCell(1).setCellValue("学习部");
             info.createCell(2).setCellValue("举办时间");
-            info.createCell(3).setCellValue("2024-05-01");
+            info.createCell(3).setCellValue(dateText);
             info.createCell(4).setCellValue("活动地点");
             info.createCell(5).setCellValue("大学生活动中心");
 
